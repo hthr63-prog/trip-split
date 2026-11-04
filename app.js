@@ -288,12 +288,13 @@ async function run(fn){
 const metaRef=()=>db.collection("trip").doc("meta");
 
 /* ---- who am I ---- */
-function readHash(){ const h=decodeURIComponent(location.hash.replace("#","")); return person(h)?h:null; }
+function readHash(){ let u=null; try{ u=new URLSearchParams(location.search).get("u"); }catch(e){} if(!u) u=decodeURIComponent(location.hash.replace("#","")); return person(u)?u:null; }
+function personalUrl(id){ return PAGE_URL+"?u="+encodeURIComponent(id); }
 function setMe(id,updateHash){
-  me=id; store("trip-me",id||""); if(id){ form.payer=id; if(updateHash&&location.hash!=="#"+id) location.hash=id; }
+  me=id; store("trip-me",id||""); if(id){ form.payer=id; if(updateHash){ try{ history.replaceState(null,"",personalUrl(id)); }catch(e){} } }
   $("newUser").hidden=true; renderAll();
 }
-$("switchBtn").onclick=()=>{ me=null; store("trip-me",""); try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){} renderAll(); $("picker").scrollIntoView({behavior:"smooth"}); };
+$("switchBtn").onclick=()=>{ me=null; store("trip-me",""); try{ history.replaceState(null,"",location.pathname); }catch(e){} renderAll(); $("picker").scrollIntoView({behavior:"smooth"}); };
 window.addEventListener("hashchange",()=>{ const w=readHash(); if(w&&w!==me) setMe(w,false); });
 $("nuCancel").onclick=()=>{ $("newUser").hidden=true; };
 $("nuSave").onclick=async()=>{
@@ -342,17 +343,26 @@ function openSettings(){
   sl.innerHTML=`<optgroup label="אסיה">${opt(ASIA)}</optgroup><optgroup label="מטבעות עיקריים">${opt(MAIN)}</optgroup><optgroup label="עוד מטבעות">${opt(OTHER)}</optgroup>`;
   sl.value=S.localCur;
   const L=$("links"); L.innerHTML="";
+  { const row=document.createElement("div"); row.className="linkrow";
+    const n=document.createElement("b"); n.textContent="קישור כללי";
+    const code=document.createElement("code"); code.textContent=PAGE_URL;
+    const btn=document.createElement("button"); btn.type="button"; btn.className="btn small"; btn.textContent="העתקת קישור";
+    btn.onclick=()=>shareLink(btn,code);
+    row.append(n,code,btn); L.appendChild(row); }
   for(const p of S.people){
     const row=document.createElement("div"); row.className="linkrow";
     const n=document.createElement("input"); n.id="pname-"+p.id; n.value=p.name; n.maxLength=20; n.setAttribute("aria-label","שם");
-    const code=document.createElement("code"); code.textContent=PAGE_URL+"#"+p.id;
+    const code=document.createElement("code"); code.textContent=personalUrl(p.id);
     const btn=document.createElement("button"); btn.type="button"; btn.className="btn small"; btn.textContent="העתקת קישור";
-    btn.onclick=()=>{ const ok=()=>{ btn.textContent="הועתק"; setTimeout(()=>btn.textContent="העתקת קישור",1500); };
-      if(navigator.share){ navigator.share({title:S.trip,url:code.textContent}).catch(()=>{}); return; }
-      try{ navigator.clipboard.writeText(code.textContent).then(ok,()=>selectText(code)); }catch(e){ selectText(code); } };
+    btn.onclick=()=>shareLink(btn,code);
     row.append(n,code,btn); L.appendChild(row);
   }
   showErr("sErr"); $("settings").hidden=false; renderHeader();
+}
+function shareLink(btn,code){
+  const ok=()=>{ btn.textContent="הועתק"; setTimeout(()=>btn.textContent="העתקת קישור",1500); };
+  if(navigator.share){ navigator.share({title:S.trip,url:code.textContent}).catch(()=>{}); return; }
+  try{ navigator.clipboard.writeText(code.textContent).then(ok,()=>selectText(code)); }catch(e){ selectText(code); }
 }
 function selectText(el){ const r=document.createRange(); r.selectNodeContents(el); const s=getSelection(); s.removeAllRanges(); s.addRange(r); }
 async function saveSettings(){
@@ -386,7 +396,7 @@ if(!cfg||!window.firebase){
 }
 firebase.initializeApp(cfg); db=firebase.firestore(); canWrite=true;
 let gotMeta=false, gotItems=false, firstMeta=true;
-const ready=()=>{ if(gotMeta&&gotItems&&!loaded){ loaded=true; form.among=null; me=readHash()||(person(load("trip-me"))?load("trip-me"):null); if(me) form.payer=me; } renderAll(); };
+const ready=()=>{ if(gotMeta&&gotItems&&!loaded){ loaded=true; form.among=null; me=readHash(); if(me) form.payer=me; } renderAll(); };
 const timer=setTimeout(()=>{ if(!loaded) $("status").textContent="הנתונים עדיין לא נטענו. בדקו את החיבור לאינטרנט."; },10000);
 metaRef().onSnapshot(async s=>{
   if(!s.exists){
