@@ -8,8 +8,5 @@ service cloud.firestore {
                             && request.resource.data.amount > 0
                             && request.resource.data.amount < 100000000;
     }
-    match /private/{key}/items/{id} {
-      allow read, write: if key.size() >= 32;
-    }
   }
 }

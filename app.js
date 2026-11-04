@@ -96,7 +96,7 @@ function compute(){
 
 /* ---- extra state ---- */
 let view="shared";                 // "shared" | "personal"
-let P=[], pLoaded=false, pUnsub=null, pEditingId=null, pform={cat:"food"};
+let P=[], pLoaded=false, pEditingId=null, pform={cat:"food"};
 let cur={fCur:null,pCur:null,cFrom:null,cTo:"ILS"};   // chosen currencies on the page
 let pinned=false;                  // opened through a personal link
 
@@ -363,7 +363,7 @@ function renderPersonal(){
     if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(conv(+it.amount,it.cur,"ILS"),"ILS"); right.appendChild(s); }
     const acts=document.createElement("div");
     const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>pStartEdit(it); acts.appendChild(e);
-    acts.appendChild(delBtn(()=>run(()=>pCol().doc(it.id).delete())));
+    acts.appendChild(delBtn(()=>run(()=>db.collection("expenses").doc(it.id).delete())));
     right.appendChild(acts);
     r.append(dot,main,right); box.appendChild(r);
   }
@@ -406,7 +406,7 @@ function setMe(id,updateUrl){
   me=id; if(id){ form.payer=id; if(updateUrl) syncUrl(); subscribePersonal(); }
   $("newUser").hidden=true; renderAll(); window.scrollTo({top:0});
 }
-$("switchBtn").onclick=()=>{ me=null; view="shared"; pinned=false; if(pUnsub){ pUnsub(); pUnsub=null; } try{ history.replaceState(null,"",location.pathname); }catch(e){} renderAll(); $("picker").scrollIntoView({behavior:"smooth"}); };
+$("switchBtn").onclick=()=>{ me=null; view="shared"; pinned=false; P=[]; try{ history.replaceState(null,"",location.pathname); }catch(e){} renderAll(); $("picker").scrollIntoView({behavior:"smooth"}); };
 $("viewBtn").onclick=()=>{ view= view==="personal"?"shared":"personal"; syncUrl(); renderAll(); window.scrollTo({top:0}); };
 $("nuCancel").onclick=()=>{ $("newUser").hidden=true; };
 $("nuSave").onclick=async()=>{
@@ -457,13 +457,38 @@ function pKey(){
   if(!k){ const a=new Uint8Array(18); crypto.getRandomValues(a); k=Array.from(a,x=>x.toString(16).padStart(2,"0")).join(""); store("trip-pk-"+me,k); }
   return k;
 }
-function pCol(){ return db.collection("private").doc(pKey()).collection("items"); }
-function subscribePersonal(){
-  if(pUnsub){ pUnsub(); pUnsub=null; } P=[]; pLoaded=false;
-  if(!db||!me) return;
-  pUnsub=pCol().onSnapshot(snap=>{ P=snap.docs.map(d=>({id:d.id,...d.data()})); pLoaded=true; if(view==="personal") renderAll(); },
-    e=>{ console.error(e); pLoaded=true; $("status").textContent= e&&e.code==="permission-denied" ? "ההוצאות האישיות עוד לא זמינות: צריך לעדכן את כללי האבטחה ב-Firebase." : "לא הצלחנו לטעון את ההוצאות האישיות."; if(view==="personal") renderAll(); });
+/* personal items live in the shared "expenses" collection, encrypted with the person's private key;
+   only someone holding that key can find (tag) and read (AES-GCM) them */
+let RAW=[], pCrypto=null, pCryptoFor=null, pSeq=0;
+const enc=new TextEncoder(), dec=new TextDecoder();
+const b64=buf=>btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function sha(s){ return new Uint8Array(await crypto.subtle.digest("SHA-256",enc.encode(s))); }
+async function pCtx(){
+  const k=pKey(); if(pCrypto&&pCryptoFor===k) return pCrypto;
+  const raw=await sha("key:"+k);
+  const key=await crypto.subtle.importKey("raw",raw,{name:"AES-GCM"},false,["encrypt","decrypt"]);
+  const tag=Array.from(await sha("tag:"+k),x=>x.toString(16).padStart(2,"0")).join("").slice(0,32);
+  pCrypto={key,tag}; pCryptoFor=k; return pCrypto;
 }
+async function pEncrypt(obj){
+  const {key,tag}=await pCtx(); const iv=crypto.getRandomValues(new Uint8Array(12));
+  const data=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,enc.encode(JSON.stringify(obj)));
+  return {kind:"private",amount:1,tag,iv:b64(iv),data:b64(data)};
+}
+async function refreshPersonal(){
+  const seq=++pSeq;
+  if(!me||!window.crypto||!crypto.subtle){ P=[]; pLoaded=true; return; }
+  try{
+    const {key,tag}=await pCtx(); const out=[];
+    for(const r of RAW){ if(r.tag!==tag) continue;
+      try{ const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(r.iv)},key,unb64(r.data)); out.push({...JSON.parse(dec.decode(plain)),id:r.id}); }catch(e){} }
+    if(seq!==pSeq) return;
+    P=out; pLoaded=true; if(view==="personal") renderAll();
+  }catch(e){ console.error(e); pLoaded=true; }
+}
+function subscribePersonal(){ P=[]; pLoaded=false; refreshPersonal(); }
+async function pWrite(id,obj){ const doc=await pEncrypt(obj); return db.collection("expenses").doc(id).set(doc); }
 $("pCur").onclick=()=>openCurPicker("באיזה מטבע שילמת?",cur.pCur,c=>{ cur.pCur=c; renderPersonal(); });
 function pStartEdit(it){
   pEditingId=it.id; pform.cat=it.cat||"other"; cur.pCur=it.cur;
@@ -481,7 +506,7 @@ async function pSave(){
   if(!(amount>0)) return showErr("pErr","צריך להזין סכום גדול מאפס");
   const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat,date:$("pDate").value||todayStr()};
   const id=pEditingId||uid("m");
-  const ok=await run(()=> pEditingId ? pCol().doc(id).update(data) : pCol().doc(id).set({...data,createdAt:Date.now()}));
+  const old=P.find(x=>x.id===id); const ok=await run(()=>pWrite(id,{...data,createdAt:old?.createdAt||Date.now()}));
   if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; }
 }
 $("pSave").onclick=pSave; $("pCancel").onclick=pReset;
@@ -562,7 +587,8 @@ metaRef().onSnapshot(async s=>{
   gotMeta=true; clearTimeout(timer); if(/נטענו/.test($("status").textContent)) $("status").textContent=""; ready();
 },e=>{ console.error(e); $("status").textContent="לא הצלחנו לטעון את הנתונים. בדקו את כללי האבטחה ב-Firebase."; });
 db.collection("expenses").onSnapshot(snap=>{
-  S.items=snap.docs.map(d=>({id:d.id,...d.data()}));
+  const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+  S.items=all.filter(x=>x.kind!=="private"); RAW=all.filter(x=>x.kind==="private"); refreshPersonal();
   gotItems=true; ready();
 },e=>{ console.error(e); });
 })();
