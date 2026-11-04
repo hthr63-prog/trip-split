@@ -678,18 +678,25 @@ applyTheme(themePref());
 renderAll();
 refreshRates(); setInterval(refreshRates,60*60*1000);
 /* pick up new versions by itself (the home-screen app otherwise keeps an old copy) */
-async function checkUpdate(){
+async function checkUpdate(manual){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return;
-    const v=(await r.json()).v; if(!v||!window.APP_V||v===window.APP_V||window.APP_V.startsWith("__")) return;
+    const v=(await r.json()).v; if(!v||!window.APP_V||v===window.APP_V||window.APP_V.startsWith("__")) return "latest";
     let tried=null; try{ tried=sessionStorage.getItem("trip-upd"); }catch(e){}
-    if(tried===v) return;
+    if(tried===v&&!manual) return "stuck";
     try{ sessionStorage.setItem("trip-upd",v); }catch(e){}
     const q=new URLSearchParams(location.search); q.set("r",v);
     location.replace(location.pathname+"?"+q.toString()+location.hash);
   }catch(e){}
 }
-checkUpdate(); setInterval(checkUpdate,10*60*1000);
+function verLabel(v){ const m=/^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)/.exec(v||""); if(!m) return "—";
+  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])); return d.toLocaleString("he-IL",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }
+$("verText").textContent="הגרסה אצלך: "+verLabel(window.APP_V);
+$("verCheck").onclick=async()=>{ $("verCheck").disabled=true; $("verCheck").textContent="בודק…";
+  const res=await checkUpdate(true);
+  $("verCheck").disabled=false;
+  $("verCheck").textContent= res==="latest" ? "✓ זו הגרסה העדכנית" : res==="stuck" ? "יש גרסה חדשה, סגרו ופתחו את האפליקציה" : "בדיקת עדכונים"; };
+checkUpdate(); setInterval(()=>checkUpdate(),10*60*1000);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") checkUpdate(); });
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&(!S.fx.at||Date.now()-S.fx.at>3600e3)) refreshRates(); });
 
