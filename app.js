@@ -550,7 +550,7 @@ function startEdit(it){
   form.mode=it.pcts?"pct":"equal"; form.pcts=it.pcts?{...it.pcts}:{};
   $("fDesc").value=it.desc||""; $("fAmt").value=it.amount; $("fDate").value=it.date||todayStr(); cur.fCur=it.cur;
   renderForm();
-  $("formTitle").textContent="✏️ עריכת הוצאה"; $("saveBtn").textContent="שמירת שינויים"; $("cancelEdit").hidden=false;
+  renderCal("fDate"); $("formTitle").textContent="✏️ עריכת הוצאה"; $("saveBtn").textContent="שמירת שינויים"; $("cancelEdit").hidden=false;
   $("form").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function resetForm(){
@@ -567,7 +567,7 @@ async function save(){
   const data={kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,date:$("fDate").value||todayStr()};
   const id=editingId||uid("e");
   const ok=await run(()=> editingId ? db.collection("expenses").doc(id).update(data) : db.collection("expenses").doc(id).set({...data,createdAt:Date.now()}));
-  if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; }
+  if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; renderCal("fDate"); }
 }
 function addTransfer(from,to,amt){ const id=uid("t"); run(()=>db.collection("expenses").doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,date:todayStr(),createdAt:Date.now()})); }
 
@@ -576,7 +576,7 @@ $("pCur").onclick=()=>openCurPicker("באיזה מטבע שילמת?",cur.pCur,c
 function pStartEdit(it){
   pEditingId=it.id; pform.cat=it.cat||"other"; cur.pCur=it.cur;
   $("pDesc").value=it.desc||""; $("pAmt").value=it.amount; $("pDate").value=it.date||todayStr();
-  $("pFormTitle").textContent="✏️ עריכת הוצאה אישית"; $("pSave").textContent="שמירת שינויים"; $("pCancel").hidden=false; renderPersonal();
+  renderCal("pDate"); $("pFormTitle").textContent="✏️ עריכת הוצאה אישית"; $("pSave").textContent="שמירת שינויים"; $("pCancel").hidden=false; renderPersonal();
   $("pForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function pReset(){
@@ -592,7 +592,7 @@ async function pSave(){
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
   const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now()});
   const ok=await run(()=>db.collection("expenses").doc(id).set(doc));
-  if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; }
+  if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; renderCal("pDate"); }
 }
 $("pSave").onclick=pSave; $("pCancel").onclick=pReset;
 $("pAmt").addEventListener("input",()=>convHint("pAmt",cur.pCur,"pConv"));
@@ -673,6 +673,19 @@ $("cA").addEventListener("input",()=>{ cLast="A"; renderConv(); });
 $("cB").addEventListener("input",()=>{ cLast="B"; renderConv(); });
 $("cSwap").onclick=()=>{ const f=cur.cFrom; cur.cFrom=cur.cTo; cur.cTo=f; const a=$("cA").value; $("cA").value=$("cB").value; $("cB").value=a; $("cSwap").classList.toggle("spin"); renderConv(); };
 $("fDate").value=todayStr(); $("pDate").value=todayStr();
+/* calendar page next to each date field */
+function renderCal(id){
+  const v=$(id).value||todayStr(); const [y,m,d]=v.split("-").map(Number); const dt=new Date(y,m-1,d);
+  const b=$(id+"Cal"); b.querySelector(".cal-m").textContent=dt.toLocaleDateString("he-IL",{month:"short"});
+  b.querySelector(".cal-d").textContent=d;
+  b.querySelector(".cal-w").textContent= v===todayStr()? "היום" : dt.toLocaleDateString("he-IL",{weekday:"short"});
+  b.classList.toggle("today",v===todayStr());
+}
+for(const id of ["fDate","pDate"]){
+  $(id).addEventListener("input",()=>renderCal(id)); $(id).addEventListener("change",()=>renderCal(id));
+  $(id+"Cal").onclick=()=>{ const el=$(id); try{ el.showPicker(); }catch(e){ el.focus(); el.click(); } };
+  renderCal(id);
+}
 if(readParam("v")==="me") view="personal";
 applyTheme(themePref());
 renderAll();
