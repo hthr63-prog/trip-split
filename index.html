@@ -3,196 +3,249 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f5c6e">
+<meta name="theme-color" content="#6C4BFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>גלי ויאירוש במזרח</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Secular+One&family=Assistant:wght@400;600;700&display=swap">
-<style id="appstyle">
-/* Layout: one column like a boarding pass. Personal balance "ticket" on top, converter, add-expense form, then the ledger by day */
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;700&display=swap">
+<script>
+/* apply the saved theme before first paint */
+try{ const t=localStorage.getItem("trip-theme"); if(t==="light"||t==="dark") document.documentElement.dataset.theme=t; }catch(e){}
+</script>
+<style>
+/* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
-  --bg:#eef3f2; --surface:#ffffff; --ink:#123a44; --muted:#5d7479; --line:#d3dfdd;
-  --sea:#0f5c6e; --sun:#f2c230; --sun-ink:#3a2d00; --good:#1f7a4d; --bad:#b4413a;
-  --on-sea:#ffffff;
-  --p0:#0f5c6e; --p1:#c2602a; --p2:#6a4fb3; --p3:#2f8a4f; --p4:#b03c76; --p5:#7a6a1e;
-  --display:"Secular One","Assistant",system-ui,sans-serif;
-  --body:"Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --bg:#F3F1FF; --surface:#FFFFFF; --surface-2:#EEEAFE; --ink:#1E1640; --muted:#6B6492; --line:#E1DCF7;
+  --brand:#6C4BFF; --brand-ink:#FFFFFF; --hot:#FF4D8D; --sun:#FFC93C; --sun-ink:#3A2600; --mint:#14C9A5;
+  --good:#0E9F7E; --bad:#E5484D;
+  --grad:linear-gradient(135deg,#6C4BFF 0%,#B84DFF 55%,#FF4D8D 100%);
+  --grad-ink:#FFFFFF;
+  --shadow:0 14px 34px -16px rgba(76,52,200,.45);
+  --p0:#6C4BFF; --p1:#FF4D8D; --p2:#14B8A6; --p3:#F59E0B; --p4:#3B82F6; --p5:#E11D48;
+  --display:"Fredoka","Rubik",system-ui,sans-serif;
+  --body:"Rubik",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --r:20px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0c1a1e; --surface:#13262b; --ink:#e3eeec; --muted:#93aaae; --line:#25404a;
-  --sea:#17677a; --sun:#f2c230; --sun-ink:#2b2100; --good:#5cc78f; --bad:#ef8a80;
-  --p0:#3a9db3; --p1:#d9773f; --p2:#8a72d1; --p3:#46a867; --p4:#cf5a94; --p5:#a08d2c; color-scheme:dark}}
+  --bg:#100C22; --surface:#1B1636; --surface-2:#251E47; --ink:#F2EFFF; --muted:#A79FCB; --line:#2E2756;
+  --brand:#8F74FF; --brand-ink:#FFFFFF; --hot:#FF6FA3; --sun:#FFD25E; --sun-ink:#2E1F00; --mint:#2EE0B9;
+  --good:#3DDBAF; --bad:#FF7B80;
+  --grad:linear-gradient(135deg,#5A3BE8 0%,#A23BE8 55%,#E83B7E 100%);
+  --shadow:0 18px 40px -18px rgba(0,0,0,.8);
+  --p0:#8F74FF; --p1:#FF6FA3; --p2:#2DD4BF; --p3:#FBBF24; --p4:#60A5FA; --p5:#FB7185;
+  color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0c1a1e; --surface:#13262b; --ink:#e3eeec; --muted:#93aaae; --line:#25404a;
-  --sea:#17677a; --sun:#f2c230; --sun-ink:#2b2100; --good:#5cc78f; --bad:#ef8a80;
-  --p0:#3a9db3; --p1:#d9773f; --p2:#8a72d1; --p3:#46a867; --p4:#cf5a94; --p5:#a08d2c; color-scheme:dark}
+  --bg:#100C22; --surface:#1B1636; --surface-2:#251E47; --ink:#F2EFFF; --muted:#A79FCB; --line:#2E2756;
+  --brand:#8F74FF; --brand-ink:#FFFFFF; --hot:#FF6FA3; --sun:#FFD25E; --sun-ink:#2E1F00; --mint:#2EE0B9;
+  --good:#3DDBAF; --bad:#FF7B80;
+  --grad:linear-gradient(135deg,#5A3BE8 0%,#A23BE8 55%,#E83B7E 100%);
+  --shadow:0 18px 40px -18px rgba(0,0,0,.8);
+  --p0:#8F74FF; --p1:#FF6FA3; --p2:#2DD4BF; --p3:#FBBF24; --p4:#60A5FA; --p5:#FB7185;
+  color-scheme:dark}
+:root[data-theme="light"]{color-scheme:light}
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;direction:rtl;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-.wrap{max-width:640px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
-h1,h2{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance}
-h1{font-size:1.8rem;line-height:1.15}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;direction:rtl;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  background-image:radial-gradient(600px 300px at 100% -10%,color-mix(in srgb,var(--hot) 14%,transparent),transparent 70%),radial-gradient(500px 300px at -10% 10%,color-mix(in srgb,var(--brand) 16%,transparent),transparent 70%);
+  background-repeat:no-repeat}
+.wrap{max-width:620px;margin:0 auto;padding-block:18px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:1.85rem;line-height:1.1;font-weight:700}
 h2{font-size:1.2rem}
 .num{font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-header .sub{color:var(--muted);font-size:.95rem}
-.hbtns{display:flex;gap:8px;flex-wrap:wrap}
-.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 14px;cursor:pointer}
-.btn:hover{border-color:var(--sea)}
-.btn.primary{background:var(--sea);color:var(--on-sea);border-color:var(--sea)}
+.hint{font-size:.85rem;color:var(--muted)}
+.err{color:var(--bad);font-size:.9rem;font-weight:500}
+.status{font-size:.85rem;color:var(--muted);text-align:center;min-height:1.2em}
+
+/* buttons */
+.btn{font:inherit;font-weight:500;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:9px 16px;cursor:pointer;transition:transform .12s ease,box-shadow .2s ease}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--grad);color:var(--grad-ink);border-color:transparent;box-shadow:var(--shadow)}
 .btn.sun{background:var(--sun);color:var(--sun-ink);border-color:var(--sun)}
-.btn.small{padding:4px 10px;font-size:.9rem}
-.btn.big{font-size:1.1rem;padding:12px 16px;flex:1 1 140px}
-.btn:focus-visible,input:focus-visible,select:focus-visible,.seg button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.btn.small{padding:5px 12px;font-size:.88rem}
+.btn.big{font-size:1.1rem;padding:14px 20px;font-family:var(--display);font-weight:600}
+.btn.block{width:100%}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.icon-btn{width:44px;height:44px;padding:0;display:grid;place-items:center;font-size:1.15rem}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:.9rem;color:var(--muted)}
+.btn:focus-visible,input:focus-visible,.chip:focus-visible,.seg button:focus-visible,.curbtn:focus-visible,.curitem:focus-visible,.pill:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.link{font:inherit;font-size:.82rem;background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;text-decoration:underline;text-underline-offset:3px}
+.link.danger{color:var(--bad)}
 
-/* ticket */
-.ticket{background:var(--sea);color:var(--on-sea);border-radius:18px;position:relative;overflow:hidden}
-.ticket .top{padding:20px 22px 16px;display:flex;flex-direction:column;gap:8px}
-.ticket .label{font-size:.8rem;letter-spacing:.06em;opacity:.85}
-.ticket .verdict{font-family:var(--display);font-size:1.6rem;line-height:1.25}
-.ticket .verdict .amt{color:var(--sun)}
-.ticket .breakdown{font-size:.9rem;opacity:.9;display:flex;flex-wrap:wrap;gap:4px 14px}
-.ticket .debts{display:flex;flex-direction:column;gap:6px;font-size:1rem}
+/* header */
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+header .t{min-width:0}
+header .sub{color:var(--muted);font-size:.92rem;margin-top:2px}
+.hbtns{display:flex;gap:8px;flex-shrink:0}
+#title{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* pills row: personal + currency */
+.toprow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toprow.one{grid-template-columns:1fr}
+.pill{display:flex;align-items:center;gap:10px;background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:6px 6px 6px 14px;cursor:pointer;font:inherit;color:var(--ink);min-width:0}
+.pill .badge{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-family:var(--display);flex-shrink:0}
+.pill .txt{display:flex;flex-direction:column;line-height:1.15;text-align:right;min-width:0}
+.pill .txt small{color:var(--muted);font-size:.72rem}
+.pill .txt b{font-family:var(--display);font-weight:600;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill.cur .badge{background:var(--sun);color:var(--sun-ink);font-size:1.05rem}
+.pill.mine .badge{background:var(--grad);color:var(--grad-ink)}
+.pill.mine[aria-pressed="true"]{border-color:var(--brand);background:var(--surface-2)}
+
+/* balance card */
+.ticket{background:var(--grad);color:var(--grad-ink);border-radius:28px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+.ticket::after{content:"";position:absolute;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.12);left:-60px;top:-90px;pointer-events:none}
+.ticket .top{padding:22px 22px 16px;display:flex;flex-direction:column;gap:8px;position:relative;z-index:1}
+.ticket .label{font-size:.82rem;opacity:.9;font-weight:500}
+.ticket .verdict{font-family:var(--display);font-weight:600;font-size:1.55rem;line-height:1.3}
+.ticket .verdict .amt{display:inline-block;background:rgba(255,255,255,.95);color:#2A1670;padding:0 12px;border-radius:14px;margin-top:4px;font-weight:700}
+.ticket .breakdown{font-size:.88rem;opacity:.92;display:flex;flex-wrap:wrap;gap:4px 14px}
+.ticket .debts{display:flex;flex-direction:column;gap:8px}
 .ticket .debt{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-.ticket .debt .btn{padding:4px 10px;font-size:.85rem}
-.ticket .perf{border-top:2px dashed rgba(255,255,255,.35);margin:0 14px}
-.ticket::before,.ticket::after{content:"";position:absolute;width:22px;height:22px;border-radius:50%;background:var(--bg);top:calc(var(--cut,150px) - 11px)}
-.ticket::before{right:-11px}.ticket::after{left:-11px}
-.ticket .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px 22px 14px}
+.ticket .debt .btn{background:rgba(255,255,255,.18);color:var(--grad-ink);border-color:rgba(255,255,255,.4);font-size:.88rem;padding:6px 12px}
+.ticket .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px 22px;background:rgba(0,0,0,.12);position:relative;z-index:1}
 .ticket .stats div{display:flex;flex-direction:column;min-width:0}
-.ticket .stats b{font-size:1.1rem;overflow-wrap:anywhere}
-.ticket .stats span{font-size:.8rem;opacity:.85}
-.showin{padding:0 22px 18px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.85rem}
-.showin .chip{font:inherit;font-size:.85rem;border:1px solid rgba(255,255,255,.45);background:transparent;color:var(--on-sea);border-radius:999px;padding:4px 10px;cursor:pointer}
-.showin .chip[aria-pressed="true"]{background:var(--on-sea);color:var(--sea);border-color:var(--on-sea);font-weight:700}
-.showin select{width:auto;background:transparent;color:var(--on-sea);border-color:rgba(255,255,255,.45);padding:4px 8px;font-size:.85rem;border-radius:999px}
-.showin select option,.showin select optgroup{color:#123a44;background:#fff}
+.ticket .stats b{font-size:1.05rem;font-weight:700;overflow-wrap:anywhere}
+.ticket .stats span{font-size:.76rem;opacity:.85}
+.showin{padding:12px 22px 18px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.85rem;position:relative;z-index:1}
+.showin .chip,.showin .curbtn{font:inherit;font-size:.82rem;border:1.5px solid rgba(255,255,255,.45);background:transparent;color:var(--grad-ink);border-radius:999px;padding:4px 11px;cursor:pointer}
+.showin .chip[aria-pressed="true"]{background:#fff;color:#2A1670;border-color:#fff;font-weight:700}
 
-/* panels */
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px}
+/* cards */
+.card{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+label{display:flex;flex-direction:column;gap:5px;font-size:.85rem;font-weight:500;color:var(--muted)}
+input{font:inherit;font-size:1rem;color:var(--ink);background:var(--surface-2);border:1.5px solid transparent;border-radius:14px;padding:11px 13px;width:100%;min-width:0}
+input:focus{border-color:var(--brand);outline:none}
+input::placeholder{color:var(--muted);opacity:.8}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .full{grid-column:1/-1}
-label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:600;color:var(--muted)}
-input,select{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;min-width:0}
-.amt-row{display:flex;gap:8px}
-.amt-row input{flex:1}
-.amt-row select{width:auto;max-width:48%}
-.seg{display:flex;flex-wrap:wrap;gap:6px}
-.seg button{font:inherit;font-size:.95rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 12px;cursor:pointer}
+.fieldset{display:flex;flex-direction:column;gap:7px}
+.fieldset > .hint{font-weight:500}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* big amount field */
+.amount{display:flex;align-items:center;gap:8px;background:var(--surface-2);border-radius:18px;padding:6px 6px 6px 14px}
+.amount input{background:transparent;border:none;font-family:var(--display);font-size:2rem;font-weight:600;padding:6px 8px;text-align:left}
+.amount input:focus{outline:none;border:none}
+.amount:focus-within{box-shadow:0 0 0 2px var(--brand)}
+
+.curbtn{font:inherit;font-weight:600;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:8px 12px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+.curbtn::after{content:"▾";font-size:.75em;opacity:.6}
+
+/* chips */
+.seg{display:flex;flex-wrap:wrap;gap:7px}
+.seg button,.chip{font:inherit;font-size:.93rem;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 13px;cursor:pointer;transition:transform .12s ease}
+.seg button:active{transform:scale(.96)}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
-.hint{font-size:.85rem;color:var(--muted)}
-.err{color:var(--bad);font-size:.9rem;font-weight:600}
-.actions{display:flex;gap:8px;justify-content:flex-start;flex-wrap:wrap;align-items:center}
-.fieldset{display:flex;flex-direction:column;gap:6px}
-.fieldset > .hint{font-weight:600}
 .pcts{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
 
-/* converter */
-.conv{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:end}
-.conv .swap{align-self:end;height:44px;width:44px;padding:0;font-size:1.2rem}
-.conv-out{display:flex;flex-direction:column;gap:2px;background:var(--bg);border-radius:12px;padding:12px 14px}
-.conv-out b{font-family:var(--display);font-weight:400;font-size:1.7rem;line-height:1.2;overflow-wrap:anywhere}
+/* money changer */
+.changer{display:flex;flex-direction:column;gap:6px;position:relative}
+.side{background:var(--surface-2);border-radius:18px;padding:10px 12px 10px 14px;display:flex;align-items:center;gap:10px}
+.side .lab{font-size:.75rem;color:var(--muted);display:block}
+.side .val{flex:1;min-width:0}
+.side input{background:transparent;border:none;padding:0;font-family:var(--display);font-size:1.8rem;font-weight:600;text-align:left}
+.side input:focus{outline:none;border:none}
+.side:focus-within{box-shadow:0 0 0 2px var(--brand)}
+.swap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;border:4px solid var(--surface);background:var(--grad);color:var(--grad-ink);font-size:1.2rem;cursor:pointer;display:grid;place-items:center;box-shadow:var(--shadow);z-index:1;transition:transform .3s ease}
+.swap.spin{transform:translate(-50%,-50%) rotate(180deg)}
+.rate{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
 .quick{display:flex;flex-wrap:wrap;gap:6px}
 
-/* picker & links */
-.who{display:flex;gap:10px;flex-wrap:wrap}
-.links{display:flex;flex-direction:column;gap:8px}
-.linkrow{display:grid;grid-template-columns:minmax(4em,auto) 1fr auto;gap:8px;align-items:center}
-.linkrow input{font-size:.9rem;padding:6px 8px}
-.linkrow code{font-size:.8rem;background:var(--bg);border-radius:8px;padding:6px 8px;overflow-x:auto;white-space:nowrap;direction:ltr;min-width:0;user-select:all}
-
 /* categories */
-.cats{display:flex;flex-direction:column;gap:8px}
-.cat{display:grid;grid-template-columns:6.5em 1fr auto;gap:10px;align-items:center;font-size:.95rem}
-.bar{height:10px;background:var(--bg);border-radius:6px;overflow:hidden}
-.bar i{display:block;height:100%;background:var(--sea);border-radius:6px}
+.cats{display:flex;flex-direction:column;gap:9px}
+.cat{display:grid;grid-template-columns:7em 1fr auto;gap:10px;align-items:center;font-size:.93rem}
+.bar{height:12px;background:var(--surface-2);border-radius:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--grad);border-radius:8px}
 
 /* ledger */
-.day{display:flex;flex-direction:column;gap:6px}
-.day h3{font-size:.85rem;color:var(--muted);margin:6px 0 0;font-weight:700;letter-spacing:.03em}
-.row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
-.dot{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;font-size:.95rem}
+.stack{display:flex;flex-direction:column;gap:10px}
+.day{display:flex;flex-direction:column;gap:7px}
+.day h3{font-size:.85rem;color:var(--muted);margin:8px 2px 0;font-weight:600}
+.row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:11px 12px;background:var(--surface);border:1.5px solid var(--line);border-radius:18px}
+.dot{width:40px;height:40px;border-radius:14px;display:grid;place-items:center;font-weight:700;color:#fff;font-size:1rem;font-family:var(--display)}
 .dot.c0{background:var(--p0)}.dot.c1{background:var(--p1)}.dot.c2{background:var(--p2)}.dot.c3{background:var(--p3)}.dot.c4{background:var(--p4)}.dot.c5{background:var(--p5)}
 .row .main{min-width:0}
-.row .t{font-weight:700;overflow-wrap:anywhere}
-.row .m{font-size:.85rem;color:var(--muted)}
-.row .r{text-align:left;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
-.row .r b{font-size:1.05rem}
-.row .mine{font-size:.8rem;font-weight:700}
+.row .t{font-weight:500;overflow-wrap:anywhere}
+.row .m{font-size:.8rem;color:var(--muted)}
+.row .r{text-align:left;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.row .r b{font-size:1.05rem;font-family:var(--display);font-weight:600}
+.row .mine{font-size:.78rem;font-weight:700}
 .mine.plus{color:var(--good)}.mine.minus{color:var(--bad)}
 .row.transfer{background:transparent;border-style:dashed}
-.link{font:inherit;font-size:.8rem;background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;text-decoration:underline}
-.link.danger{color:var(--bad)}
-.empty{text-align:center;color:var(--muted);padding:28px 12px;border:1px dashed var(--line);border-radius:14px}
-.status{font-size:.85rem;color:var(--muted);text-align:center}
-.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.empty{text-align:center;color:var(--muted);padding:26px 14px;border:1.5px dashed var(--line);border-radius:18px}
+.note{background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:10px 14px;font-size:.9rem;color:var(--muted)}
+
+/* picker */
+.who{display:flex;gap:10px;flex-wrap:wrap}
+.who .btn{flex:1 1 140px}
+
+/* personal */
+.lock{text-align:center;align-items:center}
+.lock label{width:100%;text-align:right}
+.lock .big-emoji{font-size:2.4rem;line-height:1}
+.mine-ticket{background:linear-gradient(135deg,#0E9488 0%,#0EA5A4 40%,#6C4BFF 100%)}
+.foot{text-align:center;font-size:.85rem;color:var(--muted)}
+
+/* sheets */
+.sheet-bg{position:fixed;inset:0;background:rgba(12,6,40,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);color:var(--ink);width:100%;max-width:560px;max-height:88vh;overflow-y:auto;border-radius:26px 26px 0 0;display:flex;flex-direction:column;gap:14px;padding:18px max(18px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));-webkit-overflow-scrolling:touch}
+@media (min-width:640px){.sheet-bg{align-items:center}.sheet{border-radius:26px}}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.curlist{display:flex;flex-direction:column;gap:2px;min-height:200px}
+.curlist h3{font-size:.8rem;color:var(--muted);margin:10px 4px 4px;font-family:var(--body);font-weight:500}
+.curitem{font:inherit;text-align:right;display:grid;grid-template-columns:3em 1fr auto;gap:10px;align-items:center;background:none;border:none;border-radius:14px;padding:10px 8px;color:var(--ink);cursor:pointer}
+.curitem:hover{background:var(--surface-2)}
+.curitem[aria-selected="true"]{background:var(--surface-2);font-weight:700}
+.curitem .sym{font-weight:700;text-align:center;font-family:var(--display);font-size:1.1rem}
+.curitem .code{color:var(--muted);font-size:.82rem;direction:ltr}
+.sec{display:flex;flex-direction:column;gap:10px;padding-top:4px}
+.sec + .sec{border-top:1.5px solid var(--line);padding-top:14px}
+.sec h3{font-size:1rem}
+.prow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center}
+.prow input{padding:9px 12px}
+.prow .confirm{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.88rem;color:var(--bad)}
+
 @media (max-width:440px){
   .grid{grid-template-columns:1fr}
-  .conv{grid-template-columns:1fr}
-  .conv .swap{justify-self:center;transform:rotate(90deg)}
+  .cat{grid-template-columns:6em 1fr auto}
   .ticket .verdict{font-size:1.35rem}
-  .linkrow{grid-template-columns:1fr auto}
-  .linkrow code{grid-column:1/-1;grid-row:2}
+  h1{font-size:1.55rem}
 }
-@media (prefers-reduced-motion:no-preference){.bar i{transition:width .4s ease}}
-
-/* currency bar, picker sheet, personal view */
-.curbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
-.curbar-text{display:flex;flex-direction:column;gap:0;min-width:0}
-.curbar-text b{font-family:var(--display);font-weight:400;font-size:1.25rem}
-.curbtn{font:inherit;font-size:1rem;font-weight:700;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
-.curbtn::after{content:"▾";font-size:.8em;opacity:.6}
-.curbtn.wide{width:100%;justify-content:space-between}
-.curbtn:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
-.showin .curbtn{background:transparent;color:var(--on-sea);border-color:rgba(255,255,255,.45);padding:4px 10px;font-size:.85rem;font-weight:400;border-radius:999px}
-.sheet-bg{position:fixed;inset:0;background:rgba(5,20,25,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center}
-.sheet{background:var(--surface);color:var(--ink);width:100%;max-width:560px;max-height:85vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;gap:10px;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-@media (min-width:640px){.sheet-bg{align-items:center}.sheet{border-radius:18px}}
-.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.curlist{overflow-y:auto;display:flex;flex-direction:column;gap:2px;-webkit-overflow-scrolling:touch}
-.curlist h3{font-size:.8rem;color:var(--muted);margin:10px 4px 4px;letter-spacing:.04em}
-.curitem{font:inherit;text-align:right;display:grid;grid-template-columns:3.2em 1fr auto;gap:10px;align-items:center;background:none;border:none;border-radius:10px;padding:10px 8px;color:var(--ink);cursor:pointer}
-.curitem:hover,.curitem:focus-visible{background:var(--bg);outline:none}
-.curitem[aria-selected="true"]{background:var(--bg);font-weight:700}
-.curitem .sym{font-weight:700;text-align:center}
-.curitem .code{color:var(--muted);font-size:.85rem;direction:ltr}
-.stack{display:flex;flex-direction:column;gap:10px}
-.view{display:flex;flex-direction:column;gap:20px}
-.mine-ticket{background:var(--ink);color:var(--surface)}
-.mine-ticket .showin .chip,.mine-ticket .showin .curbtn{color:var(--surface);border-color:rgba(255,255,255,.35)}
-.mine-ticket .showin .chip[aria-pressed="true"]{background:var(--surface);color:var(--ink)}
-.foot{text-align:center;font-size:.85rem;color:var(--muted)}
-details.device summary{cursor:pointer;font-weight:600}
-details.device{gap:10px}
-.mine-ticket .verdict .amt{color:inherit;text-decoration:underline;text-decoration-color:var(--sun);text-decoration-thickness:3px;text-underline-offset:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .5s ease}}
 </style>
-
 </head>
 <body>
 <div class="wrap" id="app">
   <header>
-    <div>
+    <div class="t">
       <h1 id="title">גלי ויאירוש במזרח</h1>
       <div class="sub" id="sub">החשבון המשותף של הטיול</div>
     </div>
     <div class="hbtns">
-      <button class="btn" id="viewBtn" type="button" hidden>ההוצאות האישיות שלי</button>
-      <button class="btn" id="settingsBtn" type="button" aria-label="הגדרות">הגדרות</button>
+      <button class="btn icon-btn" id="themeBtn" type="button" aria-label="מצב בהיר או כהה">🌙</button>
+      <button class="btn icon-btn" id="settingsBtn" type="button" aria-label="הגדרות">⚙️</button>
     </div>
   </header>
 
   <div class="note" id="roNote" hidden></div>
 
-  <div class="curbar" id="curbar">
-    <div class="curbar-text"><span class="hint">המטבע של המדינה עכשיו</span><b id="localName">฿ באט תאילנדי</b><span class="hint">הוצאות חדשות נרשמות בו אוטומטית</span></div>
-    <button class="btn sun" id="localBtn" type="button">החלפת מטבע</button>
+  <div class="toprow" id="toprow">
+    <button class="pill mine" id="viewBtn" type="button" aria-pressed="false" hidden>
+      <span class="badge" id="meBadge">י</span><span class="txt"><small id="viewSmall">רק שלך</small><b id="viewTxt">האישי שלי</b></span>
+    </button>
+    <button class="pill cur" id="localBtn" type="button">
+      <span class="badge" id="localSym">฿</span><span class="txt"><small>המטבע עכשיו · להחלפה</small><b id="localName">באט תאילנדי</b></span>
+    </button>
   </div>
 
-  <section class="panel" id="picker" hidden>
-    <h2>מי פותח את הדף?</h2>
+  <section class="card" id="picker" hidden>
+    <h2>מי פותח את הדף? 👋</h2>
     <div class="hint">כל אחד רואה את החשבון מהצד שלו: כמה הוא חייב וכמה חייבים לו.</div>
     <div class="who" id="whoBtns"></div>
     <div class="fieldset" id="newUser" hidden>
@@ -205,152 +258,176 @@ details.device{gap:10px}
     </div>
   </section>
 
-  <section class="panel" id="settings" hidden>
-    <h2>הגדרות הטיול</h2>
-    <div class="grid">
-      <label class="full">שם הטיול<input id="sTrip" maxlength="40"></label>
-    </div>
-    <div class="fieldset">
-      <span class="hint">המשתתפים והקישורים</span>
-      <div class="links" id="links"></div>
-    </div>
-    <div class="actions">
-      <button class="btn primary" id="saveSettings" type="button">שמירה</button>
-      <button class="btn" id="closeSettings" type="button">סגירה</button>
-    </div>
-    <div class="err" id="sErr" hidden></div>
-  </section>
+  <!-- shared view -->
+  <div id="viewShared" class="stack" style="gap:18px">
+    <section class="ticket" id="ticket">
+      <div class="top">
+        <div class="label" id="ticketLbl">המאזן שלך</div>
+        <div class="verdict" id="verdict"></div>
+        <div class="debts" id="debts"></div>
+        <div class="breakdown" id="breakdown"></div>
+      </div>
+      <div class="stats">
+        <div><b class="num" id="stTotal">—</b><span>סה״כ הטיול</span></div>
+        <div><b class="num" id="stPaid">—</b><span id="stPaidLbl">שילמת</span></div>
+        <div><b class="num" id="stShare">—</b><span id="stShareLbl">החלק שלך</span></div>
+      </div>
+      <div class="showin" id="showin"></div>
+    </section>
 
-  <div id="viewShared" class="view">
-  <section class="ticket" id="ticket">
-    <div class="top" id="ticketTop">
-      <div class="label" id="ticketLbl">המאזן שלך</div>
-      <div class="verdict" id="verdict"></div>
-      <div class="debts" id="debts"></div>
-      <div class="breakdown" id="breakdown"></div>
-    </div>
-    <div class="perf"></div>
-    <div class="stats">
-      <div><b class="num" id="stTotal">—</b><span>סה״כ הטיול</span></div>
-      <div><b class="num" id="stPaid">—</b><span id="stPaidLbl">שילמת</span></div>
-      <div><b class="num" id="stShare">—</b><span id="stShareLbl">החלק שלך</span></div>
-    </div>
-    <div class="showin" id="showin"></div>
-  </section>
-
-  <section class="panel" id="convPanel">
-    <div class="filters"><h2>מחשבון המרה</h2><span class="hint" id="fxDate"></span></div>
-    <div class="conv">
-      <label>סכום<div class="amt-row"><input id="cAmt" class="num" inputmode="decimal" value="100"><button class="curbtn" id="cFrom" type="button" aria-label="ממטבע"></button></div></label>
-      <button class="btn swap" id="cSwap" type="button" aria-label="החלפת כיוון">⇄</button>
-      <label>אל<button class="curbtn wide" id="cTo" type="button" aria-label="אל מטבע"></button></label>
-    </div>
-    <div class="conv-out">
-      <b class="num" id="cOut">—</b>
-      <span class="hint num" id="cRate"></span>
-    </div>
-    <div class="quick" id="cQuick"></div>
-  </section>
-
-  <section class="panel" id="form" hidden>
-    <h2 id="formTitle">הוצאה משותפת חדשה</h2>
-    <div class="grid">
-      <label class="full">על מה?<input id="fDesc" maxlength="60" placeholder="ארוחת ערב, מונית, מלון…"></label>
-      <label>סכום
-        <div class="amt-row"><input id="fAmt" class="num" inputmode="decimal" placeholder="0"><button class="curbtn" id="fCur" type="button" aria-label="מטבע"></button></div>
-      </label>
-      <label>תאריך<input id="fDate" type="date"></label>
-      <div class="full hint num" id="fConv"></div>
-      <div class="full fieldset"><span class="hint">מי שילם?</span><div class="seg" id="fPayer"></div></div>
-      <div class="full fieldset">
+    <section class="card" id="form" hidden>
+      <div class="card-head"><h2 id="formTitle">➕ הוצאה משותפת</h2></div>
+      <div class="amount"><input id="fAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="fCur" type="button" aria-label="מטבע"></button></div>
+      <div class="hint num" id="fConv"></div>
+      <div class="grid">
+        <label>על מה?<input id="fDesc" maxlength="60" placeholder="ארוחת ערב, טוקטוק, מלון…"></label>
+        <label>תאריך<input id="fDate" type="date"></label>
+      </div>
+      <div class="fieldset"><span class="hint">מי שילם?</span><div class="seg" id="fPayer"></div></div>
+      <div class="fieldset">
         <span class="hint">בין מי מתחלקים?</span>
         <div class="seg" id="fAmong"></div>
         <div class="seg" id="fMode"></div>
         <div class="pcts" id="fPcts" hidden></div>
       </div>
-      <div class="full fieldset"><span class="hint">קטגוריה</span><div class="seg" id="fCat"></div></div>
-    </div>
-    <div class="err" id="fErr" hidden></div>
-    <div class="actions">
-      <button class="btn primary" id="saveBtn" type="button">הוספה</button>
-      <button class="btn" id="cancelEdit" type="button" hidden>ביטול עריכה</button>
-    </div>
-  </section>
-
-  <section class="panel" id="catPanel" hidden>
-    <h2>לאן הלך הכסף</h2>
-    <div class="cats" id="cats"></div>
-  </section>
-
-  <section class="stack">
-    <div class="filters">
-      <h2>כל ההוצאות המשותפות</h2>
-      <div class="seg" id="filter"></div>
-    </div>
-    <div id="ledger"></div>
-  </section>
-  </div>
-
-  <div id="viewPersonal" class="view" hidden>
-    <section class="ticket mine-ticket" id="pTicket">
-      <div class="top" id="pTicketTop">
-        <div class="label" id="pLbl">ההוצאות שלך בטיול</div>
-        <div class="verdict"><span>סה״כ הוצאת </span><span class="amt num" id="pAll">—</span></div>
-      </div>
-      <div class="perf"></div>
-      <div class="stats">
-        <div><b class="num" id="pOwn">—</b><span>הוצאות אישיות</span></div>
-        <div><b class="num" id="pShare">—</b><span>החלק שלך במשותפות</span></div>
-        <div><b class="num" id="pToday">—</b><span>היום (אישי + משותף)</span></div>
-      </div>
-      <div class="showin" id="pShowin"></div>
-    </section>
-
-    <section class="panel" id="pForm">
-      <h2 id="pFormTitle">הוצאה אישית חדשה</h2>
-      <div class="grid">
-        <label class="full">על מה?<input id="pDesc" maxlength="60" placeholder="מזכרת, קפה, עיסוי…"></label>
-        <label>סכום
-          <div class="amt-row"><input id="pAmt" class="num" inputmode="decimal" placeholder="0"><button class="curbtn" id="pCur" type="button" aria-label="מטבע"></button></div>
-        </label>
-        <label>תאריך<input id="pDate" type="date"></label>
-        <div class="full hint num" id="pConv"></div>
-        <div class="full fieldset"><span class="hint">קטגוריה</span><div class="seg" id="pCat"></div></div>
-      </div>
-      <div class="err" id="pErr" hidden></div>
+      <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="fCat"></div></div>
+      <div class="err" id="fErr" hidden></div>
       <div class="actions">
-        <button class="btn primary" id="pSave" type="button">הוספה</button>
-        <button class="btn" id="pCancel" type="button" hidden>ביטול עריכה</button>
+        <button class="btn primary big" id="saveBtn" type="button">הוספה</button>
+        <button class="btn" id="cancelEdit" type="button" hidden>ביטול עריכה</button>
       </div>
     </section>
 
-    <section class="panel" id="pCatPanel" hidden>
-      <h2>לאן הלך הכסף שלך</h2>
-      <div class="hint">כולל החלק שלך בהוצאות המשותפות</div>
-      <div class="cats" id="pCats"></div>
+    <section class="card" id="convPanel">
+      <div class="card-head"><h2>💱 חילוף כספים</h2><span class="hint" id="fxDate"></span></div>
+      <div class="changer">
+        <div class="side"><div class="val"><span class="lab">יש לי</span><input id="cA" class="num" inputmode="decimal" value="100" aria-label="סכום מקור"></div><button class="curbtn" id="cFrom" type="button" aria-label="ממטבע"></button></div>
+        <button class="swap" id="cSwap" type="button" aria-label="החלפת כיוון">⇅</button>
+        <div class="side"><div class="val"><span class="lab">מקבלים</span><input id="cB" class="num" inputmode="decimal" aria-label="סכום יעד"></div><button class="curbtn" id="cTo" type="button" aria-label="אל מטבע"></button></div>
+      </div>
+      <div class="rate num" id="cRate"></div>
+      <div class="quick" id="cQuick"></div>
+    </section>
+
+    <section class="card" id="catPanel" hidden>
+      <h2>📊 לאן הלך הכסף</h2>
+      <div class="cats" id="cats"></div>
     </section>
 
     <section class="stack">
-      <h2>ההוצאות האישיות שלך</h2>
-      <div id="pLedger"></div>
+      <div class="card-head">
+        <h2>🧾 כל ההוצאות המשותפות</h2>
+        <div class="seg" id="filter"></div>
+      </div>
+      <div id="ledger"></div>
+    </section>
+  </div>
+
+  <!-- personal view -->
+  <div id="viewPersonal" class="stack" style="gap:18px" hidden>
+    <section class="card lock" id="lockCard" hidden>
+      <div class="big-emoji">🔐</div>
+      <h2 id="lockTitle">החשבון האישי שלך</h2>
+      <div class="hint" id="lockText"></div>
+      <label>סיסמה<input id="lockPw" type="password" autocomplete="current-password"></label>
+      <label id="lockPw2Wrap" hidden>שוב, לאימות<input id="lockPw2" type="password" autocomplete="new-password"></label>
+      <div class="err" id="lockErr" hidden></div>
+      <button class="btn primary big block" id="lockBtn" type="button">כניסה</button>
     </section>
 
-    <details class="panel device">
-      <summary>לפתוח את ההוצאות האישיות גם ממכשיר אחר</summary>
-      <div class="hint">הקישור הזה פותח את ההוצאות האישיות שלך בכל מכשיר. אל תשלחו אותו לאחרים: מי שיש לו אותו רואה את ההוצאות האישיות שלך.</div>
-      <div class="linkrow"><b>קישור פרטי</b><code id="pKeyLink"></code><button class="btn small" id="pKeyCopy" type="button">העתקת קישור</button></div>
-    </details>
+    <div id="pBody" class="stack" style="gap:18px">
+      <section class="ticket mine-ticket" id="pTicket">
+        <div class="top">
+          <div class="label" id="pLbl">ההוצאות שלך בטיול</div>
+          <div class="verdict">סה״כ הוצאת<br><span class="amt num" id="pAll">—</span></div>
+        </div>
+        <div class="stats">
+          <div><b class="num" id="pOwn">—</b><span>אישיות</span></div>
+          <div><b class="num" id="pShare">—</b><span>החלק שלך במשותפות</span></div>
+          <div><b class="num" id="pToday">—</b><span>היום</span></div>
+        </div>
+        <div class="showin" id="pShowin"></div>
+      </section>
+
+      <section class="card" id="pForm">
+        <div class="card-head"><h2 id="pFormTitle">➕ הוצאה אישית</h2><span class="hint" id="pOnly">רק את/ה רואה</span></div>
+        <div class="amount"><input id="pAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="pCur" type="button" aria-label="מטבע"></button></div>
+        <div class="hint num" id="pConv"></div>
+        <div class="grid">
+          <label>על מה?<input id="pDesc" maxlength="60" placeholder="מזכרת, קפה, עיסוי…"></label>
+          <label>תאריך<input id="pDate" type="date"></label>
+        </div>
+        <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="pCat"></div></div>
+        <div class="err" id="pErr" hidden></div>
+        <div class="actions">
+          <button class="btn primary big" id="pSave" type="button">הוספה</button>
+          <button class="btn" id="pCancel" type="button" hidden>ביטול עריכה</button>
+        </div>
+      </section>
+
+      <section class="card" id="pCatPanel" hidden>
+        <h2>📊 לאן הלך הכסף שלך</h2>
+        <div class="hint">כולל החלק שלך בהוצאות המשותפות</div>
+        <div class="cats" id="pCats"></div>
+      </section>
+
+      <section class="stack">
+        <h2>🧾 ההוצאות האישיות שלך</h2>
+        <div id="pLedger"></div>
+      </section>
+    </div>
   </div>
 
   <div class="status" id="status"></div>
   <footer class="foot" id="foot" hidden><span id="footWho"></span> <button class="link" id="switchBtn" type="button">החלפת משתמש</button></footer>
 </div>
 
+<!-- currency picker -->
 <div class="sheet-bg" id="curSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="curSheetTitle">
     <div class="sheet-head"><h2 id="curSheetTitle">בחירת מטבע</h2><button class="btn small" id="curClose" type="button">סגירה</button></div>
-    <input id="curSearch" type="search" placeholder="חיפוש: שם מטבע, מדינה או קוד (PHP, פיליפינים…)" autocomplete="off">
+    <input id="curSearch" type="search" placeholder="🔎 חיפוש: מטבע, מדינה או קוד (פסו, באלי, PHP)" autocomplete="off">
     <div class="curlist" id="curList"></div>
+  </div>
+</div>
+
+<!-- settings -->
+<div class="sheet-bg" id="setSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="sheet-head"><h2 id="setTitle">⚙️ הגדרות</h2><button class="btn small" id="setClose" type="button">סגירה</button></div>
+
+    <div class="sec">
+      <h3>עיצוב</h3>
+      <div class="seg" id="themeSeg"></div>
+    </div>
+
+    <div class="sec">
+      <h3>שם הטיול</h3>
+      <div class="actions"><input id="sTrip" maxlength="40" style="flex:1;width:auto"><button class="btn small" id="sTripSave" type="button">שמירה</button></div>
+    </div>
+
+    <div class="sec">
+      <h3>משתתפים וקישורים</h3>
+      <div class="hint">קישור אישי פותח את האפליקציה ישר בתור אותו אדם. הקישור הכללי מאפשר לבחור או להצטרף.</div>
+      <div class="prow"><b>קישור כללי</b><span></span><button class="btn small" id="shareAll" type="button">שיתוף</button></div>
+      <div id="people" class="stack" style="gap:10px"></div>
+      <div class="err" id="sErr" hidden></div>
+    </div>
+
+    <div class="sec" id="acctSec" hidden>
+      <h3>החשבון האישי שלי</h3>
+      <div class="hint" id="acctText"></div>
+      <div class="actions">
+        <button class="btn small" id="acctChange" type="button">שינוי סיסמה</button>
+        <button class="btn small" id="acctLogout" type="button">יציאה במכשיר הזה</button>
+      </div>
+      <div id="pwChange" class="stack" hidden>
+        <label>סיסמה חדשה<input id="newPw" type="password" autocomplete="new-password"></label>
+        <label>שוב, לאימות<input id="newPw2" type="password" autocomplete="new-password"></label>
+        <div class="err" id="pwErr" hidden></div>
+        <button class="btn primary" id="pwSave" type="button">שמירת סיסמה חדשה</button>
+      </div>
+    </div>
   </div>
 </div>
 
