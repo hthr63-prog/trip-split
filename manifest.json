@@ -1,7 +1,6 @@
 {
   "name": "גלי ויאירוש במזרח",
   "short_name": "גלי ויאירוש",
-  "start_url": "./",
   "display": "standalone",
   "background_color": "#F3F1FF",
   "theme_color": "#6C4BFF",

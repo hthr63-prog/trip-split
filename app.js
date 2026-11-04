@@ -514,6 +514,7 @@ $("localBtn").onclick=()=>openCurPicker("באיזו מדינה אתם עכשיו
 });
 
 /* ---- who am I ---- */
+function isApp(){ try{ return navigator.standalone===true||matchMedia("(display-mode: standalone)").matches; }catch(e){ return false; } }
 function readParam(name){ try{ return new URLSearchParams(location.search).get(name); }catch(e){ return null; } }
 function readHash(){ let u=readParam("u"); if(!u) u=decodeURIComponent(location.hash.replace("#","")); return person(u)?u:null; }
 function personalUrl(id){ return PAGE_URL+"?u="+encodeURIComponent(id); }
@@ -523,10 +524,10 @@ function syncUrl(){
   try{ history.replaceState(null,"",u); }catch(e){}
 }
 function setMe(id,updateUrl){
-  me=id; acct=null; acctFor=null; if(id){ form.payer=id; if(updateUrl) syncUrl(); refreshPersonal(); }
+  me=id; acct=null; acctFor=null; store("trip-me",id||""); if(id){ form.payer=id; if(updateUrl) syncUrl(); refreshPersonal(); }
   $("newUser").hidden=true; renderAll(); window.scrollTo({top:0});
 }
-$("switchBtn").onclick=()=>{ me=null; view="shared"; P=[]; acct=null; try{ history.replaceState(null,"",location.pathname); }catch(e){} renderAll(); $("picker").scrollIntoView({behavior:"smooth"}); };
+$("switchBtn").onclick=()=>{ me=null; store("trip-me",""); view="shared"; P=[]; acct=null; try{ history.replaceState(null,"",location.pathname); }catch(e){} renderAll(); $("picker").scrollIntoView({behavior:"smooth"}); };
 $("viewBtn").onclick=()=>{ view= view==="personal"?"shared":"personal"; syncUrl(); renderAll(); window.scrollTo({top:0}); };
 $("nuCancel").onclick=()=>{ $("newUser").hidden=true; };
 $("nuSave").onclick=async()=>{
@@ -689,6 +690,9 @@ let gotMeta=false, gotItems=false, firstMeta=true;
 const ready=()=>{
   if(gotMeta&&gotItems&&!loaded){
     loaded=true; form.among=null; me=readHash();
+    /* opened from the home-screen icon: remember who uses this phone */
+    if(!me&&isApp()){ const r=load("trip-me"); if(person(r)&&!person(r).archived){ me=r; syncUrl(); } }
+    if(me) store("trip-me",me);
     if(me){ form.payer=me; refreshPersonal(); if(location.hash&&!readParam("u")) syncUrl(); }
     else view="shared";
   }
