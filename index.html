@@ -130,6 +130,8 @@ input[type="date"]{-webkit-appearance:none;appearance:none;display:block;max-wid
 input[type="date"]::-webkit-date-and-time-value{text-align:right;margin:0}
 input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .grid > label{min-width:0}
+.datebox{display:block;width:100%;max-width:100%;overflow:hidden;border-radius:14px;background:var(--surface-2)}
+.datebox input[type="date"]{width:100%;-webkit-min-logical-width:calc(100% - 26px);background:transparent}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .full{grid-column:1/-1}
 .fieldset{display:flex;flex-direction:column;gap:7px}
@@ -290,7 +292,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
       <div class="hint num" id="fConv"></div>
       <div class="grid">
         <label>על מה?<input id="fDesc" maxlength="60" placeholder="ארוחת ערב, טוקטוק, מלון…"></label>
-        <label>תאריך<input id="fDate" type="date"></label>
+        <label>תאריך<span class="datebox"><input id="fDate" type="date"></span></label>
       </div>
       <div class="fieldset"><span class="hint">מי שילם?</span><div class="seg" id="fPayer"></div></div>
       <div class="fieldset">
@@ -364,7 +366,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
         <div class="hint num" id="pConv"></div>
         <div class="grid">
           <label>על מה?<input id="pDesc" maxlength="60" placeholder="מזכרת, קפה, עיסוי…"></label>
-          <label>תאריך<input id="pDate" type="date"></label>
+          <label>תאריך<span class="datebox"><input id="pDate" type="date"></span></label>
         </div>
         <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="pCat"></div></div>
         <div class="err" id="pErr" hidden></div>
