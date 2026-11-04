@@ -305,6 +305,14 @@ function catBars(el,panel,cats){
   }
 }
 function renderCats(){ catBars("cats","catPanel",compute().cats); }
+/* the time an expense was logged, shown in the time zone of the place it was logged */
+function hereTz(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone||null; }catch(e){ return null; } }
+function timeOf(it){
+  if(!it.createdAt||it.source==="splitwise") return "";
+  const o={hour:"2-digit",minute:"2-digit",hourCycle:"h23"};
+  try{ return new Date(it.createdAt).toLocaleTimeString("he-IL",it.tz?{...o,timeZone:it.tz}:o); }catch(e){ return new Date(it.createdAt).toLocaleTimeString("he-IL",o); }
+}
+function withTime(it,txt){ const t=timeOf(it); return t? "🕒 "+t+" · "+txt : txt; }
 function dayLabel(s){
   if(!s) return "ללא תאריך"; if(s===todayStr()) return "היום";
   const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d).toLocaleDateString("he-IL",{weekday:"long",day:"numeric",month:"long"});
@@ -333,8 +341,8 @@ function renderLedger(){
     const dot=document.createElement("div"); dot.className="dot c"+pidx(it.payer); dot.textContent=nm(it.payer).trim().charAt(0);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; const m=document.createElement("div"); m.className="m";
-    if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent="סגירת חשבון"; }
-    else{ t.textContent=it.desc||"הוצאה"; m.textContent=nm(it.payer)+" "+g.paid(it.payer)+" · "+splitText(it)+" · "+(CATNAME[it.cat]||"✨ אחר"); }
+    if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent=withTime(it,"סגירת חשבון"); }
+    else{ t.textContent=it.desc||"הוצאה"; m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+splitText(it)+" · "+(CATNAME[it.cat]||"✨ אחר")); }
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
@@ -476,7 +484,7 @@ function renderPersonal(){
     const dot=document.createElement("div"); dot.className="dot c"+pidx(me); dot.textContent=nm(me).trim().charAt(0);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; t.textContent=it.desc||"הוצאה";
-    const m=document.createElement("div"); m.className="m"; m.textContent="אישי · "+(CATNAME[it.cat]||"✨ אחר");
+    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(it,"אישי · "+(CATNAME[it.cat]||"✨ אחר"));
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
@@ -566,10 +574,10 @@ async function save(){
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
   const data={kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,date:$("fDate").value||todayStr()};
   const id=editingId||uid("e");
-  const ok=await run(()=> editingId ? db.collection("expenses").doc(id).update(data) : db.collection("expenses").doc(id).set({...data,createdAt:Date.now()}));
+  const ok=await run(()=> editingId ? db.collection("expenses").doc(id).update(data) : db.collection("expenses").doc(id).set({...data,createdAt:Date.now(),tz:hereTz()}));
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; }
 }
-function addTransfer(from,to,amt){ const id=uid("t"); run(()=>db.collection("expenses").doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,date:todayStr(),createdAt:Date.now()})); }
+function addTransfer(from,to,amt){ const id=uid("t"); run(()=>db.collection("expenses").doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,date:todayStr(),createdAt:Date.now(),tz:hereTz()})); }
 
 /* ---- personal form ---- */
 $("pCur").onclick=()=>openCurPicker("באיזה מטבע שילמת?",cur.pCur,c=>{ cur.pCur=c; renderPersonal(); });
@@ -590,7 +598,7 @@ async function pSave(){
   const c=await loadAcct(); if(!c) return showErr("pErr","צריך להיכנס לחשבון האישי קודם.");
   const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat,date:$("pDate").value||todayStr()};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
-  const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now()});
+  const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz()});
   const ok=await run(()=>db.collection("expenses").doc(id).set(doc));
   if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; }
 }
