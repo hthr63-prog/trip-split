@@ -132,14 +132,6 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .grid > label{min-width:0}
 .datebox{display:block;width:100%;max-width:100%;overflow:hidden;border-radius:14px;background:var(--surface-2)}
 .datebox input[type="date"]{width:100%;-webkit-min-logical-width:calc(100% - 26px);background:transparent}
-.datefield{display:flex;align-items:center;gap:10px;min-width:0}
-.datefield .datebox{flex:1}
-.cal{flex-shrink:0;width:58px;height:62px;border-radius:14px;overflow:hidden;border:1.5px solid var(--line);background:var(--surface);padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:stretch;box-shadow:0 6px 14px -8px rgba(76,52,200,.5);transition:transform .15s ease;font:inherit;color:var(--ink)}
-.cal:active{transform:scale(.95) rotate(-3deg)}
-.cal-m{background:var(--grad);color:#fff;font-size:.68rem;font-weight:700;line-height:1;padding:4px 0 3px;text-align:center}
-.cal-d{font-family:var(--display);font-weight:700;font-size:1.5rem;line-height:1.05;text-align:center;margin-top:2px}
-.cal-w{font-size:.62rem;color:var(--muted);text-align:center;line-height:1}
-.cal.today .cal-w{color:var(--hot);font-weight:700}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .full{grid-column:1/-1}
 .fieldset{display:flex;flex-direction:column;gap:7px}
@@ -300,7 +292,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
       <div class="hint num" id="fConv"></div>
       <div class="grid">
         <label>על מה?<input id="fDesc" maxlength="60" placeholder="ארוחת ערב, טוקטוק, מלון…"></label>
-        <div class="fieldset"><span class="hint" style="font-weight:500">תאריך</span><div class="datefield"><button class="cal" id="fDateCal" type="button" aria-label="בחירת תאריך"><span class="cal-m"></span><span class="cal-d"></span><span class="cal-w"></span></button><span class="datebox"><input id="fDate" type="date" aria-label="תאריך"></span></div></div>
+        <label>תאריך<span class="datebox"><input id="fDate" type="date"></span></label>
       </div>
       <div class="fieldset"><span class="hint">מי שילם?</span><div class="seg" id="fPayer"></div></div>
       <div class="fieldset">
@@ -374,7 +366,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
         <div class="hint num" id="pConv"></div>
         <div class="grid">
           <label>על מה?<input id="pDesc" maxlength="60" placeholder="מזכרת, קפה, עיסוי…"></label>
-          <div class="fieldset"><span class="hint" style="font-weight:500">תאריך</span><div class="datefield"><button class="cal" id="pDateCal" type="button" aria-label="בחירת תאריך"><span class="cal-m"></span><span class="cal-d"></span><span class="cal-w"></span></button><span class="datebox"><input id="pDate" type="date" aria-label="תאריך"></span></div></div>
+          <label>תאריך<span class="datebox"><input id="pDate" type="date"></span></label>
         </div>
         <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="pCat"></div></div>
         <div class="err" id="pErr" hidden></div>
