@@ -138,6 +138,36 @@ input,select{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);b
   .linkrow code{grid-column:1/-1;grid-row:2}
 }
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .4s ease}}
+
+/* currency bar, picker sheet, personal view */
+.curbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+.curbar-text{display:flex;flex-direction:column;gap:0;min-width:0}
+.curbar-text b{font-family:var(--display);font-weight:400;font-size:1.25rem}
+.curbtn{font:inherit;font-size:1rem;font-weight:700;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.curbtn::after{content:"▾";font-size:.8em;opacity:.6}
+.curbtn.wide{width:100%;justify-content:space-between}
+.curbtn:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.showin .curbtn{background:transparent;color:var(--on-sea);border-color:rgba(255,255,255,.45);padding:4px 10px;font-size:.85rem;font-weight:400;border-radius:999px}
+.sheet-bg{position:fixed;inset:0;background:rgba(5,20,25,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);color:var(--ink);width:100%;max-width:560px;max-height:85vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;gap:10px;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+@media (min-width:640px){.sheet-bg{align-items:center}.sheet{border-radius:18px}}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.curlist{overflow-y:auto;display:flex;flex-direction:column;gap:2px;-webkit-overflow-scrolling:touch}
+.curlist h3{font-size:.8rem;color:var(--muted);margin:10px 4px 4px;letter-spacing:.04em}
+.curitem{font:inherit;text-align:right;display:grid;grid-template-columns:3.2em 1fr auto;gap:10px;align-items:center;background:none;border:none;border-radius:10px;padding:10px 8px;color:var(--ink);cursor:pointer}
+.curitem:hover,.curitem:focus-visible{background:var(--bg);outline:none}
+.curitem[aria-selected="true"]{background:var(--bg);font-weight:700}
+.curitem .sym{font-weight:700;text-align:center}
+.curitem .code{color:var(--muted);font-size:.85rem;direction:ltr}
+.stack{display:flex;flex-direction:column;gap:10px}
+.view{display:flex;flex-direction:column;gap:20px}
+.mine-ticket{background:var(--ink);color:var(--surface)}
+.mine-ticket .showin .chip,.mine-ticket .showin .curbtn{color:var(--surface);border-color:rgba(255,255,255,.35)}
+.mine-ticket .showin .chip[aria-pressed="true"]{background:var(--surface);color:var(--ink)}
+.foot{text-align:center;font-size:.85rem;color:var(--muted)}
+details.device summary{cursor:pointer;font-weight:600}
+details.device{gap:10px}
+.mine-ticket .verdict .amt{color:inherit;text-decoration:underline;text-decoration-color:var(--sun);text-decoration-thickness:3px;text-underline-offset:6px}
 </style>
 
 </head>
@@ -149,16 +179,21 @@ input,select{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);b
       <div class="sub" id="sub">החשבון המשותף של הטיול</div>
     </div>
     <div class="hbtns">
-      <button class="btn" id="switchBtn" type="button" hidden>החלפת משתמש</button>
-      <button class="btn" id="settingsBtn" type="button">הגדרות</button>
+      <button class="btn" id="viewBtn" type="button" hidden>ההוצאות האישיות שלי</button>
+      <button class="btn" id="settingsBtn" type="button" aria-label="הגדרות">הגדרות</button>
     </div>
   </header>
 
   <div class="note" id="roNote" hidden></div>
 
+  <div class="curbar" id="curbar">
+    <div class="curbar-text"><span class="hint">המטבע של המדינה עכשיו</span><b id="localName">฿ באט תאילנדי</b><span class="hint">הוצאות חדשות נרשמות בו אוטומטית</span></div>
+    <button class="btn sun" id="localBtn" type="button">החלפת מטבע</button>
+  </div>
+
   <section class="panel" id="picker" hidden>
     <h2>מי פותח את הדף?</h2>
-    <div class="hint">כל אחד רואה את החשבון מהצד שלו: כמה הוא חייב וכמה חייבים לו. הבחירה נשמרת במכשיר הזה.</div>
+    <div class="hint">כל אחד רואה את החשבון מהצד שלו: כמה הוא חייב וכמה חייבים לו.</div>
     <div class="who" id="whoBtns"></div>
     <div class="fieldset" id="newUser" hidden>
       <div class="grid">
@@ -174,10 +209,9 @@ input,select{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);b
     <h2>הגדרות הטיול</h2>
     <div class="grid">
       <label class="full">שם הטיול<input id="sTrip" maxlength="40"></label>
-      <label class="full">המטבע של המדינה שאתם בה עכשיו<select id="sLocal"></select></label>
     </div>
     <div class="fieldset">
-      <span class="hint">המשתתפים והקישור האישי של כל אחד</span>
+      <span class="hint">המשתתפים והקישורים</span>
       <div class="links" id="links"></div>
     </div>
     <div class="actions">
@@ -187,6 +221,7 @@ input,select{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);b
     <div class="err" id="sErr" hidden></div>
   </section>
 
+  <div id="viewShared" class="view">
   <section class="ticket" id="ticket">
     <div class="top" id="ticketTop">
       <div class="label" id="ticketLbl">המאזן שלך</div>
@@ -206,9 +241,9 @@ input,select{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);b
   <section class="panel" id="convPanel">
     <div class="filters"><h2>מחשבון המרה</h2><span class="hint" id="fxDate"></span></div>
     <div class="conv">
-      <label>סכום<div class="amt-row"><input id="cAmt" class="num" inputmode="decimal" value="100"><select id="cFrom" aria-label="ממטבע"></select></div></label>
+      <label>סכום<div class="amt-row"><input id="cAmt" class="num" inputmode="decimal" value="100"><button class="curbtn" id="cFrom" type="button" aria-label="ממטבע"></button></div></label>
       <button class="btn swap" id="cSwap" type="button" aria-label="החלפת כיוון">⇄</button>
-      <label>אל<select id="cTo"></select></label>
+      <label>אל<button class="curbtn wide" id="cTo" type="button" aria-label="אל מטבע"></button></label>
     </div>
     <div class="conv-out">
       <b class="num" id="cOut">—</b>
@@ -218,11 +253,11 @@ input,select{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);b
   </section>
 
   <section class="panel" id="form" hidden>
-    <h2 id="formTitle">הוצאה חדשה</h2>
+    <h2 id="formTitle">הוצאה משותפת חדשה</h2>
     <div class="grid">
       <label class="full">על מה?<input id="fDesc" maxlength="60" placeholder="ארוחת ערב, מונית, מלון…"></label>
       <label>סכום
-        <div class="amt-row"><input id="fAmt" class="num" inputmode="decimal" placeholder="0"><select id="fCur" aria-label="מטבע"></select></div>
+        <div class="amt-row"><input id="fAmt" class="num" inputmode="decimal" placeholder="0"><button class="curbtn" id="fCur" type="button" aria-label="מטבע"></button></div>
       </label>
       <label>תאריך<input id="fDate" type="date"></label>
       <div class="full hint num" id="fConv"></div>
@@ -247,16 +282,77 @@ input,select{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);b
     <div class="cats" id="cats"></div>
   </section>
 
-  <section style="display:flex;flex-direction:column;gap:10px">
+  <section class="stack">
     <div class="filters">
-      <h2>כל ההוצאות</h2>
+      <h2>כל ההוצאות המשותפות</h2>
       <div class="seg" id="filter"></div>
     </div>
     <div id="ledger"></div>
   </section>
+  </div>
+
+  <div id="viewPersonal" class="view" hidden>
+    <section class="ticket mine-ticket" id="pTicket">
+      <div class="top" id="pTicketTop">
+        <div class="label" id="pLbl">ההוצאות שלך בטיול</div>
+        <div class="verdict"><span>סה״כ הוצאת </span><span class="amt num" id="pAll">—</span></div>
+      </div>
+      <div class="perf"></div>
+      <div class="stats">
+        <div><b class="num" id="pOwn">—</b><span>הוצאות אישיות</span></div>
+        <div><b class="num" id="pShare">—</b><span>החלק שלך במשותפות</span></div>
+        <div><b class="num" id="pToday">—</b><span>היום (אישי + משותף)</span></div>
+      </div>
+      <div class="showin" id="pShowin"></div>
+    </section>
+
+    <section class="panel" id="pForm">
+      <h2 id="pFormTitle">הוצאה אישית חדשה</h2>
+      <div class="grid">
+        <label class="full">על מה?<input id="pDesc" maxlength="60" placeholder="מזכרת, קפה, עיסוי…"></label>
+        <label>סכום
+          <div class="amt-row"><input id="pAmt" class="num" inputmode="decimal" placeholder="0"><button class="curbtn" id="pCur" type="button" aria-label="מטבע"></button></div>
+        </label>
+        <label>תאריך<input id="pDate" type="date"></label>
+        <div class="full hint num" id="pConv"></div>
+        <div class="full fieldset"><span class="hint">קטגוריה</span><div class="seg" id="pCat"></div></div>
+      </div>
+      <div class="err" id="pErr" hidden></div>
+      <div class="actions">
+        <button class="btn primary" id="pSave" type="button">הוספה</button>
+        <button class="btn" id="pCancel" type="button" hidden>ביטול עריכה</button>
+      </div>
+    </section>
+
+    <section class="panel" id="pCatPanel" hidden>
+      <h2>לאן הלך הכסף שלך</h2>
+      <div class="hint">כולל החלק שלך בהוצאות המשותפות</div>
+      <div class="cats" id="pCats"></div>
+    </section>
+
+    <section class="stack">
+      <h2>ההוצאות האישיות שלך</h2>
+      <div id="pLedger"></div>
+    </section>
+
+    <details class="panel device">
+      <summary>לפתוח את ההוצאות האישיות גם ממכשיר אחר</summary>
+      <div class="hint">הקישור הזה פותח את ההוצאות האישיות שלך בכל מכשיר. אל תשלחו אותו לאחרים: מי שיש לו אותו רואה את ההוצאות האישיות שלך.</div>
+      <div class="linkrow"><b>קישור פרטי</b><code id="pKeyLink"></code><button class="btn small" id="pKeyCopy" type="button">העתקת קישור</button></div>
+    </details>
+  </div>
+
   <div class="status" id="status"></div>
+  <footer class="foot" id="foot" hidden><span id="footWho"></span> <button class="link" id="switchBtn" type="button">החלפת משתמש</button></footer>
 </div>
 
+<div class="sheet-bg" id="curSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="curSheetTitle">
+    <div class="sheet-head"><h2 id="curSheetTitle">בחירת מטבע</h2><button class="btn small" id="curClose" type="button">סגירה</button></div>
+    <input id="curSearch" type="search" placeholder="חיפוש: שם מטבע, מדינה או קוד (PHP, פיליפינים…)" autocomplete="off">
+    <div class="curlist" id="curList"></div>
+  </div>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
