@@ -677,6 +677,20 @@ if(readParam("v")==="me") view="personal";
 applyTheme(themePref());
 renderAll();
 refreshRates(); setInterval(refreshRates,60*60*1000);
+/* pick up new versions by itself (the home-screen app otherwise keeps an old copy) */
+async function checkUpdate(){
+  try{
+    const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return;
+    const v=(await r.json()).v; if(!v||!window.APP_V||v===window.APP_V||window.APP_V.startsWith("__")) return;
+    let tried=null; try{ tried=sessionStorage.getItem("trip-upd"); }catch(e){}
+    if(tried===v) return;
+    try{ sessionStorage.setItem("trip-upd",v); }catch(e){}
+    const q=new URLSearchParams(location.search); q.set("r",v);
+    location.replace(location.pathname+"?"+q.toString()+location.hash);
+  }catch(e){}
+}
+checkUpdate(); setInterval(checkUpdate,10*60*1000);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") checkUpdate(); });
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&(!S.fx.at||Date.now()-S.fx.at>3600e3)) refreshRates(); });
 
 /* ---- data ---- */
