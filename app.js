@@ -766,9 +766,11 @@ function renderStats(){
   /* by country, across the whole trip */
   /* the country card has its own switch: couple (shared expenses) or personal (only my own) */
   const canMine=!!me; if(!canMine) locScope="couple";
-  seg($("stLocScope"),canMine?[["couple","👫 זוגי"],["mine","🙋 אישי"]]:[["couple","👫 זוגי"]],v=>v===locScope,v=>{locScope=v;renderStats();});
-  const locItems= locScope==="mine" ? (acct&&acctFor===me?P:[]) : S.items.filter(it=>it.kind!=="transfer");
-  $("stLocNote").hidden=!(locScope==="mine"&&!(acct&&acctFor===me));
+  seg($("stLocScope"),canMine?[["couple","👫 זוגי"],["mine","🙋 אישי"],["both","💜 משולב"]]:[["couple","👫 זוגי"]],v=>v===locScope,v=>{locScope=v;renderStats();});
+  const mineP= acct&&acctFor===me ? P : [];
+  /* both: my own expenses plus my part of the shared ones */
+  const locItems= locScope==="mine" ? mineP : locScope==="both" ? [...myShareItems(),...mineP] : S.items.filter(it=>it.kind!=="transfer");
+  $("stLocNote").hidden=!((locScope==="mine"||locScope==="both")&&!(acct&&acctFor===me));
   const byC={}; for(const it of locItems){ const k=locOf(it); const o=byC[k]||(byC[k]={v:0,days:new Set()}); o.v+=conv(+it.amount||0,it.cur,showCur); if(it.date) o.days.add(it.date); }
   const ce=Object.entries(byC).sort((x,y)=>y[1].v-x[1].v); const cm=ce[0]?.[1].v||1; const CC=$("stCountries"); CC.innerHTML="";
   if(!ce.length) CC.innerHTML='<div class="hint">עוד אין הוצאות.</div>';
