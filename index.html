@@ -314,7 +314,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
       <div class="amount"><input id="fAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="fCur" type="button" aria-label="מטבע"></button></div>
       <div class="hint num" id="fConv"></div>
       <div class="grid">
-        <label>על מה?<input id="fDesc" maxlength="60" placeholder="ארוחת ערב, טוקטוק, מלון…"></label>
+        <label>שם ההוצאה *<input id="fDesc" required maxlength="60" placeholder="ארוחת ערב, סליפר לצ׳יאנג מאי…"></label>
         <label>תאריך<span class="datebox"><input id="fDate" type="date"></span></label>
       </div>
       <div class="fieldset"><span class="hint">מי שילם?</span><div class="seg" id="fPayer"></div></div>
@@ -389,7 +389,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
         <div class="amount"><input id="pAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="pCur" type="button" aria-label="מטבע"></button></div>
         <div class="hint num" id="pConv"></div>
         <div class="grid">
-          <label>על מה?<input id="pDesc" maxlength="60" placeholder="מזכרת, קפה, עיסוי…"></label>
+          <label>שם ההוצאה *<input id="pDesc" required maxlength="60" placeholder="מזכרת, קפה, עיסוי…"></label>
           <label>תאריך<span class="datebox"><input id="pDate" type="date"></span></label>
         </div>
         <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="pCat"></div><input id="pCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
@@ -516,8 +516,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>window.APP_V="20261105071320";</script>
-<script src="config.js?v=20261105071320"></script>
-<script src="app.js?v=20261105071320"></script>
+<script>window.APP_V="20261105071727";</script>
+<script src="config.js?v=20261105071727"></script>
+<script src="app.js?v=20261105071727"></script>
 </body>
 </html>

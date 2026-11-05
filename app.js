@@ -6,7 +6,9 @@ const ASIA=[["THB","באט תאילנדי","฿"],["VND","דונג וייטנא�
 const MAIN=[["ILS","שקל","₪"],["USD","דולר אמריקאי","$"],["EUR","אירו","€"]];
 const OTHER=[["GBP","לירה שטרלינג","£"],["CHF","פרנק שווייצרי"],["AUD","דולר אוסטרלי","A$"],["NZD","דולר ניו זילנדי","NZ$"],["CAD","דולר קנדי","C$"],["TRY","לירה טורקית","₺"],["GEL","לארי גאורגי"],["AMD","דראם ארמני"],["AZN","מנאט אזרבייג׳ני"],["JOD","דינר ירדני"],["EGP","לירה מצרית"],["QAR","ריאל קטארי"],["OMR","ריאל עומאני"],["MAD","דירהם מרוקאי"],["ZAR","ראנד דרום אפריקאי"],["KES","שילינג קנייתי"],["TZS","שילינג טנזני"],["FJD","דולר פיג׳י"],["MXN","פסו מקסיקני"],["BRL","ריאל ברזילאי"],["ARS","פסו ארגנטינאי"],["CLP","פסו צ׳יליאני"],["PEN","סול פרואני"],["COP","פסו קולומביאני"],["CZK","קורונה צ׳כית"],["HUF","פורינט הונגרי"],["PLN","זלוטי פולני"],["RON","לאו רומני"],["BGN","לב בולגרי"],["RSD","דינר סרבי"],["SEK","קרונה שוודית"],["NOK","קרונה נורווגית"],["DKK","קרונה דנית"],["ISK","קרונה איסלנדית"]];
 const CUR={}; for(const [c,n,s] of [...MAIN,...ASIA,...OTHER]) CUR[c]={name:n,sym:s||""};
-const CATS=[["food","🍜 אוכל"],["stay","🛏️ לינה"],["transport","🛺 תחבורה"],["scooter","🛵 קטנוע ודלק"],["flights","✈️ טיסות"],["fun","🎢 אטרקציות"],["tours","🥾 טרקים וסיורים"],["party","🍻 מסיבות ושתייה"],["massage","💆 עיסויים"],["laundry","🧺 כביסה"],["sim","📶 סים ואינטרנט"],["visa","🛂 ויזה"],["health","💊 בריאות"],["shop","🛍️ קניות"],["other","✨ אחר"]];
+const CATS=[["food","🍜 אוכל"],["stay","🛏️ לינה"],["transport","🛺 תחבורה"],["fun","🎢 אטרקציות"],["party","🎉 מסיבות"],["laundry","🧺 כביסה"],["shop","🛍️ קניות"],["other","✨ אחר"]];
+/* names for categories that were offered briefly, so older entries still read well */
+const OLD_CATS={scooter:"🛵 קטנוע ודלק",flights:"✈️ טיסות",tours:"🥾 טרקים וסיורים",massage:"💆 עיסויים",sim:"📶 סים ואינטרנט",visa:"🛂 ויזה",health:"💊 בריאות"};
 const CATNAME=Object.fromEntries(CATS);
 
 /* rates snapshot (units per 1 USD), used only until live rates load */
@@ -330,7 +332,7 @@ function matches(it,q){
   return q.split(" ").every(w=>hay.includes(w));
 }
 function catKey(it){ const l=(it.catLabel||"").trim(); return (it.cat||"other")==="other"&&l ? "other:"+l : (it.cat||"other"); }
-function catName(k){ return k.startsWith("other:") ? "✨ "+k.slice(6) : (CATNAME[k]||"✨ אחר"); }
+function catName(k){ return k.startsWith("other:") ? "✨ "+k.slice(6) : (CATNAME[k]||OLD_CATS[k]||"✨ אחר"); }
 function monthOf(it){ return (it.date||"").slice(0,7); }
 function thisMonth(){ return todayStr().slice(0,7); }
 function monthName(ym,long){ const [y,m]=ym.split("-").map(Number); return new Date(y,m-1,1).toLocaleDateString("he-IL",long?{month:"long",year:"numeric"}:{month:"short"}); }
@@ -597,6 +599,7 @@ async function save(){
   showErr("fErr");
   const amount=parseFloat(String($("fAmt").value).replace(/,/g,""));
   if(!(amount>0)) return showErr("fErr","צריך להזין סכום גדול מאפס");
+  if(!$("fDesc").value.trim()){ $("fDesc").focus(); return showErr("fErr","צריך לתת שם להוצאה, למשל: ארוחת ערב"); }
   if(!form.among.length) return showErr("fErr","צריך לבחור לפחות אדם אחד שמתחלק בהוצאה");
   let pcts=null;
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
@@ -624,6 +627,7 @@ async function pSave(){
   showErr("pErr");
   const amount=parseFloat(String($("pAmt").value).replace(/,/g,""));
   if(!(amount>0)) return showErr("pErr","צריך להזין סכום גדול מאפס");
+  if(!$("pDesc").value.trim()){ $("pDesc").focus(); return showErr("pErr","צריך לתת שם להוצאה, למשל: קפה"); }
   const c=await loadAcct(); if(!c) return showErr("pErr","צריך להיכנס לחשבון האישי קודם.");
   const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat,catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",date:$("pDate").value||todayStr()};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
