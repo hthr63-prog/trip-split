@@ -257,6 +257,18 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .binrow{grid-template-columns:1fr auto auto}
 .bininfo{display:flex;flex-direction:column;min-width:0}
 .bininfo b{font-weight:500;overflow-wrap:anywhere}
+.tablewrap{overflow-x:auto}
+table.daily{width:100%;border-collapse:collapse;font-size:.9rem}
+table.daily th{font-weight:500;color:var(--muted);font-size:.78rem;text-align:right;padding:6px 6px;border-bottom:1.5px solid var(--line);white-space:nowrap}
+table.daily td{padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.daily td.strong{font-weight:700}
+table.daily td.num{text-align:right}
+.cashbal{display:flex;flex-direction:column;gap:4px}
+.cashline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.cashline b{font-family:var(--display);font-weight:600;font-size:1.1rem}
+.cashline.main b{font-size:1.9rem}
+.cashline b.neg{color:var(--bad)}
+.small-amt input{font-size:1.2rem}
 @media (max-width:440px){
   .grid{grid-template-columns:1fr}
   .cat{grid-template-columns:6em 1fr auto}
@@ -333,6 +345,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
         <label>תאריך<span class="datebox"><input id="fDate" type="date"></span></label>
       </div>
       <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="fLoc" type="button"></button></div>
+      <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="fPm"></div></div>
       <div class="fieldset"><span class="hint">מי שילם?</span><div class="seg" id="fPayer"></div></div>
       <div class="fieldset">
         <span class="hint">בין מי מתחלקים?</span>
@@ -409,12 +422,46 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
           <label>תאריך<span class="datebox"><input id="pDate" type="date"></span></label>
         </div>
         <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="pLoc" type="button"></button></div>
+        <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="pPm"></div></div>
         <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="pCat"></div><input id="pCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
         <div class="err" id="pErr" hidden></div>
         <div class="actions">
           <button class="btn primary big" id="pSave" type="button">הוספה</button>
           <button class="btn" id="pCancel" type="button" hidden>ביטול עריכה</button>
         </div>
+      </section>
+
+      <section class="card" id="dailyCard">
+        <div class="card-head"><h2>📅 סיכום יומי</h2></div>
+        <div class="seg" id="dShowin"></div>
+        <div class="tablewrap"><table class="daily">
+          <thead><tr><th>יום</th><th>🙋 לבד</th><th>👫 ביחד</th><th>💜 משולב</th></tr></thead>
+          <tbody id="dTable"></tbody>
+        </table></div>
+        <button class="link" id="dMore" type="button" hidden>עוד ימים</button>
+      </section>
+
+      <section class="card" id="cashCard">
+        <div class="card-head"><h2>💵 ארנק מזומן</h2><span class="hint" id="cashFees"></span></div>
+        <div id="cashBal" class="cashbal"></div>
+        <div class="actions">
+          <button class="btn small primary" id="cashWBtn" type="button">🏧 משיכה מכספומט</button>
+          <button class="btn small" id="cashABtn" type="button">🔢 עדכון לפי ספירה</button>
+        </div>
+        <div id="cashW" class="stack" hidden>
+          <div class="amount"><input id="cwAmt" class="num" inputmode="decimal" placeholder="כמה משכת" aria-label="סכום משיכה"><button class="curbtn" id="cwCur" type="button"></button></div>
+          <div class="amount small-amt"><input id="cwFee" class="num" inputmode="decimal" placeholder="עמלה (לא חובה)" aria-label="עמלה"><button class="curbtn" id="cwFeeCur" type="button"></button></div>
+          <div class="err" id="cwErr" hidden></div>
+          <button class="btn primary" id="cwSave" type="button">שמירת משיכה</button>
+        </div>
+        <div id="cashA" class="stack" hidden>
+          <div class="hint" id="caNow"></div>
+          <div class="amount"><input id="caAmt" class="num" inputmode="decimal" placeholder="כמה יש לך בארנק עכשיו" aria-label="יתרה בפועל"><button class="curbtn" id="caCur" type="button"></button></div>
+          <div class="err" id="caErr" hidden></div>
+          <button class="btn primary" id="caSave" type="button">עדכון יתרה</button>
+        </div>
+        <div class="hint">משיכה היא לא הוצאה. היתרה יורדת לבד כשרושמים הוצאה ששולמה במזומן: הוצאה אישית, או הוצאה משותפת ש<b>את/ה</b> שילמת.</div>
+        <div id="cashList" class="stack" style="gap:7px"></div>
       </section>
 
       <section class="card" id="pCatPanel" hidden>
@@ -568,8 +615,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>window.APP_V="20261105171930";</script>
-<script src="config.js?v=20261105171930"></script>
-<script src="app.js?v=20261105171930"></script>
+<script>window.APP_V="20261105172624";</script>
+<script src="config.js?v=20261105172624"></script>
+<script src="app.js?v=20261105172624"></script>
 </body>
 </html>

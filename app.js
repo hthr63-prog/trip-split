@@ -99,7 +99,7 @@ function compute(){
 
 /* ---- extra state ---- */
 let view="shared";
-let PENDING=new Set(), FRESH=new Set(), BIN=[], BINRAW=[], purged=false;                 // "shared" | "personal"
+let PENDING=new Set(), FRESH=new Set(), BIN=[], BINRAW=[], purged=false, CASH=[], dayCur="ILS", cashForm=null;                 // "shared" | "personal"
 let P=[], pLoaded=false, pEditingId=null, pform={cat:"food"};
 let cur={fCur:null,pCur:null,cFrom:null,cTo:"ILS"};
 let cLast="A";                     // which converter field the person typed in
@@ -300,6 +300,7 @@ function renderForm(){
   form.among=form.among.filter(person);
   if(!cur.fCur) cur.fCur=S.localCur; setCurBtn("fCur",cur.fCur);
   const payers=active(); if(form.payer&&!payers.find(p=>p.id===form.payer)&&person(form.payer)) payers.push(person(form.payer));
+  seg($("fPm"),[["cash","💵 מזומן"],["card","💳 כרטיס"]],v=>v===(form.pm||"cash"),v=>{form.pm=v;renderForm();});
   seg($("fPayer"),payers.map(p=>[p.id,p.name+" "+g.paid(p.id)]),v=>v===form.payer,v=>{form.payer=v;renderForm();});
   seg($("fAmong"),active().map(p=>[p.id,p.name]),v=>form.among.includes(v),v=>{ form.among=form.among.includes(v)?form.among.filter(x=>x!==v):[...form.among,v]; renderForm(); });
   seg($("fMode"),[["equal","בחלקים שווים"],["pct","באחוזים"]],v=>v===form.mode,v=>{form.mode=v;renderForm();});
@@ -472,7 +473,7 @@ async function refreshPersonal(){
     const c=await loadAcct();
     const out= c? await decryptMine(c) : [];
     if(seq!==pSeq) return;
-    P=out; pLoaded=true; if(view==="personal") renderAll();
+    P=out.filter(x=>x.type!=="cash"); CASH=out.filter(x=>x.type==="cash"); pLoaded=true; if(view==="personal") renderAll();
   }catch(e){ console.error(e); pLoaded=true; }
 }
 async function setPassword(pw){
@@ -536,9 +537,11 @@ function renderPersonal(){
   $("pOnly").textContent= fem(me)?"רק את רואה":"רק אתה רואה";
   $("pAll").textContent=fmt(own+share,showCur); $("pOwn").textContent=fmt(own,showCur); $("pShare").textContent=fmt(share,showCur); $("pToday").textContent=fmt(today,showCur);
   showinRow($("pShowin"));
+  renderDaily(); renderCash();
   catBars("pCats","pCatPanel",cats);
   if(!cur.pCur) cur.pCur=S.localCur; setCurBtn("pCur",cur.pCur);
   $("pLoc").textContent=locName(pform.loc||S.localCur);
+  seg($("pPm"),[["cash","💵 מזומן"],["card","💳 כרטיס"]],v=>v===(pform.pm||"cash"),v=>{pform.pm=v;renderPersonal();});
   seg($("pCat"),CATS,v=>v===pform.cat,v=>{pform.cat=v;renderPersonal(); if(v==="other") $("pCatLabel").focus();});
   $("pCatLabel").hidden=pform.cat!=="other";
   convHint("pAmt",cur.pCur,"pConv");
@@ -548,7 +551,7 @@ function renderPersonal(){
   if(!list.length){ const e=document.createElement("div"); e.className="empty"; e.textContent=!pLoaded?"טוען…":"עוד אין הוצאות אישיות. מה שתוסיפו כאן שמור בחשבון שלכם, ואף אחד אחר לא רואה אותו."; L.appendChild(e); }
   let curDay=null, box=null;
   for(const it of list){
-    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,mineDay(it.date)); box.appendChild(h); L.appendChild(box); }
+    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,""); box.appendChild(h); L.appendChild(box); }
     const r=document.createElement("div"); r.className="row";
     const dot=document.createElement("div"); dot.className="dot c"+pidx(me); dot.textContent=nm(me).trim().charAt(0);
     const main=document.createElement("div"); main.className="main";
@@ -631,7 +634,7 @@ $("cFrom").onclick=()=>openCurPicker("יש לי…",cur.cFrom,c=>{ cur.cFrom=c; 
 $("cTo").onclick=()=>openCurPicker("מקבלים…",cur.cTo,c=>{ cur.cTo=c; renderConv(); });
 function startEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
-  editingId=it.id; form.payer=it.payer; form.cat=it.cat||"other"; form.loc=locOf(it);
+  editingId=it.id; form.payer=it.payer; form.cat=it.cat||"other"; form.loc=locOf(it); form.pm=it.pm||"cash";
   form.among=it.pcts?Object.keys(it.pcts):((it.among&&it.among.length)?[...it.among]:S.people.map(p=>p.id));
   form.mode=it.pcts?"pct":"equal"; form.pcts=it.pcts?{...it.pcts}:{};
   $("fDesc").value=it.desc||""; $("fCatLabel").value=it.catLabel||""; $("fAmt").value=it.amount; $("fDate").value=it.date||todayStr(); cur.fCur=it.cur;
@@ -651,7 +654,7 @@ async function save(){
   if(!form.among.length) return showErr("fErr","צריך לבחור לפחות אדם אחד שמתחלק בהוצאה");
   let pcts=null;
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
-  const data={kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||S.localCur,date:$("fDate").value||todayStr()};
+  const data={kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||S.localCur,pm:form.pm||"cash",date:$("fDate").value||todayStr()};
   const id=editingId||uid("e");
   const ok=await run(()=> editingId ? db.collection("expenses").doc(id).update(data) : db.collection("expenses").doc(id).set({...data,createdAt:Date.now(),tz:hereTz(),by:me||null}));
   if(ok&&!editingId) notifyOthers("🧾 "+nm(me||form.payer)+" "+(fem(me||form.payer)?"הוסיפה":"הוסיף")+": "+data.desc+" "+fmt(amount,data.cur));
@@ -674,7 +677,7 @@ function toast(msg,actLabel,act){
 $("pCur").onclick=()=>openCurPicker("באיזה מטבע שילמת?",cur.pCur,c=>{ cur.pCur=c; renderPersonal(); });
 function pStartEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
-  pEditingId=it.id; pform.cat=it.cat||"other"; pform.loc=locOf(it); cur.pCur=it.cur;
+  pEditingId=it.id; pform.cat=it.cat||"other"; pform.loc=locOf(it); pform.pm=it.pm||"cash"; cur.pCur=it.cur;
   $("pDesc").value=it.desc||""; $("pCatLabel").value=it.catLabel||""; $("pAmt").value=it.amount; $("pDate").value=it.date||todayStr();
   $("pFormTitle").textContent="✏️ עריכת הוצאה אישית"; $("pSave").textContent="שמירת שינויים"; $("pCancel").hidden=false; renderPersonal();
   $("pForm").scrollIntoView({behavior:"smooth",block:"start"});
@@ -689,7 +692,7 @@ async function pSave(){
   if(!(amount>0)) return showErr("pErr","צריך להזין סכום גדול מאפס");
   if(!$("pDesc").value.trim()){ $("pDesc").focus(); return showErr("pErr","צריך לתת שם להוצאה, למשל: קפה"); }
   const c=await loadAcct(); if(!c) return showErr("pErr","צריך להיכנס לחשבון האישי קודם.");
-  const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat,catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||S.localCur,date:$("pDate").value||todayStr()};
+  const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat,catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||S.localCur,pm:pform.pm||"cash",date:$("pDate").value||todayStr()};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
   const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz()});
   const ok=await run(()=>db.collection("expenses").doc(id).set(doc));
@@ -822,6 +825,104 @@ $("fabUp").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
 window.addEventListener("scroll",()=>{ $("fabUp").hidden= window.scrollY<400; },{passive:true});
 $("lSearch").addEventListener("input",renderLedger);
 $("pSearch").addEventListener("input",renderPersonal);
+
+/* ---- daily summary in the personal view: alone / together / combined, in shekels unless chosen otherwise ---- */
+function renderDaily(){
+  const S2=$("dShowin"); S2.innerHTML="";
+  const quick=["ILS",S.localCur,"USD"].filter((x,i,arr)=>arr.indexOf(x)===i);
+  for(const q of quick){ const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=(CUR[q].sym?CUR[q].sym+" ":"")+CUR[q].name; b.setAttribute("aria-pressed",String(dayCur===q)); b.onclick=()=>{ dayCur=q; renderDaily(); }; S2.appendChild(b); }
+  const o=document.createElement("button"); o.type="button"; o.className="curbtn"; o.textContent=quick.includes(dayCur)?"🔎 מטבע אחר":curText(dayCur);
+  o.onclick=()=>openCurPicker("להציג את הסיכום היומי ב…",dayCur,c=>{ dayCur=c; renderDaily(); }); S2.appendChild(o);
+  const share=myShareItems(); const days=new Map();
+  const add=(it,k,v)=>{ if(!it.date) return; const o=days.get(it.date)||{alone:0,tog:0}; o[k]+=v; days.set(it.date,o); };
+  for(const it of P) add(it,"alone",conv(+it.amount||0,it.cur,dayCur));
+  for(const it of share) add(it,"tog",conv(it.amount,it.cur,dayCur));
+  const T=$("dTable"); T.innerHTML="";
+  const list=[...days.entries()].sort((x,y)=>y[0].localeCompare(x[0]));
+  if(!list.length){ T.innerHTML='<tr><td colspan="4" class="hint">עוד אין הוצאות.</td></tr>'; return; }
+  for(const [d,o] of list.slice(0,dayLimit)){
+    const tr=document.createElement("tr");
+    const c=(txt,cls)=>{ const td=document.createElement("td"); td.textContent=txt; if(cls) td.className=cls; tr.appendChild(td); };
+    c(dayLabel(d)); c(fmt(o.alone,dayCur),"num"); c(fmt(o.tog,dayCur),"num"); c(fmt(o.alone+o.tog,dayCur),"num strong");
+    T.appendChild(tr);
+  }
+  $("dMore").hidden=list.length<=dayLimit;
+}
+let dayLimit=7;
+
+/* ---- cash wallet (personal): withdrawals in, cash payments out ---- */
+function cashPaidByMe(){
+  /* cash I handed over: my shared expenses paid in cash + my personal ones paid in cash */
+  const out=[];
+  for(const it of S.items){ if(it.kind==="transfer"||it.payer!==me||it.pm!=="cash") continue; out.push(it); }
+  for(const it of P){ if(it.pm==="cash") out.push(it); }
+  return out;
+}
+function renderCash(){
+  const since=Math.min(...CASH.map(x=>x.createdAt||Infinity));
+  const bal={}, fees={};
+  for(const x of CASH){
+    if(x.sub==="withdraw"){ bal[x.cur]=(bal[x.cur]||0)+(+x.amount||0); if(+x.fee>0){ const fc=x.feeCur||x.cur; fees[fc]=(fees[fc]||0)+(+x.fee); } }
+    if(x.sub==="adjust"){ bal[x.cur]=(bal[x.cur]||0)+(+x.amount||0); }
+  }
+  /* cash payments only count from the first wallet entry on */
+  for(const it of cashPaidByMe()){ if((it.createdAt||0)<since) continue; bal[it.cur]=(bal[it.cur]||0)-(+it.amount||0); }
+  const B=$("cashBal"); B.innerHTML="";
+  const curs=Object.keys(bal).filter(c=>Math.abs(bal[c])>0.004||c===S.localCur);
+  if(!CASH.length){ B.innerHTML='<div class="hint">עוד לא נרשמו משיכות. כשמושכים מזומן מכספומט, לוחצים "משיכה מכספומט", ומאז היתרה מתעדכנת לבד בכל תשלום במזומן.</div>'; }
+  else for(const c of curs.sort((x,y)=>(y===S.localCur)-(x===S.localCur))){
+    const d=document.createElement("div"); d.className="cashline"+(c===S.localCur?" main":"");
+    const n=document.createElement("b"); n.className="num"; n.textContent=fmt(bal[c],c); if(bal[c]<0) n.classList.add("neg");
+    const s=document.createElement("small"); s.className="hint num"; s.textContent= c!=="ILS" ? "≈ "+fmt(conv(bal[c],c,"ILS"),"ILS") : "";
+    d.append(n,s); B.appendChild(d);
+  }
+  const feeTot=Object.entries(fees).reduce((s,[c,v])=>s+conv(v,c,"ILS"),0);
+  $("cashFees").textContent= feeTot>0 ? "עמלות משיכה עד עכשיו: "+fmt(feeTot,"ILS") : "";
+  /* withdrawal history */
+  const L=$("cashList"); L.innerHTML="";
+  for(const x of [...CASH].sort((p,q)=>(q.createdAt||0)-(p.createdAt||0))){
+    const r=document.createElement("div"); r.className="row";
+    const dot=document.createElement("div"); dot.className="dot c2"; dot.textContent=x.sub==="adjust"?"🔢":"🏧";
+    const main=document.createElement("div"); main.className="main";
+    const t=document.createElement("div"); t.className="t"; t.textContent= x.sub==="adjust" ? "עדכון לפי ספירה" : "משיכה מכספומט";
+    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(x,dayLabel(x.date)+(+x.fee>0?" · עמלה "+fmt(+x.fee,x.feeCur||x.cur):""));
+    main.append(t,m);
+    const right=document.createElement("div"); right.className="r";
+    const b=document.createElement("b"); b.className="num"; b.textContent=(x.amount>0?"+":"")+fmt(+x.amount,x.cur); right.appendChild(b);
+    const acts=document.createElement("div"); acts.appendChild(delBtn(()=>delItem({id:x.id,desc:x.sub==="adjust"?"עדכון ארנק":"משיכה מכספומט"},true))); right.appendChild(acts);
+    r.append(dot,main,right); L.appendChild(r);
+  }
+  /* inline forms */
+  $("cashW").hidden=cashForm!=="w"; $("cashA").hidden=cashForm!=="a";
+  setCurBtn("cwCur",cur.cw||S.localCur); setCurBtn("cwFeeCur",cur.cwFee||S.localCur); setCurBtn("caCur",cur.ca||S.localCur);
+  $("caNow").textContent= "לפי האפליקציה: "+fmt(bal[cur.ca||S.localCur]||0,cur.ca||S.localCur);
+  CASHBAL=bal;
+}
+let CASHBAL={};
+async function cashSave(entry){
+  const c=await loadAcct(); if(!c) return false;
+  const doc=await encFor(c,{type:"cash",...entry,createdAt:Date.now(),tz:hereTz(),date:entry.date||todayStr()});
+  return run(()=>db.collection("expenses").doc(uid("w")).set(doc));
+}
+$("cashWBtn").onclick=()=>{ cashForm= cashForm==="w"?null:"w"; renderCash(); if(cashForm) $("cwAmt").focus(); };
+$("cashABtn").onclick=()=>{ cashForm= cashForm==="a"?null:"a"; renderCash(); if(cashForm) $("caAmt").focus(); };
+$("cwCur").onclick=()=>openCurPicker("באיזה מטבע משכת?",cur.cw||S.localCur,c=>{ cur.cw=c; renderCash(); });
+$("cwFeeCur").onclick=()=>openCurPicker("באיזה מטבע העמלה?",cur.cwFee||S.localCur,c=>{ cur.cwFee=c; renderCash(); });
+$("caCur").onclick=()=>openCurPicker("איזה מטבע ספרת?",cur.ca||S.localCur,c=>{ cur.ca=c; renderCash(); });
+$("cwSave").onclick=async()=>{
+  showErr("cwErr"); const amt=parseFloat($("cwAmt").value.replace(/,/g,"")); const fee=parseFloat(($("cwFee").value||"0").replace(/,/g,""))||0;
+  if(!(amt>0)) return showErr("cwErr","כמה משכת?");
+  const ok=await cashSave({sub:"withdraw",amount:amt,cur:cur.cw||S.localCur,fee,feeCur:cur.cwFee||S.localCur,desc:"משיכה מכספומט"});
+  if(ok){ $("cwAmt").value=""; $("cwFee").value=""; cashForm=null; toast("🏧 נרשמה משיכה של "+fmt(amt,cur.cw||S.localCur)); }
+};
+$("caSave").onclick=async()=>{
+  showErr("caErr"); const real=parseFloat($("caAmt").value.replace(/,/g,"")); const c=cur.ca||S.localCur;
+  if(!(real>=0)) return showErr("caErr","כמה יש לך בארנק?");
+  const diff=Math.round((real-(CASHBAL[c]||0))*100)/100; if(!diff){ cashForm=null; renderCash(); return toast("היתרה כבר מדויקת ✓"); }
+  const ok=await cashSave({sub:"adjust",amount:diff,cur:c,desc:"עדכון ארנק"});
+  if(ok){ $("caAmt").value=""; cashForm=null; toast("🔢 היתרה עודכנה ל-"+fmt(real,c)); }
+};
+$("dMore").onclick=()=>{ dayLimit+=30; renderDaily(); };
 
 /* ---- repeat an expense for today, and undo for deletes ---- */
 async function again(it,personal){
