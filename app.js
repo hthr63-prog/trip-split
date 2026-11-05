@@ -349,14 +349,14 @@ function splitText(it){
 }
 function delBtn(onConfirm){
   const d=document.createElement("button"); d.className="link danger"; d.type="button"; d.textContent="מחיקה";
-  d.onclick=()=>{ if(d.dataset.sure){ onConfirm(); } else { d.dataset.sure="1"; d.textContent="בטוח?"; setTimeout(()=>{ if(d.isConnected){ delete d.dataset.sure; d.textContent="מחיקה"; } },3000); } };
+  d.onclick=()=>{ if(d.dataset.sure){ onConfirm(); } else { d.dataset.sure="1"; d.textContent="בטוח?"; setTimeout(()=>{ if(d.isConnected){ delete d.dataset.sure; d.textContent=d.dataset.label||"מחיקה"; } },3000); } };
   return d;
 }
 function renderLedger(){
-  seg($("filter"),[["all","הכול"],...active().map(p=>[p.id,p.name])],v=>v===filter,v=>{filter=v;renderLedger();});
+  seg($("filter"),[["all","הכול"],...active().map(p=>[p.id,p.name]),["transfers","💸 העברות"]],v=>v===filter,v=>{filter=v;renderLedger();});
   const L=$("ledger"); L.innerHTML="";
   const q=norm($("lSearch").value);
-  const list=S.items.filter(it=>(filter==="all"||it.payer===filter)&&matches(it,q)).sort((x,y)=>(y.date||"").localeCompare(x.date||"")||(y.createdAt||0)-(x.createdAt||0));
+  const list=S.items.filter(it=>(filter==="all"||(filter==="transfers"?it.kind==="transfer":it.payer===filter))&&matches(it,q)).sort((x,y)=>(y.date||"").localeCompare(x.date||"")||(y.createdAt||0)-(x.createdAt||0));
   if(!list.length){ const e=document.createElement("div"); e.className="empty"; e.textContent=!loaded?"טוען את ההוצאות…":q?"לא נמצאה הוצאה שמתאימה לחיפוש":S.items.length?"אין הוצאות בסינון הזה":"כאן יופיעו ההוצאות, מסודרות לפי ימים."; L.appendChild(e); return; }
   let curDay=null, box=null;
   for(const it of list){
@@ -375,7 +375,8 @@ function renderLedger(){
     if(canWrite){
       const acts=document.createElement("div");
       if(it.kind!=="transfer"){ const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>startEdit(it); acts.appendChild(e); }
-      acts.appendChild(delBtn(()=>run(()=>db.collection("expenses").doc(it.id).delete())));
+      const d=delBtn(()=>run(()=>db.collection("expenses").doc(it.id).delete())); if(it.kind==="transfer"){ d.textContent="ביטול ההעברה"; d.dataset.label="ביטול ההעברה"; }
+      acts.appendChild(d);
       right.appendChild(acts);
     }
     r.append(dot,main,right); box.appendChild(r);
@@ -608,7 +609,17 @@ async function save(){
   const ok=await run(()=> editingId ? db.collection("expenses").doc(id).update(data) : db.collection("expenses").doc(id).set({...data,createdAt:Date.now(),tz:hereTz()}));
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
-function addTransfer(from,to,amt){ const id=uid("t"); run(()=>db.collection("expenses").doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,date:todayStr(),createdAt:Date.now(),tz:hereTz()})); }
+async function addTransfer(from,to,amt){
+  const id=uid("t");
+  const ok=await run(()=>db.collection("expenses").doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,date:todayStr(),createdAt:Date.now(),tz:hereTz()}));
+  if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur),"ביטול",()=>run(()=>db.collection("expenses").doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
+}
+let toastTimer=null;
+function toast(msg,actLabel,act){
+  const T=$("toast"); T.innerHTML=""; const s=document.createElement("span"); s.textContent=msg; T.appendChild(s);
+  if(actLabel){ const b=document.createElement("button"); b.type="button"; b.textContent=actLabel; b.onclick=()=>{ T.hidden=true; act(); }; T.appendChild(b); }
+  T.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ T.hidden=true; },actLabel?10000:3000);
+}
 
 /* ---- personal form ---- */
 $("pCur").onclick=()=>openCurPicker("באיזה מטבע שילמת?",cur.pCur,c=>{ cur.pCur=c; renderPersonal(); });
