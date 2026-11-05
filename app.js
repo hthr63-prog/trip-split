@@ -866,12 +866,13 @@ function renderDaily(){
   for(const [d,o] of list.slice(0,dayLimit)){
     const tr=document.createElement("tr");
     const c=(txt,cls)=>{ const td=document.createElement("td"); td.textContent=txt; if(cls) td.className=cls; tr.appendChild(td); };
-    c(dayLabel(d)); c(fmt(o.alone,dayCur),"num"); c(fmt(o.tog,dayCur),"num"); c(fmt(o.alone+o.tog,dayCur),"num strong");
+    c(shortDay(d)); c(fmt(o.alone,dayCur),"num"); c(fmt(o.tog,dayCur),"num"); c(fmt(o.alone+o.tog,dayCur),"num strong");
     T.appendChild(tr);
   }
   $("dMore").hidden=list.length<=dayLimit;
 }
 let dayLimit=7;
+function shortDay(s){ if(s===todayStr()) return "היום"; const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d).toLocaleDateString("he-IL",{weekday:"short"}).replace("יום ","")+" "+d+"."+m; }
 
 /* ---- cash wallet (personal): withdrawals in, cash payments out ---- */
 function cashPaidByMe(){
