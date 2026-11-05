@@ -696,7 +696,7 @@ $("pDesc").addEventListener("keydown",e=>{ if(e.key==="Enter") $("pAmt").focus()
 
 
 /* ---- stats page: spending per month and by category ---- */
-let stScope="trip", stMonth=null;
+let stScope="trip", stMonth=null, locScope="couple";
 function goView(v){ view=v; syncUrl(); renderAll(); window.scrollTo({top:0}); }
 $("statsBtn").onclick=()=>goView(view==="stats"?"shared":"stats");
 $("statsBack").onclick=()=>goView("shared");
@@ -764,7 +764,12 @@ function renderStats(){
     r.title=catName(k)+": "+fmt(v,showCur); C.appendChild(r);
   }
   /* by country, across the whole trip */
-  const byC={}; for(const it of items){ const k=locOf(it); const o=byC[k]||(byC[k]={v:0,days:new Set()}); o.v+=conv(+it.amount||0,it.cur,showCur); if(it.date) o.days.add(it.date); }
+  /* the country card has its own switch: couple (shared expenses) or personal (only my own) */
+  const canMine=!!me; if(!canMine) locScope="couple";
+  seg($("stLocScope"),canMine?[["couple","👫 זוגי"],["mine","🙋 אישי"]]:[["couple","👫 זוגי"]],v=>v===locScope,v=>{locScope=v;renderStats();});
+  const locItems= locScope==="mine" ? (acct&&acctFor===me?P:[]) : S.items.filter(it=>it.kind!=="transfer");
+  $("stLocNote").hidden=!(locScope==="mine"&&!(acct&&acctFor===me));
+  const byC={}; for(const it of locItems){ const k=locOf(it); const o=byC[k]||(byC[k]={v:0,days:new Set()}); o.v+=conv(+it.amount||0,it.cur,showCur); if(it.date) o.days.add(it.date); }
   const ce=Object.entries(byC).sort((x,y)=>y[1].v-x[1].v); const cm=ce[0]?.[1].v||1; const CC=$("stCountries"); CC.innerHTML="";
   if(!ce.length) CC.innerHTML='<div class="hint">עוד אין הוצאות.</div>';
   for(const [k,o] of ce){
