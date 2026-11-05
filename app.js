@@ -98,7 +98,8 @@ function compute(){
 }
 
 /* ---- extra state ---- */
-let view="shared";                 // "shared" | "personal"
+let view="shared";
+let PENDING=new Set(), FRESH=new Set();                 // "shared" | "personal"
 let P=[], pLoaded=false, pEditingId=null, pform={cat:"food"};
 let cur={fCur:null,pCur:null,cFrom:null,cTo:"ILS"};
 let cLast="A";                     // which converter field the person typed in
@@ -331,6 +332,15 @@ function matches(it,q){
   const hay=norm([it.desc,catName(catKey(it)),nm(it.payer),it.to?nm(it.to):"",it.cur,CUR[it.cur]?.name,String(it.amount),dayLabel(it.date)].join(" "));
   return q.split(" ").every(w=>hay.includes(w));
 }
+const CTRY={THB:"🇹🇭 תאילנד",VND:"🇻🇳 וייטנאם",LAK:"🇱🇦 לאוס",KHR:"🇰🇭 קמבודיה",MMK:"🇲🇲 מיאנמר",MYR:"🇲🇾 מלזיה",SGD:"🇸🇬 סינגפור",IDR:"🇮🇩 אינדונזיה",PHP:"🇵🇭 פיליפינים",BND:"🇧🇳 ברוניי",JPY:"🇯🇵 יפן",KRW:"🇰🇷 קוריאה",CNY:"🇨🇳 סין",HKD:"🇭🇰 הונג קונג",MOP:"🇲🇴 מקאו",TWD:"🇹🇼 טייוואן",MNT:"🇲🇳 מונגוליה",INR:"🇮🇳 הודו",NPR:"🇳🇵 נפאל",LKR:"🇱🇰 סרי לנקה",BTN:"🇧🇹 בהוטן",MVR:"🇲🇻 מלדיביים",BDT:"🇧🇩 בנגלדש",PKR:"🇵🇰 פקיסטן",KZT:"🇰🇿 קזחסטן",UZS:"🇺🇿 אוזבקיסטן",KGS:"🇰🇬 קירגיזסטן",AED:"🇦🇪 אמירויות",ILS:"🇮🇱 ישראל",USD:"🇺🇸 ארה״ב",EUR:"🇪🇺 אירופה",GBP:"🇬🇧 בריטניה",CHF:"🇨🇭 שווייץ",AUD:"🇦🇺 אוסטרליה",NZD:"🇳🇿 ניו זילנד",CAD:"🇨🇦 קנדה",TRY:"🇹🇷 טורקיה",GEL:"🇬🇪 גאורגיה",AMD:"🇦🇲 ארמניה",AZN:"🇦🇿 אזרבייג׳ן",JOD:"🇯🇴 ירדן",EGP:"🇪🇬 מצרים",QAR:"🇶🇦 קטאר",OMR:"🇴🇲 עומאן",MAD:"🇲🇦 מרוקו",ZAR:"🇿🇦 דרום אפריקה",KES:"🇰🇪 קניה",TZS:"🇹🇿 טנזניה",FJD:"🇫🇯 פיג׳י",MXN:"🇲🇽 מקסיקו",BRL:"🇧🇷 ברזיל",ARS:"🇦🇷 ארגנטינה",CLP:"🇨🇱 צ׳ילה",PEN:"🇵🇪 פרו",COP:"🇨🇴 קולומביה",CZK:"🇨🇿 צ׳כיה",HUF:"🇭🇺 הונגריה",PLN:"🇵🇱 פולין",RON:"🇷🇴 רומניה",BGN:"🇧🇬 בולגריה",RSD:"🇷🇸 סרביה",SEK:"🇸🇪 שוודיה",NOK:"🇳🇴 נורווגיה",DKK:"🇩🇰 דנמרק",ISK:"🇮🇸 איסלנד"};
+/* where an expense happened: saved with new expenses; older ones are inferred from their currency */
+function locOf(it){
+  if(it.loc) return it.loc;
+  if(it.source==="splitwise") return "THB";
+  if(["USD","EUR","GBP","ILS"].includes(it.cur)) return "?";
+  return it.cur||"?";
+}
+function locName(k){ return k==="?" ? "🌐 לא ידוע" : (CTRY[k]||CUR[k]?.name||k); }
 function catKey(it){ const l=(it.catLabel||"").trim(); return (it.cat||"other")==="other"&&l ? "other:"+l : (it.cat||"other"); }
 function catName(k){ return k.startsWith("other:") ? "✨ "+k.slice(6) : (CATNAME[k]||OLD_CATS[k]||"✨ אחר"); }
 function monthOf(it){ return (it.date||"").slice(0,7); }
@@ -361,12 +371,12 @@ function renderLedger(){
   let curDay=null, box=null;
   for(const it of list){
     if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); h.textContent=dayLabel(it.date); box.appendChild(h); L.appendChild(box); }
-    const r=document.createElement("div"); r.className="row"+(it.kind==="transfer"?" transfer":"");
+    const r=document.createElement("div"); r.className="row"+(it.kind==="transfer"?" transfer":"")+(FRESH.has(it.id)?" fresh":"");
     const dot=document.createElement("div"); dot.className="dot c"+pidx(it.payer); dot.textContent=nm(it.payer).trim().charAt(0);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; const m=document.createElement("div"); m.className="m";
     if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent=withTime(it,"סגירת חשבון"); }
-    else{ t.textContent=it.desc||"הוצאה"; m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+splitText(it)+" · "+catName(catKey(it))); }
+    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+splitText(it)+" · "+catName(catKey(it))); }
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
@@ -375,7 +385,8 @@ function renderLedger(){
     if(canWrite){
       const acts=document.createElement("div");
       if(it.kind!=="transfer"){ const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>startEdit(it); acts.appendChild(e); }
-      const d=delBtn(()=>run(()=>db.collection("expenses").doc(it.id).delete())); if(it.kind==="transfer"){ d.textContent="ביטול ההעברה"; d.dataset.label="ביטול ההעברה"; }
+      if(it.kind!=="transfer"){ const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.title="להוסיף את אותה הוצאה להיום"; ag.onclick=()=>again(it,false); acts.prepend(ag); }
+      const d=delBtn(()=>delItem(it,false)); if(it.kind==="transfer"){ d.textContent="ביטול ההעברה"; d.dataset.label="ביטול ההעברה"; }
       acts.appendChild(d);
       right.appendChild(acts);
     }
@@ -520,7 +531,8 @@ function renderPersonal(){
     if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(conv(+it.amount,it.cur,"ILS"),"ILS"); right.appendChild(s); }
     const acts=document.createElement("div");
     const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>pStartEdit(it); acts.appendChild(e);
-    acts.appendChild(delBtn(()=>run(()=>db.collection("expenses").doc(it.id).delete())));
+    const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.onclick=()=>again(it,true); acts.prepend(ag);
+    acts.appendChild(delBtn(()=>delItem(it,true)));
     right.appendChild(acts);
     r.append(dot,main,right); box.appendChild(r);
   }
@@ -538,7 +550,13 @@ function renderAll(){
 async function run(fn){
   if(!canWrite||busy) return false;
   busy=true; $("status").textContent="שומר…"; document.querySelectorAll("#saveBtn,#nuSave,#pSave").forEach(b=>b.disabled=true);
-  try{ await fn(); $("status").textContent="נשמר ✓"; setTimeout(()=>{ if($("status").textContent==="נשמר ✓") $("status").textContent=""; },2000); return true; }
+  const done=()=>{ $("status").textContent="נשמר ✓"; setTimeout(()=>{ if($("status").textContent==="נשמר ✓") $("status").textContent=""; },2000); };
+  try{
+    /* without reception the write is kept on the phone and uploads later; don't wait for the server */
+    const job=Promise.resolve().then(fn);
+    const r=await Promise.race([job.then(()=>"ok"),new Promise(res=>setTimeout(()=>res("slow"),2500))]);
+    if(r==="slow"){ $("status").textContent="⏳ נשמר בטלפון, יעלה כשתחזור קליטה"; job.then(done).catch(e=>{ console.error(e); $("status").textContent="השמירה נכשלה. נסו שוב."; }); return true; }
+    done(); return true; }
   catch(e){ console.error(e); $("status").textContent= e&&e.code==="permission-denied" ? "אין הרשאה לשמור." : "השמירה נכשלה. בדקו את החיבור ונסו שוב."; return false; }
   finally{ busy=false; document.querySelectorAll("#saveBtn,#nuSave,#pSave").forEach(b=>b.disabled=false); }
 }
@@ -562,7 +580,7 @@ function syncUrl(){
   try{ history.replaceState(null,"",u); }catch(e){}
 }
 function setMe(id,updateUrl){
-  me=id; acct=null; acctFor=null; store("trip-me",id||""); if(id){ form.payer=id; if(updateUrl) syncUrl(); refreshPersonal(); }
+  me=id; if(id) setTimeout(sinceLastVisit,300); acct=null; acctFor=null; store("trip-me",id||""); if(id){ form.payer=id; if(updateUrl) syncUrl(); refreshPersonal(); }
   $("newUser").hidden=true; renderAll(); window.scrollTo({top:0});
 }
 $("switchBtn").onclick=()=>{ me=null; store("trip-me",""); view="shared"; P=[]; acct=null; try{ history.replaceState(null,"",location.pathname); }catch(e){} renderAll(); $("picker").scrollIntoView({behavior:"smooth"}); };
@@ -606,12 +624,14 @@ async function save(){
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
   const data={kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",date:$("fDate").value||todayStr()};
   const id=editingId||uid("e");
-  const ok=await run(()=> editingId ? db.collection("expenses").doc(id).update(data) : db.collection("expenses").doc(id).set({...data,createdAt:Date.now(),tz:hereTz()}));
+  const ok=await run(()=> editingId ? db.collection("expenses").doc(id).update(data) : db.collection("expenses").doc(id).set({...data,createdAt:Date.now(),tz:hereTz(),loc:S.localCur,by:me||null}));
+  if(ok&&!editingId) notifyOthers("🧾 "+nm(me||form.payer)+" "+(fem(me||form.payer)?"הוסיפה":"הוסיף")+": "+data.desc+" "+fmt(amount,data.cur));
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
 async function addTransfer(from,to,amt){
   const id=uid("t");
-  const ok=await run(()=>db.collection("expenses").doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,date:todayStr(),createdAt:Date.now(),tz:hereTz()}));
+  const ok=await run(()=>db.collection("expenses").doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:S.localCur,by:me||null}));
+  if(ok) notifyOthers("💸 "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur));
   if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur),"ביטול",()=>run(()=>db.collection("expenses").doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
 }
 let toastTimer=null;
@@ -642,7 +662,7 @@ async function pSave(){
   const c=await loadAcct(); if(!c) return showErr("pErr","צריך להיכנס לחשבון האישי קודם.");
   const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat,catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",date:$("pDate").value||todayStr()};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
-  const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz()});
+  const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz(),loc:old?.loc||S.localCur});
   const ok=await run(()=>db.collection("expenses").doc(id).set(doc));
   if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
@@ -720,6 +740,18 @@ function renderStats(){
     r.querySelector("b").textContent=fmt(v,showCur); r.querySelector("small").textContent=Math.round(v/(tot||1)*100)+"%";
     r.title=catName(k)+": "+fmt(v,showCur); C.appendChild(r);
   }
+  /* by country, across the whole trip */
+  const byC={}; for(const it of items){ const k=locOf(it); const o=byC[k]||(byC[k]={v:0,days:new Set()}); o.v+=conv(+it.amount||0,it.cur,showCur); if(it.date) o.days.add(it.date); }
+  const ce=Object.entries(byC).sort((x,y)=>y[1].v-x[1].v); const cm=ce[0]?.[1].v||1; const CC=$("stCountries"); CC.innerHTML="";
+  if(!ce.length) CC.innerHTML='<div class="hint">עוד אין הוצאות.</div>';
+  for(const [k,o] of ce){
+    const r=document.createElement("div"); r.className="cat";
+    r.innerHTML='<span></span><div class="bar"><i></i></div><span class="amtpct"><b class="num"></b><small></small></span>';
+    r.children[0].textContent=locName(k); r.querySelector("i").style.width=(o.v/cm*100).toFixed(1)+"%";
+    r.querySelector("b").textContent=fmt(o.v,showCur);
+    r.querySelector("small").textContent=o.days.size+" ימים · "+fmt(o.v/(o.days.size||1),showCur)+" ליום";
+    CC.appendChild(r);
+  }
   /* who paid (whole trip only) */
   $("stPayersCard").hidden= stScope!=="trip";
   if(stScope==="trip"){
@@ -753,10 +785,96 @@ window.addEventListener("scroll",()=>{ $("fabUp").hidden= window.scrollY<400; },
 $("lSearch").addEventListener("input",renderLedger);
 $("pSearch").addEventListener("input",renderPersonal);
 
+/* ---- repeat an expense for today, and undo for deletes ---- */
+async function again(it,personal){
+  const id=uid(personal?"m":"e"); const base={...it}; delete base.id;
+  Object.assign(base,{date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:S.localCur});
+  let ok;
+  if(personal){ const c=await loadAcct(); if(!c) return; const doc=await encFor(c,base); ok=await run(()=>db.collection("expenses").doc(id).set(doc)); }
+  else { base.by=me||null; delete base.source; ok=await run(()=>db.collection("expenses").doc(id).set(base)); if(ok) notifyOthers("🧾 "+nm(me||it.payer)+" "+(fem(me||it.payer)?"הוסיפה":"הוסיף")+": "+(base.desc||"הוצאה")+" "+fmt(+base.amount,base.cur)); }
+  if(ok) toast("🔁 נוסף שוב להיום: "+(it.desc||"הוצאה"),"ביטול",()=>run(()=>db.collection("expenses").doc(id).delete()));
+}
+async function delItem(it,personal){
+  const src= personal ? RAW.find(r=>r.id===it.id) : S.items.find(r=>r.id===it.id);
+  const copy= src ? {...src} : null; if(copy) delete copy.id;
+  const ok=await run(()=>db.collection("expenses").doc(it.id).delete());
+  if(ok&&copy) toast("🗑 נמחק: "+(it.kind==="transfer"?"העברה":(it.desc||"הוצאה")),"ביטול",()=>run(()=>db.collection("expenses").doc(it.id).set(copy)).then(k=>{ if(k) toast("שוחזר ✓"); }));
+}
+
+/* ---- name suggestions from earlier expenses ---- */
+function suggest(inputId,boxId,pool,apply){
+  const box=$(boxId); const q=norm($(inputId).value); box.innerHTML="";
+  if(!q){ box.hidden=true; return; }
+  const seen=new Set(), out=[];
+  for(const it of [...pool].sort((x,y)=>(y.createdAt||0)-(x.createdAt||0))){
+    const d=(it.desc||"").trim(); const k=norm(d); if(!d||seen.has(k)||k===q||!k.includes(q)) continue; seen.add(k); out.push(it); if(out.length>=4) break;
+  }
+  box.hidden=!out.length;
+  for(const it of out){ const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=it.desc+" · "+fmt(+it.amount,it.cur);
+    b.onclick=()=>{ apply(it); box.hidden=true; }; box.appendChild(b); }
+}
+$("fDesc").addEventListener("input",()=>suggest("fDesc","fSuggest",S.items.filter(x=>x.kind!=="transfer"),it=>{
+  $("fDesc").value=it.desc; form.cat=it.cat||"other"; $("fCatLabel").value=it.catLabel||"";
+  if(!$("fAmt").value){ $("fAmt").value=it.amount; cur.fCur=it.cur||cur.fCur; }
+  renderForm(); }));
+$("pDesc").addEventListener("input",()=>suggest("pDesc","pSuggest",P,it=>{
+  $("pDesc").value=it.desc; pform.cat=it.cat||"other"; $("pCatLabel").value=it.catLabel||"";
+  if(!$("pAmt").value){ $("pAmt").value=it.amount; cur.pCur=it.cur||cur.pCur; }
+  renderPersonal(); }));
+
+/* ---- notifications: in the app, and to the phone through the free ntfy app ---- */
+function notifyOthers(text){
+  if(!me) return;
+  for(const p of active()){ if(p.id===me||!p.ntfy) continue;
+    try{ fetch("https://ntfy.sh/"+encodeURIComponent(p.ntfy)+"?title="+encodeURIComponent(S.trip||"הטיול")+"&tags=moneybag",{method:"POST",body:text,keepalive:true}).catch(()=>{}); }catch(e){} }
+}
+function sinceLastVisit(){
+  if(!me) return;
+  const key="trip-seen-"+me; const last=+load(key)||0; store(key,String(Date.now()));
+  if(!last) return;
+  const fresh=S.items.filter(it=>it.by&&it.by!==me&&(it.createdAt||0)>last);
+  FRESH=new Set(fresh.map(it=>it.id));
+  if(fresh.length){ const by=[...new Set(fresh.map(it=>it.by))].map(nm).join(" ו");
+    toast("🔔 "+by+" "+(fresh.length===1?"הוסיף/ה הוצאה אחת":"הוסיפו "+fresh.length+" הוצאות")+" מאז הפעם הקודמת (מסומנות ברשימה)"); renderAll(); }
+}
+function renderNotif(){
+  if(!me){ $("notifSec").hidden=true; return; } $("notifSec").hidden=false;
+  const t=person(me)?.ntfy; $("ntfyOff").hidden=!!t; $("ntfyOn").hidden=!t;
+  if(t) $("ntfyTopic").textContent=t;
+}
+$("ntfyEnable").onclick=async()=>{
+  const topic="trip-"+Array.from(crypto.getRandomValues(new Uint8Array(9)),x=>x.toString(16).padStart(2,"0")).join("");
+  const ok=await run(()=>db.runTransaction(async tx=>{ const s=await tx.get(metaRef()); const people=((s.data()?.people)||[]).map(p=>p.id===me?{...p,ntfy:topic}:p); tx.update(metaRef(),{people}); }));
+  if(ok){ const p=person(me); if(p) p.ntfy=topic; renderNotif(); }
+};
+$("ntfyCopy").onclick=()=>{ const t=$("ntfyTopic").textContent; try{ navigator.clipboard.writeText(t).then(()=>{ $("ntfyCopy").textContent="הועתק ✓"; setTimeout(()=>$("ntfyCopy").textContent="העתקה",1500); }); }catch(e){} };
+$("ntfyTest").onclick=()=>{ const t=person(me)?.ntfy; if(!t) return;
+  fetch("https://ntfy.sh/"+encodeURIComponent(t)+"?title="+encodeURIComponent(S.trip||"הטיול"),{method:"POST",body:"🔔 בדיקה: ההתראות עובדות!"}).then(r=>toast(r.ok?"נשלחה התראת בדיקה ✓":"השליחה נכשלה")).catch(()=>toast("השליחה נכשלה. בדקו קליטה.")); };
+$("ntfyOffBtn").onclick=async()=>{
+  const ok=await run(()=>db.runTransaction(async tx=>{ const s=await tx.get(metaRef()); const people=((s.data()?.people)||[]).map(p=>{ if(p.id!==me) return p; const q={...p}; delete q.ntfy; return q; }); tx.update(metaRef(),{people}); }));
+  if(ok){ const p=person(me); if(p) delete p.ntfy; renderNotif(); }
+};
+
+/* ---- export a backup for Excel ---- */
+$("exportBtn").onclick=async()=>{
+  const esc=v=>{ const s=String(v==null?"":v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const head=["סוג","תאריך","שעה","שם","קטגוריה","סכום","מטבע","בשקלים","מי שילם","בין מי","מדינה"];
+  const rows=[head];
+  const line=(type,it,payer,among)=>rows.push([type,it.date,timeOf(it),it.kind==="transfer"?"העברה ל"+nm(it.to):(it.desc||""),it.kind==="transfer"?"":catName(catKey(it)),it.amount,it.cur,Math.round(conv(+it.amount||0,it.cur,"ILS")*100)/100,payer,among,locName(locOf(it))]);
+  for(const it of [...S.items].sort((x,y)=>(x.date||"").localeCompare(y.date||""))) line(it.kind==="transfer"?"העברה":"משותף",it,nm(it.payer),it.kind==="transfer"?"":splitText(it));
+  if(me&&acct&&acctFor===me) for(const it of [...P].sort((x,y)=>(x.date||"").localeCompare(y.date||""))) line("אישי של "+nm(me),it,nm(me),"");
+  const csv="\ufeff"+rows.map(r=>r.map(esc).join(",")).join("\r\n");
+  const name=(S.trip||"trip").replace(/[^\w\u0590-\u05FF]+/g,"-").replace(/^-|-$/g,"")+"-"+todayStr()+".csv";
+  const file=new File([csv],name,{type:"text/csv"});
+  try{ if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:name}); return; } }catch(e){ if(e&&e.name==="AbortError") return; }
+  const url=URL.createObjectURL(file); const l=document.createElement("a"); l.href=url; l.download=name; document.body.appendChild(l); l.click(); l.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
+};
+
 /* ---- settings sheet ---- */
 let delAsk=null;
 function usesPerson(id){ return S.items.some(it=>it.payer===id||it.to===id||(it.among||[]).includes(id)||(it.pcts&&id in it.pcts)); }
 function renderSettings(){
+  renderNotif();
   applyTheme(themePref());
   if(document.activeElement!==$("sTrip")) $("sTrip").value=S.trip||"";
   const L=$("people"); L.innerHTML="";
@@ -861,6 +979,10 @@ if(!cfg||!window.firebase){
   return;
 }
 firebase.initializeApp(cfg); db=firebase.firestore(); canWrite=true;
+try{ const pr=db.enablePersistence&&db.enablePersistence({synchronizeTabs:true}); if(pr&&pr.catch) pr.catch(()=>{}); }catch(e){}
+if("serviceWorker" in navigator&&location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
+function netNote(){ $("netNote").hidden=navigator.onLine!==false; }
+window.addEventListener("online",netNote); window.addEventListener("offline",netNote); netNote();
 let gotMeta=false, gotItems=false, firstMeta=true;
 const ready=()=>{
   if(gotMeta&&gotItems&&!loaded){
@@ -868,7 +990,7 @@ const ready=()=>{
     /* opened from the home-screen icon: remember who uses this phone */
     if(!me&&isApp()){ const r=load("trip-me"); if(person(r)&&!person(r).archived){ me=r; syncUrl(); } }
     if(me) store("trip-me",me);
-    if(me){ form.payer=me; refreshPersonal(); if(location.hash&&!readParam("u")) syncUrl(); }
+    if(me){ form.payer=me; refreshPersonal(); if(location.hash&&!readParam("u")) syncUrl(); setTimeout(sinceLastVisit,600); }
     else view="shared";
   }
   renderAll();
@@ -888,7 +1010,14 @@ metaRef().onSnapshot(async s=>{
   if(loaded&&me){ acct=null; acctFor=null; refreshPersonal(); }
   ready();
 },e=>{ console.error(e); $("status").textContent="לא הצלחנו לטעון את הנתונים."; });
-db.collection("expenses").onSnapshot(snap=>{
+let firstItems=true;
+db.collection("expenses").onSnapshot({includeMetadataChanges:true},snap=>{
+  PENDING=new Set(snap.docs.filter(d=>d.metadata&&d.metadata.hasPendingWrites).map(d=>d.id));
+  if(!firstItems&&loaded&&me&&snap.docChanges) for(const ch of snap.docChanges()){
+    const d=ch.doc.data(); if(ch.type!=="added"||!d||d.kind==="private"||!d.by||d.by===me||(ch.doc.metadata&&ch.doc.metadata.hasPendingWrites)) continue;
+    toast("🔔 "+nm(d.by)+" "+(fem(d.by)?"הוסיפה":"הוסיף")+": "+(d.kind==="transfer"?"העברה ל"+nm(d.to):(d.desc||"הוצאה"))+" "+fmt(+d.amount,d.cur));
+  }
+  firstItems=false;
   const all=snap.docs.map(d=>({id:d.id,...d.data()}));
   S.items=all.filter(x=>x.kind!=="private"); RAW=all.filter(x=>x.kind==="private"); if(loaded) refreshPersonal();
   gotItems=true; ready();
