@@ -99,7 +99,7 @@ function compute(){
 
 /* ---- extra state ---- */
 let view="shared";
-let PENDING=new Set(), FRESH=new Set();                 // "shared" | "personal"
+let PENDING=new Set(), FRESH=new Set(), BIN=[], BINRAW=[], purged=false;                 // "shared" | "personal"
 let P=[], pLoaded=false, pEditingId=null, pform={cat:"food"};
 let cur={fCur:null,pCur:null,cFrom:null,cTo:"ILS"};
 let cLast="A";                     // which converter field the person typed in
@@ -366,6 +366,14 @@ function catName(k){ return k.startsWith("other:") ? "✨ "+k.slice(6) : (CATNAM
 function monthOf(it){ return (it.date||"").slice(0,7); }
 function thisMonth(){ return todayStr().slice(0,7); }
 function monthName(ym,long){ const [y,m]=ym.split("-").map(Number); return new Date(y,m-1,1).toLocaleDateString("he-IL",long?{month:"long",year:"numeric"}:{month:"short"}); }
+/* totals shown beside each day heading */
+function sharedDay(d){ const v=S.items.filter(it=>it.date===d&&it.kind!=="transfer").reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0); return v>0?"סה״כ "+fmt(v,showCur):""; }
+function mineDay(d){
+  const alone=P.filter(it=>it.date===d).reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0);
+  const tog=myShareItems().filter(it=>it.date===d).reduce((s,it)=>s+conv(it.amount,it.cur,showCur),0);
+  return "לבד "+fmt(alone,showCur)+" · ביחד "+fmt(tog,showCur)+" · משולב "+fmt(alone+tog,showCur);
+}
+function dayHead(h,d,extra){ h.className="dayhead"; const a=document.createElement("span"); a.textContent=dayLabel(d); h.appendChild(a); if(extra){ const b=document.createElement("span"); b.className="daysum num"; b.textContent=extra; h.appendChild(b); } }
 function dayLabel(s){
   if(!s) return "ללא תאריך"; if(s===todayStr()) return "היום";
   const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d).toLocaleDateString("he-IL",{weekday:"long",day:"numeric",month:"long"});
@@ -390,7 +398,7 @@ function renderLedger(){
   if(!list.length){ const e=document.createElement("div"); e.className="empty"; e.textContent=!loaded?"טוען את ההוצאות…":q?"לא נמצאה הוצאה שמתאימה לחיפוש":S.items.length?"אין הוצאות בסינון הזה":"כאן יופיעו ההוצאות, מסודרות לפי ימים."; L.appendChild(e); return; }
   let curDay=null, box=null;
   for(const it of list){
-    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); h.textContent=dayLabel(it.date); box.appendChild(h); L.appendChild(box); }
+    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,sharedDay(it.date)); box.appendChild(h); L.appendChild(box); }
     const r=document.createElement("div"); r.className="row"+(it.kind==="transfer"?" transfer":"")+(FRESH.has(it.id)?" fresh":"");
     const dot=document.createElement("div"); dot.className="dot c"+pidx(it.payer); dot.textContent=nm(it.payer).trim().charAt(0);
     const main=document.createElement("div"); main.className="main";
@@ -540,7 +548,7 @@ function renderPersonal(){
   if(!list.length){ const e=document.createElement("div"); e.className="empty"; e.textContent=!pLoaded?"טוען…":"עוד אין הוצאות אישיות. מה שתוסיפו כאן שמור בחשבון שלכם, ואף אחד אחר לא רואה אותו."; L.appendChild(e); }
   let curDay=null, box=null;
   for(const it of list){
-    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); h.textContent=dayLabel(it.date); box.appendChild(h); L.appendChild(box); }
+    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,mineDay(it.date)); box.appendChild(h); L.appendChild(box); }
     const r=document.createElement("div"); r.className="row";
     const dot=document.createElement("div"); dot.className="dot c"+pidx(me); dot.textContent=nm(me).trim().charAt(0);
     const main=document.createElement("div"); main.className="main";
@@ -824,11 +832,34 @@ async function again(it,personal){
   else { base.by=me||null; delete base.source; ok=await run(()=>db.collection("expenses").doc(id).set(base)); if(ok) notifyOthers("🧾 "+nm(me||it.payer)+" "+(fem(me||it.payer)?"הוסיפה":"הוסיף")+": "+(base.desc||"הוצאה")+" "+fmt(+base.amount,base.cur)); }
   if(ok) toast("🔁 נוסף שוב להיום: "+(it.desc||"הוצאה"),"ביטול",()=>run(()=>db.collection("expenses").doc(id).delete()));
 }
+/* deleting moves an expense to the recycle bin for 30 days */
+const BIN_DAYS=30;
 async function delItem(it,personal){
-  const src= personal ? RAW.find(r=>r.id===it.id) : S.items.find(r=>r.id===it.id);
-  const copy= src ? {...src} : null; if(copy) delete copy.id;
-  const ok=await run(()=>db.collection("expenses").doc(it.id).delete());
-  if(ok&&copy) toast("🗑 נמחק: "+(it.kind==="transfer"?"העברה":(it.desc||"הוצאה")),"ביטול",()=>run(()=>db.collection("expenses").doc(it.id).set(copy)).then(k=>{ if(k) toast("שוחזר ✓"); }));
+  const ok=await run(()=>db.collection("expenses").doc(it.id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null}));
+  if(ok) toast("🗑 הועבר לסל המחזור: "+(it.kind==="transfer"?"העברה":(it.desc||"הוצאה")),"ביטול",()=>restoreItem(it.id));
+}
+async function restoreItem(id){ const k=await run(()=>db.collection("expenses").doc(id).update({deleted:false,deletedAt:null,deletedBy:null})); if(k) toast("שוחזר ✓"); }
+async function purgeItem(id){ await run(()=>db.collection("expenses").doc(id).delete()); }
+async function renderBin(){
+  const L=$("binList"); if(!L) return; L.innerHTML="";
+  const rows=[...BIN.map(it=>({...it,_mine:false}))];
+  const c=await loadAcct().catch(()=>null);
+  if(c){ for(const r of BINRAW){ if(r.tag!==c.tag) continue; try{ const pb=await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(r.iv)},c.key,unb64(r.data)); rows.push({...JSON.parse(dec.decode(pb)),id:r.id,deletedAt:r.deletedAt,deletedBy:r.deletedBy,_mine:true}); }catch(e){} } }
+  rows.sort((x,y)=>(y.deletedAt||0)-(x.deletedAt||0));
+  $("binCount").textContent=rows.length?"("+rows.length+")":"";
+  if(!rows.length){ L.innerHTML='<div class="hint">הסל ריק.</div>'; return; }
+  for(const it of rows){
+    const r=document.createElement("div"); r.className="prow binrow";
+    const t=document.createElement("div"); t.className="bininfo";
+    const left=Math.max(0,BIN_DAYS-Math.floor((Date.now()-(it.deletedAt||0))/864e5));
+    t.innerHTML='<b></b><small class="hint"></small>';
+    t.querySelector("b").textContent=(it._mine?"🔐 ":"")+(it.kind==="transfer"?"💸 "+nm(it.payer)+" ← "+nm(it.to):(it.desc||"הוצאה"))+" · "+fmt(+it.amount,it.cur);
+    t.querySelector("small").textContent=(it.deletedBy?"נמחק ע״י "+nm(it.deletedBy)+" · ":"")+"יימחק לגמרי בעוד "+left+" ימים";
+    const rs=document.createElement("button"); rs.type="button"; rs.className="btn small"; rs.textContent="↩️ שחזור"; rs.onclick=()=>restoreItem(it.id);
+    const del=document.createElement("button"); del.type="button"; del.className="btn small danger"; del.textContent="מחיקה סופית";
+    del.onclick=()=>{ if(del.dataset.sure){ purgeItem(it.id); } else { del.dataset.sure="1"; del.textContent="בטוח?"; setTimeout(()=>{ if(del.isConnected){ delete del.dataset.sure; del.textContent="מחיקה סופית"; } },3000); } };
+    r.append(t,rs,del); L.appendChild(r);
+  }
 }
 
 /* ---- name suggestions from earlier expenses ---- */
@@ -904,7 +935,7 @@ $("exportBtn").onclick=async()=>{
 let delAsk=null;
 function usesPerson(id){ return S.items.some(it=>it.payer===id||it.to===id||(it.among||[]).includes(id)||(it.pcts&&id in it.pcts)); }
 function renderSettings(){
-  renderNotif();
+  renderNotif(); renderBin();
   applyTheme(themePref());
   if(document.activeElement!==$("sTrip")) $("sTrip").value=S.trip||"";
   const L=$("people"); L.innerHTML="";
@@ -1044,12 +1075,17 @@ let firstItems=true;
 db.collection("expenses").onSnapshot({includeMetadataChanges:true},snap=>{
   PENDING=new Set(snap.docs.filter(d=>d.metadata&&d.metadata.hasPendingWrites).map(d=>d.id));
   if(!firstItems&&loaded&&me&&snap.docChanges) for(const ch of snap.docChanges()){
-    const d=ch.doc.data(); if(ch.type!=="added"||!d||d.kind==="private"||!d.by||d.by===me||(ch.doc.metadata&&ch.doc.metadata.hasPendingWrites)) continue;
+    const d=ch.doc.data(); if(ch.type!=="added"||!d||d.deleted||d.kind==="private"||!d.by||d.by===me||(ch.doc.metadata&&ch.doc.metadata.hasPendingWrites)) continue;
     toast("🔔 "+nm(d.by)+" "+(fem(d.by)?"הוסיפה":"הוסיף")+": "+(d.kind==="transfer"?"העברה ל"+nm(d.to):(d.desc||"הוצאה"))+" "+fmt(+d.amount,d.cur));
   }
   firstItems=false;
   const all=snap.docs.map(d=>({id:d.id,...d.data()}));
-  S.items=all.filter(x=>x.kind!=="private"); RAW=all.filter(x=>x.kind==="private"); if(loaded) refreshPersonal();
+  const live=all.filter(x=>!x.deleted), gone=all.filter(x=>x.deleted);
+  S.items=live.filter(x=>x.kind!=="private"); RAW=live.filter(x=>x.kind==="private");
+  BIN=gone.filter(x=>x.kind!=="private"); BINRAW=gone.filter(x=>x.kind==="private");
+  if(!purged&&!snap.metadata?.fromCache){ purged=true; const cut=Date.now()-BIN_DAYS*864e5; for(const x of gone){ if((x.deletedAt||0)<cut) db.collection("expenses").doc(x.id).delete().catch(()=>{}); } }
+  if(loaded) refreshPersonal();
+  if(!$("setSheet").hidden) renderBin();
   gotItems=true; ready();
 },e=>{ console.error(e); });
 })();

@@ -252,6 +252,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .linkbox{font-size:.8rem;background:var(--surface-2);border-radius:10px;padding:7px 10px;overflow-x:auto;white-space:nowrap;direction:ltr;user-select:all;color:var(--ink)}
 .cat .amtpct small{font-size:.72rem}
 .curbtn.wide{width:100%;justify-content:space-between;font-weight:500;padding:10px 14px}
+.dayhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.daysum{font-weight:500;font-size:.78rem;color:var(--muted)}
+.binrow{grid-template-columns:1fr auto auto}
+.bininfo{display:flex;flex-direction:column;min-width:0}
+.bininfo b{font-weight:500;overflow-wrap:anywhere}
 @media (max-width:440px){
   .grid{grid-template-columns:1fr}
   .cat{grid-template-columns:6em 1fr auto}
@@ -543,6 +548,12 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
     </div>
 
     <div class="sec">
+      <h3>🗑 סל מחזור <span class="hint" id="binCount"></span></h3>
+      <div class="hint">הוצאות שנמחקו נשמרות כאן 30 יום, ואפשר לשחזר אותן. הוצאות אישיות שלך מסומנות ב-🔐 ורק את/ה רואה אותן.</div>
+      <div id="binList" class="stack" style="gap:8px"></div>
+    </div>
+
+    <div class="sec">
       <h3>💾 גיבוי</h3>
       <div class="hint">כל ההוצאות המשותפות, וההוצאות האישיות שלך אם נכנסת לחשבון, בקובץ שנפתח באקסל או ב-Google Sheets.</div>
       <div class="actions"><button class="btn small" id="exportBtn" type="button">ייצוא לאקסל</button></div>
@@ -557,8 +568,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>window.APP_V="20261105170057";</script>
-<script src="config.js?v=20261105170057"></script>
-<script src="app.js?v=20261105170057"></script>
+<script>window.APP_V="20261105171930";</script>
+<script src="config.js?v=20261105171930"></script>
+<script src="app.js?v=20261105171930"></script>
 </body>
 </html>
