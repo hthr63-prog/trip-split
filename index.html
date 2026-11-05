@@ -268,6 +268,9 @@ table.daily td.num{text-align:right}
 .cashline b{font-family:var(--display);font-weight:600;font-size:1.1rem}
 .cashline.main b{font-size:1.9rem}
 .cashline b.neg{color:var(--bad)}
+#cashList .r b.pos{color:var(--good)}
+#cashList .r b.neg{color:var(--bad)}
+.cashacts button{font-size:.88rem;padding:7px 11px}
 .small-amt input{font-size:1.2rem}
 @media (max-width:440px){
   .grid{grid-template-columns:1fr}
@@ -444,21 +447,37 @@ table.daily td.num{text-align:right}
       <section class="card" id="cashCard">
         <div class="card-head"><h2>💵 ארנק מזומן</h2><span class="hint" id="cashFees"></span></div>
         <div id="cashBal" class="cashbal"></div>
-        <div class="actions">
-          <button class="btn small primary" id="cashWBtn" type="button">🏧 משיכה מכספומט</button>
-          <button class="btn small" id="cashABtn" type="button">🔢 עדכון לפי ספירה</button>
+        <div class="seg cashacts">
+          <button id="cashWBtn" type="button">🏧 משיכה</button>
+          <button id="cashABtn" type="button">± עדכון</button>
+          <button id="cashXBtn" type="button">💱 החלפת מטבע</button>
+          <button id="cashRBtn" type="button">🔄 איפוס</button>
         </div>
         <div id="cashW" class="stack" hidden>
           <div class="amount"><input id="cwAmt" class="num" inputmode="decimal" placeholder="כמה משכת" aria-label="סכום משיכה"><button class="curbtn" id="cwCur" type="button"></button></div>
           <div class="amount small-amt"><input id="cwFee" class="num" inputmode="decimal" placeholder="עמלה (לא חובה)" aria-label="עמלה"><button class="curbtn" id="cwFeeCur" type="button"></button></div>
+          <div class="hint">העמלה נרשמת אוטומטית כהוצאה אישית ("עמלות משיכה"). היא לא יורדת מהמזומן.</div>
           <div class="err" id="cwErr" hidden></div>
           <button class="btn primary" id="cwSave" type="button">שמירת משיכה</button>
         </div>
         <div id="cashA" class="stack" hidden>
+          <div class="seg" id="caMode"></div>
           <div class="hint" id="caNow"></div>
-          <div class="amount"><input id="caAmt" class="num" inputmode="decimal" placeholder="כמה יש לך בארנק עכשיו" aria-label="יתרה בפועל"><button class="curbtn" id="caCur" type="button"></button></div>
+          <div class="amount"><input id="caAmt" class="num" inputmode="decimal" aria-label="סכום"><button class="curbtn" id="caCur" type="button"></button></div>
+          <input id="caNote" maxlength="40" placeholder="הערה (לא חובה): למשל טיפ, מונית ששכחנו לרשום">
           <div class="err" id="caErr" hidden></div>
-          <button class="btn primary" id="caSave" type="button">עדכון יתרה</button>
+          <button class="btn primary" id="caSave" type="button">עדכון</button>
+        </div>
+        <div id="cashX" class="stack" hidden>
+          <div class="hint">החלפה בצ׳יינג׳: כמה נתת ובאיזה מטבע, וכמה קיבלת. הסכום שמתקבל מחושב לפי השער, ואפשר לתקן אותו לפי מה שקיבלתם בפועל.</div>
+          <div class="amount small-amt"><input id="cxAmt" class="num" inputmode="decimal" placeholder="נתתי" aria-label="נתתי"><button class="curbtn" id="cxFrom" type="button"></button></div>
+          <div class="amount small-amt"><input id="cxGot" class="num" inputmode="decimal" placeholder="קיבלתי" aria-label="קיבלתי"><button class="curbtn" id="cxTo" type="button"></button></div>
+          <div class="err" id="cxErr" hidden></div>
+          <button class="btn primary" id="cxSave" type="button">שמירת החלפה</button>
+        </div>
+        <div id="cashR" class="stack" hidden>
+          <div class="hint" id="cashRText"></div>
+          <button class="btn danger" id="cashRSave" type="button">כן, לאפס את הארנק</button>
         </div>
         <div class="hint">משיכה היא לא הוצאה. היתרה יורדת לבד כשרושמים הוצאה ששולמה במזומן: הוצאה אישית, או הוצאה משותפת ש<b>את/ה</b> שילמת.</div>
         <div id="cashList" class="stack" style="gap:7px"></div>
@@ -615,8 +634,8 @@ table.daily td.num{text-align:right}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>window.APP_V="20261105172624";</script>
-<script src="config.js?v=20261105172624"></script>
-<script src="app.js?v=20261105172624"></script>
+<script>window.APP_V="20261105173616";</script>
+<script src="config.js?v=20261105173616"></script>
+<script src="app.js?v=20261105173616"></script>
 </body>
 </html>
