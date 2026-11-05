@@ -221,6 +221,28 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .prow input{padding:9px 12px}
 .prow .confirm{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.88rem;color:var(--bad)}
 
+
+/* floating buttons */
+.fabs{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px;z-index:40}
+.fab{width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;display:grid;place-items:center;font-family:var(--display);font-weight:600;line-height:1;transition:transform .15s ease,opacity .2s ease}
+.fab:active{transform:scale(.92)}
+.fab.add{background:var(--grad);color:var(--grad-ink);font-size:2rem;box-shadow:var(--shadow)}
+.fab.up{width:46px;height:46px;margin-inline:5px;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);font-size:1.3rem;box-shadow:0 8px 20px -12px rgba(30,22,64,.5)}
+.fab:focus-visible{outline:3px solid var(--sun);outline-offset:3px}
+.wrap{padding-bottom:110px}
+#addSlot .card{border:none;padding:0;background:transparent}
+/* monthly bars */
+.months{display:flex;align-items:flex-end;gap:10px;height:190px;padding-top:22px;overflow-x:auto}
+.mbar{flex:1 0 54px;max-width:90px;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;background:none;border:none;padding:0;cursor:pointer;font:inherit;color:var(--ink)}
+.mbar .v{font-size:.75rem;font-weight:700;color:var(--ink);white-space:nowrap}
+.mbar .col{width:100%;max-width:44px;border-radius:4px 4px 0 0;background:var(--brand);opacity:.35;min-height:4px;transition:opacity .2s ease,height .4s ease}
+.mbar[aria-pressed="true"] .col{opacity:1;background:var(--grad)}
+.mbar .l{font-size:.78rem;color:var(--muted);white-space:nowrap}
+.mbar[aria-pressed="true"] .l{color:var(--ink);font-weight:700}
+.mbar:focus-visible{outline:3px solid var(--sun);outline-offset:2px;border-radius:8px}
+.stats-ticket{background:linear-gradient(135deg,#F59E0B 0%,#FF4D8D 55%,#6C4BFF 100%)}
+.cat .amtpct{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.cat .amtpct small{color:var(--muted);font-weight:400}
 @media (max-width:440px){
   .grid{grid-template-columns:1fr}
   .cat{grid-template-columns:6em 1fr auto}
@@ -239,6 +261,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
       <div class="sub" id="sub">החשבון המשותף של הטיול</div>
     </div>
     <div class="hbtns">
+      <button class="btn icon-btn" id="statsBtn" type="button" aria-label="גרפים לפי חודשים">📊</button>
       <button class="btn icon-btn" id="themeBtn" type="button" aria-label="מצב בהיר או כהה">🌙</button>
       <button class="btn icon-btn" id="settingsBtn" type="button" aria-label="הגדרות">⚙️</button>
     </div>
@@ -301,7 +324,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
         <div class="seg" id="fMode"></div>
         <div class="pcts" id="fPcts" hidden></div>
       </div>
-      <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="fCat"></div></div>
+      <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="fCat"></div><input id="fCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
       <div class="err" id="fErr" hidden></div>
       <div class="actions">
         <button class="btn primary big" id="saveBtn" type="button">הוספה</button>
@@ -321,7 +344,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
     </section>
 
     <section class="card" id="catPanel" hidden>
-      <h2>📊 לאן הלך הכסף</h2>
+      <div class="card-head"><h2 id="catTitle">📊 לאן הלך הכסף החודש</h2><button class="link" id="catMore" type="button">כל החודשים ←</button></div>
       <div class="cats" id="cats"></div>
     </section>
 
@@ -330,6 +353,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
         <h2>🧾 כל ההוצאות המשותפות</h2>
         <div class="seg" id="filter"></div>
       </div>
+      <input id="lSearch" type="search" placeholder="🔎 חיפוש הוצאה: מה, מי, קטגוריה או סכום" autocomplete="off">
       <div id="ledger"></div>
     </section>
   </div>
@@ -368,7 +392,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
           <label>על מה?<input id="pDesc" maxlength="60" placeholder="מזכרת, קפה, עיסוי…"></label>
           <label>תאריך<span class="datebox"><input id="pDate" type="date"></span></label>
         </div>
-        <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="pCat"></div></div>
+        <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="pCat"></div><input id="pCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
         <div class="err" id="pErr" hidden></div>
         <div class="actions">
           <button class="btn primary big" id="pSave" type="button">הוספה</button>
@@ -377,20 +401,63 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
       </section>
 
       <section class="card" id="pCatPanel" hidden>
-        <h2>📊 לאן הלך הכסף שלך</h2>
+        <div class="card-head"><h2 id="pCatTitle">📊 לאן הלך הכסף שלך החודש</h2><button class="link" id="pCatMore" type="button">כל החודשים ←</button></div>
         <div class="hint">כולל החלק שלך בהוצאות המשותפות</div>
         <div class="cats" id="pCats"></div>
       </section>
 
       <section class="stack">
         <h2>🧾 ההוצאות האישיות שלך</h2>
+        <input id="pSearch" type="search" placeholder="🔎 חיפוש הוצאה" autocomplete="off">
         <div id="pLedger"></div>
       </section>
     </div>
   </div>
 
+  <!-- stats view -->
+  <div id="viewStats" class="stack" style="gap:18px" hidden>
+    <div class="actions"><button class="btn small" id="statsBack" type="button">→ חזרה</button><div class="seg" id="stScope"></div></div>
+    <section class="ticket stats-ticket">
+      <div class="top">
+        <div class="label" id="stLbl">סה״כ</div>
+        <div class="verdict"><span id="stMonthName">החודש</span><br><span class="amt num" id="stMonthTotal">—</span></div>
+      </div>
+      <div class="stats">
+        <div><b class="num" id="stCount">—</b><span>הוצאות</span></div>
+        <div><b class="num" id="stPerDay">—</b><span>ממוצע ליום</span></div>
+        <div><b class="num" id="stAllTime">—</b><span>כל הטיול</span></div>
+      </div>
+      <div class="showin" id="stShowin"></div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>📅 כמה הוצאנו בכל חודש</h2><span class="hint">לוחצים על חודש לפירוט</span></div>
+      <div class="months" id="stMonths" role="list"></div>
+      <div class="note" id="stLock" hidden></div>
+    </section>
+    <section class="card">
+      <h2 id="stCatTitle">📊 על מה</h2>
+      <div class="cats" id="stCats"></div>
+    </section>
+    <section class="card" id="stPayersCard">
+      <h2>🙋 מי שילם</h2>
+      <div class="cats" id="stPayers"></div>
+    </section>
+  </div>
+
   <div class="status" id="status"></div>
   <footer class="foot" id="foot" hidden><span id="footWho"></span> <button class="link" id="switchBtn" type="button">החלפת משתמש</button></footer>
+</div>
+
+<div class="fabs" id="fabs">
+  <button class="fab up" id="fabUp" type="button" aria-label="חזרה למעלה" hidden>↑</button>
+  <button class="fab add" id="fabAdd" type="button" aria-label="הוספת הוצאה" hidden>+</button>
+</div>
+
+<div class="sheet-bg" id="addSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="הוספת הוצאה">
+    <div class="sheet-head"><span></span><button class="btn small" id="addClose" type="button">סגירה</button></div>
+    <div id="addSlot"></div>
+  </div>
 </div>
 
 <!-- currency picker -->
@@ -449,8 +516,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>window.APP_V="20261104235100";</script>
-<script src="config.js?v=20261104235100"></script>
-<script src="app.js?v=20261104235100"></script>
+<script>window.APP_V="20261105070513";</script>
+<script src="config.js?v=20261105070513"></script>
+<script src="app.js?v=20261105070513"></script>
 </body>
 </html>
