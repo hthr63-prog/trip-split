@@ -680,7 +680,19 @@ function renderStats(){
   $("stLbl").textContent= stScope==="mine" ? "ההוצאות של "+nm(me) : "ההוצאות של כל הטיול";
   $("stMonthName").textContent=monthName(stMonth,true);
   $("stMonthTotal").textContent=fmt(tot,showCur);
-  $("stCount").textContent=inM.length; $("stPerDay").textContent=fmt(tot/days,showCur); $("stAllTime").textContent=fmt(all,showCur);
+  if(stScope==="mine"){
+    /* summary split: alone (personal) vs. my part of what we shared */
+    const sum=list=>list.filter(it=>monthOf(it)===stMonth).reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0);
+    const own= acct&&acctFor===me ? sum(P) : 0, shared=sum(myShareItems());
+    const others=active().filter(p=>p.id!==me).map(p=>p.name);
+    $("stCount").textContent=fmt(own,showCur); $("stL1").textContent="🙋 לבד (אישי)";
+    $("stPerDay").textContent=fmt(shared,showCur); $("stL2").textContent="👫 "+(others.length===1?"עם "+others[0]:"משותף")+" (החלק שלך)";
+    $("stAllTime").textContent=fmt(own+shared,showCur); $("stL3").textContent="💜 ביחד החודש";
+  }else{
+    $("stCount").textContent=inM.length; $("stL1").textContent="הוצאות";
+    $("stPerDay").textContent=fmt(tot/days,showCur); $("stL2").textContent="ממוצע ליום";
+    $("stAllTime").textContent=fmt(all,showCur); $("stL3").textContent="כל הטיול";
+  }
   showinRow($("stShowin"));
   const lock=$("stLock"); lock.hidden=!(stScope==="mine"&&!(acct&&acctFor===me));
   lock.textContent="כרגע מוצג רק החלק שלך בהוצאות המשותפות. כדי לכלול גם את ההוצאות האישיות, נכנסים פעם אחת ל\"האישי שלי\" עם הסיסמה.";
