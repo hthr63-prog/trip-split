@@ -282,13 +282,13 @@ function renderConv(){
   if(!cur.cFrom) cur.cFrom=S.localCur;
   const f=cur.cFrom, t=cur.cTo; setCurBtn("cFrom",f); setCurBtn("cTo",t);
   const pa=v=>parseFloat(String(v).replace(/,/g,""));
-  if(cLast==="A"){ const a=pa($("cA").value); if(document.activeElement!==$("cB")) $("cB").value= a>=0? plain(conv(a,f,t)) : ""; }
-  else { const b=pa($("cB").value); if(document.activeElement!==$("cA")) $("cA").value= b>=0? plain(conv(b,t,f)) : ""; }
+  if(cLast==="A"){ const a=pa($("cA").value); if(document.activeElement!==$("cB")) $("cB").value= a>=0? group(plain(conv(a,f,t))) : ""; }
+  else { const b=pa($("cB").value); if(document.activeElement!==$("cA")) $("cA").value= b>=0? group(plain(conv(b,t,f))) : ""; }
   const r=conv(1,f,t);
   $("cRate").innerHTML=""; const s1=document.createElement("span"); s1.textContent="1 "+f+" = "+fmtRate(r)+" "+t; const s2=document.createElement("span"); s2.textContent="1 "+t+" = "+fmtRate(1/r)+" "+f; $("cRate").append(s1,s2);
   const Q=$("cQuick"); Q.innerHTML="";
   const mult=Math.max(1,Math.pow(10,Math.floor(Math.log10(perUsd(f)||1))));
-  for(const x of [100,500,1000].map(v=>v*mult)){ const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=fmt(x,f)+" = "+fmt(conv(x,f,t),t); b.onclick=()=>{ cLast="A"; $("cA").value=x; renderConv(); }; Q.appendChild(b); }
+  for(const x of [100,500,1000].map(v=>v*mult)){ const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=fmt(x,f)+" = "+fmt(conv(x,f,t),t); b.onclick=()=>{ cLast="A"; $("cA").value=group(String(x)); renderConv(); }; Q.appendChild(b); }
   const at=S.fx.at;
   $("fxDate").textContent= S.fx.live&&at ? "שער עדכני · "+at.toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"}) : at ? "שער מ-"+at.toLocaleDateString("he-IL",{day:"numeric",month:"long"}) : "טוען שער…";
 }
@@ -640,7 +640,7 @@ function startEdit(it){
   editingId=it.id; form.payer=it.payer; form.cat=it.cat||"other"; form.loc=locOf(it); form.pm=it.pm||"cash";
   form.among=it.pcts?Object.keys(it.pcts):((it.among&&it.among.length)?[...it.among]:S.people.map(p=>p.id));
   form.mode=it.pcts?"pct":"equal"; form.pcts=it.pcts?{...it.pcts}:{};
-  $("fDesc").value=it.desc||""; $("fCatLabel").value=it.catLabel||""; $("fAmt").value=it.amount; $("fDate").value=it.date||todayStr(); cur.fCur=it.cur;
+  $("fDesc").value=it.desc||""; $("fCatLabel").value=it.catLabel||""; $("fAmt").value=group(String(it.amount)); $("fDate").value=it.date||todayStr(); cur.fCur=it.cur;
   renderForm();
   $("formTitle").textContent="✏️ עריכת הוצאה"; $("saveBtn").textContent="שמירת שינויים"; $("cancelEdit").hidden=false;
   $("form").scrollIntoView({behavior:"smooth",block:"start"});
@@ -681,7 +681,7 @@ $("pCur").onclick=()=>openCurPicker("באיזה מטבע שילמת?",cur.pCur,c
 function pStartEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
   pEditingId=it.id; pform.cat=it.cat||"other"; pform.loc=locOf(it); pform.pm=it.pm||"cash"; cur.pCur=it.cur;
-  $("pDesc").value=it.desc||""; $("pCatLabel").value=it.catLabel||""; $("pAmt").value=it.amount; $("pDate").value=it.date||todayStr();
+  $("pDesc").value=it.desc||""; $("pCatLabel").value=it.catLabel||""; $("pAmt").value=group(String(it.amount)); $("pDate").value=it.date||todayStr();
   $("pFormTitle").textContent="✏️ עריכת הוצאה אישית"; $("pSave").textContent="שמירת שינויים"; $("pCancel").hidden=false; renderPersonal();
   $("pForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
@@ -811,6 +811,26 @@ function renderStats(){
   }
 }
 
+/* ---- amounts are typed with thousands separators: 25,000 or 1,250.50 ---- */
+function group(s){
+  s=String(s).replace(/,/g,"").replace(/[^\d.]/g,"");
+  const i=s.indexOf("."); let int=i<0?s:s.slice(0,i); const frac=i<0?null:s.slice(i+1).replace(/\./g,"").slice(0,2);
+  int=int.replace(/^0+(?=\d)/,"");
+  const g=int.replace(/\B(?=(\d{3})+(?!\d))/g,",");
+  return frac===null? g : (g||"0")+"."+frac;
+}
+function liveGroup(el){
+  el.addEventListener("input",()=>{
+    const raw=el.value, pos=el.selectionStart??raw.length;
+    const before=raw.slice(0,pos).replace(/[^\d.]/g,"").length;   /* digits and dot left of the caret */
+    const out=group(raw); if(out===raw) return;
+    el.value=out;
+    let n=0, c=0; while(c<out.length&&n<before){ if(/[\d.]/.test(out[c])) n++; c++; }
+    try{ el.setSelectionRange(c,c); }catch(e){}
+  });
+}
+for(const id of ["fAmt","pAmt","cA","cB","cwAmt","cwFee","caAmt","cxAmt","cxGot"]) liveGroup($(id));
+
 /* ---- floating buttons: back to top, quick add ---- */
 let addHome=null;
 function openAdd(){
@@ -932,7 +952,7 @@ $("cwFeeCur").onclick=()=>openCurPicker("באיזה מטבע העמלה?",cur.cw
 $("caCur").onclick=()=>openCurPicker("איזה מטבע?",cur.ca||S.localCur,c=>{ cur.ca=c; renderCash(); });
 $("cxFrom").onclick=()=>openCurPicker("נתתי…",cur.cxF||S.localCur,c=>{ cur.cxF=c; renderCash(); cxFill(); });
 $("cxTo").onclick=()=>openCurPicker("קיבלתי…",cur.cxT||"USD",c=>{ cur.cxT=c; renderCash(); cxFill(); });
-function cxFill(){ const a=num("cxAmt"); const f=cur.cxF||S.localCur, t=cur.cxT||(S.localCur==="USD"?"ILS":"USD"); if(a>0&&!$("cxTo").dataset.touched) $("cxGot").value=Math.round(conv(a,f,t)*100)/100; }
+function cxFill(){ const a=num("cxAmt"); const f=cur.cxF||S.localCur, t=cur.cxT||(S.localCur==="USD"?"ILS":"USD"); if(a>0&&!$("cxTo").dataset.touched) $("cxGot").value=group(String(Math.round(conv(a,f,t)*100)/100)); }
 $("cxAmt").addEventListener("input",()=>{ delete $("cxTo").dataset.touched; cxFill(); });
 $("cxGot").addEventListener("input",()=>{ $("cxTo").dataset.touched="1"; });
 $("cwSave").onclick=async()=>{
@@ -1017,11 +1037,11 @@ function suggest(inputId,boxId,pool,apply){
 }
 $("fDesc").addEventListener("input",()=>suggest("fDesc","fSuggest",S.items.filter(x=>x.kind!=="transfer"),it=>{
   $("fDesc").value=it.desc; form.cat=it.cat||"other"; $("fCatLabel").value=it.catLabel||"";
-  if(!$("fAmt").value){ $("fAmt").value=it.amount; cur.fCur=it.cur||cur.fCur; }
+  if(!$("fAmt").value){ $("fAmt").value=group(String(it.amount)); cur.fCur=it.cur||cur.fCur; }
   renderForm(); }));
 $("pDesc").addEventListener("input",()=>suggest("pDesc","pSuggest",P,it=>{
   $("pDesc").value=it.desc; pform.cat=it.cat||"other"; $("pCatLabel").value=it.catLabel||"";
-  if(!$("pAmt").value){ $("pAmt").value=it.amount; cur.pCur=it.cur||cur.pCur; }
+  if(!$("pAmt").value){ $("pAmt").value=group(String(it.amount)); cur.pCur=it.cur||cur.pCur; }
   renderPersonal(); }));
 
 /* ---- notifications: in the app, and to the phone through the free ntfy app ---- */
