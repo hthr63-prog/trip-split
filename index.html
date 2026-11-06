@@ -398,6 +398,9 @@ table.daily td.num{text-align:right}
 
 /* ================= playful layer ================= */
 .btn,.chip,.seg button,.pill,.curbtn,.fab,.curitem,.hero-place{position:relative;overflow:hidden}
+/* items in scrolling columns must keep their height (overflow:hidden would let them shrink to nothing) */
+.curlist > *,.sheet > *,.stack > *,.cats > *,.day > *{flex-shrink:0}
+.curitem{min-height:46px}
 .ripple{position:absolute;border-radius:50%;background:currentColor;opacity:.18;transform:scale(0);pointer-events:none;animation:ripple .6s ease-out forwards}
 @keyframes ripple{to{transform:scale(1);opacity:0}}
 .swipe{position:relative;border-radius:18px}
@@ -833,8 +836,8 @@ table.daily td.num{text-align:right}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>window.APP_V="20261106201439";</script>
-<script src="config.js?v=20261106201439"></script>
-<script src="app.js?v=20261106201439"></script>
+<script>window.APP_V="20261106203233";</script>
+<script src="config.js?v=20261106203233"></script>
+<script src="app.js?v=20261106203233"></script>
 </body>
 </html>
