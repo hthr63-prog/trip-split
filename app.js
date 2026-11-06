@@ -3,7 +3,12 @@ const $=id=>document.getElementById(id);
 const PAGE_URL=location.origin+location.pathname;
 /* ---- motion & feedback ---- */
 const calm=()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){ return false; } };
-const buzz=ms=>{ try{ navigator.vibrate&&navigator.vibrate(ms||8); }catch(e){} };
+let hapticEl=null;
+const buzz=ms=>{ try{
+  if(navigator.vibrate){ navigator.vibrate(ms||8); return; }
+  if(!hapticEl){ const l=document.createElement("label"); l.setAttribute("aria-hidden","true"); l.style.cssText="position:fixed;left:-200px;top:0;opacity:0;pointer-events:none"; const i=document.createElement("input"); i.type="checkbox"; i.setAttribute("switch",""); i.tabIndex=-1; l.appendChild(i); document.body.appendChild(l); hapticEl=l; }
+  hapticEl.click();
+}catch(e){} };
 const MONEY=new Map();   /* last shown value per number, to count from it */
 function money(el,v,cur,key){
   if(!el) return; key=key||el.id||""; const prev=MONEY.get(key); MONEY.set(key,{v,cur});
@@ -453,7 +458,7 @@ function renderLedger(){
       acts.appendChild(d);
       right.appendChild(acts);
     }
-    r.append(dot,main,right); box.appendChild(r);
+    r.append(dot,main,right); box.appendChild(swipeWrap(r,it,false));
   }
 }
 
@@ -603,9 +608,99 @@ function renderPersonal(){
     const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.onclick=()=>again(it,true); acts.prepend(ag);
     acts.appendChild(delBtn(()=>delItem(it,true)));
     right.appendChild(acts);
-    r.append(dot,main,right); box.appendChild(r);
+    r.append(dot,main,right); box.appendChild(swipeWrap(r,it,true));
   }
 }
+
+/* ================= playful layer ================= */
+/* swipe a row: right = repeat for today, left = delete (with undo) */
+function swipeWrap(r,it,personal){
+  const w=document.createElement("div"); w.className="swipe";
+  if(it._fee||!canWrite) { w.appendChild(r); return w; }
+  const canAgain=it.kind!=="transfer";
+  w.innerHTML='<div class="sw-bg"><span class="sw-again">'+(canAgain?"🔁 שוב להיום":"")+'</span><span class="sw-del">'+(it.kind==="transfer"?"↩️ ביטול":"🗑 מחיקה")+'</span></div>';
+  w.appendChild(r);
+  let x0=0,y0=0,dx=0,drag=false,locked=false,id=null,armed=0;
+  const TH=88;
+  r.addEventListener("pointerdown",e=>{ if(e.target.closest("button")) return; x0=e.clientX; y0=e.clientY; dx=0; drag=true; locked=false; id=e.pointerId; armed=0; });
+  r.addEventListener("pointermove",e=>{
+    if(!drag||e.pointerId!==id) return; const mx=e.clientX-x0, my=e.clientY-y0;
+    if(!locked){ if(Math.abs(mx)<8&&Math.abs(my)<8) return; if(Math.abs(my)>Math.abs(mx)){ drag=false; return; } locked=true; try{ r.setPointerCapture(id); }catch(_){} w.classList.add("dragging"); }
+    dx= mx>0&&!canAgain ? mx*.2 : mx; const ease=Math.sign(dx)*Math.min(Math.abs(dx),140+Math.max(0,Math.abs(dx)-140)*.25);
+    r.style.transform="translateX("+ease+"px)"; w.classList.toggle("to-again",dx>0); w.classList.toggle("to-del",dx<0);
+    const now= Math.abs(dx)>TH ? Math.sign(dx) : 0; if(now!==armed){ armed=now; w.classList.toggle("armed",!!now); if(now) buzz(10); }
+  });
+  const end=()=>{ if(!drag) return; drag=false; w.classList.remove("dragging");
+    const act=armed; r.style.transform=""; w.classList.remove("armed","to-again","to-del");
+    if(act>0&&canAgain) again(it,personal); else if(act<0) delItem(it,personal); };
+  r.addEventListener("pointerup",end); r.addEventListener("pointercancel",end);
+  return w;
+}
+
+/* ripple from the touch point */
+document.addEventListener("pointerdown",e=>{
+  if(calm()) return; const t=e.target.closest(".btn,.chip,.seg button,.pill,.curbtn,.fab,.curitem,.hero-place"); if(!t||t.disabled) return;
+  const r=t.getBoundingClientRect(), s=Math.max(r.width,r.height)*2.2, d=document.createElement("span"); d.className="ripple";
+  d.style.width=d.style.height=s+"px"; d.style.left=(e.clientX-r.left-s/2)+"px"; d.style.top=(e.clientY-r.top-s/2)+"px";
+  t.appendChild(d); setTimeout(()=>d.remove(),600);
+},{passive:true});
+
+/* category emoji burst when an expense is saved */
+function burst(from,emoji){
+  if(calm()||!from) return; const r=from.getBoundingClientRect(); const box=document.createElement("div"); box.className="burst"; document.body.appendChild(box);
+  for(let i=0;i<10;i++){ const s=document.createElement("span"); s.textContent=emoji; s.style.left=(r.left+r.width/2)+"px"; s.style.top=(r.top+r.height/2)+"px"; box.appendChild(s);
+    const a=Math.PI*(1.1+Math.random()*.8), dist=70+Math.random()*90;
+    s.animate([{transform:"translate(-50%,-50%) scale(.4)",opacity:1},{transform:`translate(calc(-50% + ${Math.cos(a)*dist}px),calc(-50% + ${Math.sin(a)*dist}px)) scale(1.15)`,opacity:1,offset:.6},{transform:`translate(calc(-50% + ${Math.cos(a)*dist*1.2}px),calc(-50% + ${Math.sin(a)*dist*1.2+40}px)) scale(.8)`,opacity:0}],{duration:900+Math.random()*300,easing:"cubic-bezier(.2,.8,.3,1)",fill:"forwards"}); }
+  setTimeout(()=>box.remove(),1400);
+}
+
+/* streak milestones */
+function checkStreak(){
+  if(!me) return; const n=streak(); const k="trip-streak-"+me; const prev=+load(k)||0; store(k,String(n));
+  if(n>prev&&n>=2){ setTimeout(()=>{ toast("🔥 רצף של "+n+" ימים! ממשיכים ככה"); if(n%5===0) confetti(); buzz([10,50,10,50,20]); },700); }
+}
+
+/* scroll: hero parallax, compact bar, back-to-top, reveal on scroll */
+let ticking=false;
+function onScroll(){
+  ticking=false; const y=window.scrollY;
+  $("fabUp").hidden= y<400;
+  if(!calm()){ const sc=document.querySelector(".hero .scene"), tx=document.querySelector(".hero-txt");
+    if(sc&&y<400){ sc.style.transform="translateY("+(y*.35)+"px) scale("+(1+y/1600)+")"; tx.style.opacity=String(Math.max(0,1-y/170)); tx.style.transform="translateY("+(y*.15)+"px)"; } }
+  const t=$("ticket"); const mini=$("mini");
+  if(view!=="shared"||!loaded||!t){ mini.classList.remove("show"); return; }
+  const b=t.getBoundingClientRect().bottom; mini.classList.toggle("show",b<0);
+}
+window.addEventListener("scroll",()=>{ if(!ticking){ ticking=true; requestAnimationFrame(onScroll); } },{passive:true});
+function renderMini(){
+  const c=compute(); const mine=me? c.debts.filter(d=>d.from===me||d.to===me):c.debts; let txt="אתם מאוזנים 🎉";
+  if(mine.length===1){ const d=mine[0]; txt= me&&d.to===me ? nm(d.from)+" "+g.owes(d.from)+" לך "+fmt(d.amt,showCur) : me ? g.you(me)+" "+g.owes(me)+" ל"+nm(d.to)+" "+fmt(d.amt,showCur) : nm(d.from)+" ← "+nm(d.to)+" "+fmt(d.amt,showCur); }
+  else if(mine.length>1&&me){ const b=c.bal[me]||0; txt= b>0?"מגיע לך "+fmt(b,showCur):g.you(me)+" "+g.owes(me)+" "+fmt(-b,showCur); }
+  $("miniTxt").textContent=txt; $("miniDay").textContent=$("heroDay").textContent+" "+$("heroSince").textContent;
+}
+$("mini").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
+const revealed=new WeakSet();
+const io=("IntersectionObserver" in window)? new IntersectionObserver(es=>{ for(const e of es){ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } } },{rootMargin:"0px 0px -6% 0px",threshold:.08}) : null;
+function watchReveal(){
+  if(!io||calm()) return;
+  document.querySelectorAll("#viewShared > section, #viewPersonal section, #viewStats > section, .insight").forEach(el=>{
+    if(revealed.has(el)) return; revealed.add(el);
+    const r=el.getBoundingClientRect(); if(r.top<innerHeight) return;   /* already on screen: leave it alone */
+    el.classList.add("rv"); io.observe(el);
+  });
+}
+
+/* pull down at the top to refresh the rates */
+(()=>{
+  let y0=null, pull=0; const P=$("ptr");
+  window.addEventListener("touchstart",e=>{ y0= window.scrollY<=0 && !document.querySelector(".sheet-bg:not([hidden])") ? e.touches[0].clientY : null; pull=0; },{passive:true});
+  window.addEventListener("touchmove",e=>{ if(y0==null) return; pull=Math.max(0,e.touches[0].clientY-y0); if(pull<=0) return;
+    const d=Math.min(110,pull*.5); P.style.transform="translate(-50%,"+(d-50)+"px) rotate("+(d*3)+"deg)"; P.style.opacity=String(Math.min(1,d/60)); P.classList.toggle("ready",d>=70); },{passive:true});
+  window.addEventListener("touchend",async()=>{ if(y0==null) return; const go=P.classList.contains("ready"); y0=null;
+    if(go){ P.classList.add("spin"); buzz(12); await refreshRates(); checkUpdate&&checkUpdate(); setTimeout(()=>{ P.classList.remove("spin","ready"); P.style.transform=""; P.style.opacity="0"; toast("✈️ רוענן: שער עדכני "+new Date().toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})); },600); }
+    else { P.classList.remove("ready"); P.style.transform=""; P.style.opacity="0"; } },{passive:true});
+})();
+
 /* ---- visual layer: category tiles, hero, insights ---- */
 const CAT_TINT={food:"#FF8A3D",stay:"#6C4BFF",transport:"#14B8A6",fun:"#FF4D8D",party:"#B84DFF",laundry:"#3B82F6",shop:"#F59E0B",other:"#8B85A8"};
 function catEmoji(it){ if(it.kind==="transfer") return "💸"; if(it._fee) return "🏧"; const k=it.cat||"other"; const l=(CATNAME[k]||OLD_CATS[k]||"✨").split(" ")[0]; return l; }
@@ -614,8 +709,8 @@ function catTile(it,payer){
   if(payer){ const w=document.createElement("span"); w.className="who c"+pidx(payer); w.textContent=nm(payer).trim().charAt(0); d.appendChild(w); }
   return d;
 }
-/* the trip started on 12.10.2026 unless changed in settings */
-const TRIP_START="2026-10-12";
+/* the trip starts on 12.11.2026 unless changed in settings */
+const TRIP_START="2026-11-12";
 function tripStart(){ if(S.startDate) return S.startDate; if(TRIP_START) return TRIP_START; const ds=S.items.filter(it=>it.kind!=="transfer"&&locOf(it)!=="prep"&&it.date).map(it=>it.date).sort(); return ds[0]||null; }
 function daysBetween(a,b){ const [y1,m1,d1]=a.split("-").map(Number),[y2,m2,d2]=b.split("-").map(Number); return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/864e5); }
 function streak(){
@@ -629,8 +724,9 @@ function renderHero(){
   if(H.hidden) return;
   const k=S.localCur; const name=(CTRY[k]||CUR[k]?.name||k); const flag=name.split(" ")[0]; const country=CTRY[k]?name.slice(flag.length+1):name;
   $("heroFlag").textContent=CTRY[k]?flag:"🌏"; $("heroCountry").textContent=CTRY[k]?country:name;
-  const st=tripStart(); const dayN= st? Math.max(1,daysBetween(st,todayStr())+1) : 1;
-  $("heroDay").textContent="יום "+dayN; $("heroSince").textContent= st? "לטיול" : "הטיול מתחיל";
+  const st=tripStart(); const diff= st? daysBetween(st,todayStr()) : 0;
+  if(st&&diff<0){ const left=-diff; $("heroDay").textContent= left===1?"מחר!":"עוד "+left; $("heroSince").textContent= left===1?"טסים ✈️":"ימים לטיסה ✈️"; }
+  else { $("heroDay").textContent="יום "+(diff+1); $("heroSince").textContent="לטיול"; }
   const countries=new Set(S.items.filter(it=>it.kind!=="transfer").map(locOf).filter(c=>CTRY[c])).size;
   const C=$("heroChips"); C.innerHTML="";
   const chip=(txt,hot)=>{ const s=document.createElement("span"); s.textContent=txt; if(hot) s.className="hot"; C.appendChild(s); };
@@ -661,6 +757,7 @@ $("heroPlace").onclick=()=>$("localBtn").click();
 
 function renderAll(){
   renderHero(); renderInsight();
+  requestAnimationFrame(()=>{ watchReveal(); renderMini(); onScroll(); });
   renderHeader();
   if(view==="stats"){ renderStats(); }
   else if(view==="personal"&&me){ renderPersonal(); }
@@ -750,7 +847,7 @@ async function save(){
   const id=editingId||uid("e");
   const ok=await run(()=> editingId ? db.collection("expenses").doc(id).update(data) : db.collection("expenses").doc(id).set({...data,createdAt:Date.now(),tz:hereTz(),by:me||null}));
   if(ok&&!editingId) notifyOthers("🧾 "+nm(me||form.payer)+" "+(fem(me||form.payer)?"הוסיפה":"הוסיף")+": "+data.desc+" "+fmt(amount,data.cur));
-  if(ok){ done($("saveBtn")); }
+  if(ok){ done($("saveBtn")); burst($("saveBtn"),catEmoji(data)); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
 async function addTransfer(from,to,amt){
@@ -793,7 +890,7 @@ async function pSave(){
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
   const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz()});
   const ok=await run(()=>db.collection("expenses").doc(id).set(doc));
-  if(ok){ done($("pSave")); }
+  if(ok){ done($("pSave")); burst($("pSave"),catEmoji(data)); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
 $("fLoc").onclick=()=>openLocPicker(form.loc||S.localCur,k=>{ form.loc=k; renderForm(); });
@@ -1092,7 +1189,7 @@ async function again(it,personal){
 /* deleting moves an expense to the recycle bin for 30 days */
 const BIN_DAYS=30;
 async function delItem(it,personal){
-  const row=document.querySelector('.row[data-id="'+CSS.escape(it.id)+'"]');
+  const r0=document.querySelector('.row[data-id="'+CSS.escape(it.id)+'"]'); const row=r0&&r0.closest(".swipe")||r0;
   if(row&&!calm()){ row.classList.add("leave"); buzz(12); await new Promise(r=>setTimeout(r,240)); }
   SEEN.delete(it.id);
   const ok=await run(()=>db.collection("expenses").doc(it.id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null}));

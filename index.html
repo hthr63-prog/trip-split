@@ -395,6 +395,33 @@ table.daily td.num{text-align:right}
 @keyframes twinkle{0%,100%{opacity:.35}50%{opacity:1}}
 @keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,30px)}}
 @keyframes float2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-50px,-30px) scale(1.15)}}
+
+/* ================= playful layer ================= */
+.btn,.chip,.seg button,.pill,.curbtn,.fab,.curitem,.hero-place{position:relative;overflow:hidden}
+.ripple{position:absolute;border-radius:50%;background:currentColor;opacity:.18;transform:scale(0);pointer-events:none;animation:ripple .6s ease-out forwards}
+@keyframes ripple{to{transform:scale(1);opacity:0}}
+.swipe{position:relative;border-radius:18px}
+.swipe .sw-bg{position:absolute;inset:0;border-radius:18px;display:flex;justify-content:space-between;align-items:center;padding:0 18px;font-weight:700;color:#fff;opacity:0;transition:opacity .15s}
+.swipe.to-again .sw-bg{opacity:1;background:linear-gradient(90deg,transparent,#0E9F7E 40%)}
+.swipe.to-del .sw-bg{opacity:1;background:linear-gradient(270deg,transparent,#E5484D 40%)}
+.swipe.to-again .sw-del,.swipe.to-del .sw-again{visibility:hidden}
+.swipe .sw-bg span{transition:transform .2s cubic-bezier(.3,.7,.4,1.6)}
+.swipe.armed .sw-bg span{transform:scale(1.18)}
+.swipe .row{position:relative;touch-action:pan-y;transition:transform .32s cubic-bezier(.3,.7,.4,1.2)}
+.swipe.dragging .row{transition:none;cursor:grabbing;box-shadow:0 10px 24px -14px rgba(30,20,80,.45)}
+.swipe.leave{animation:leave .24s cubic-bezier(.4,0,1,1) forwards;overflow:hidden}
+.burst{position:fixed;inset:0;pointer-events:none;z-index:85}
+.burst span{position:fixed;font-size:22px}
+.mini{position:fixed;top:0;left:50%;transform:translate(-50%,-120%);z-index:45;margin-top:calc(env(safe-area-inset-top,0px) + 8px);display:flex;align-items:center;gap:10px;background:color-mix(in srgb,var(--surface) 82%,transparent);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border:1.5px solid var(--line);border-radius:999px;padding:8px 16px;font:inherit;font-family:var(--display);font-weight:600;color:var(--ink);box-shadow:0 10px 24px -14px rgba(30,20,80,.5);cursor:pointer;white-space:nowrap;max-width:calc(100vw - 32px);transition:transform .35s cubic-bezier(.2,.9,.3,1.2)}
+.mini small{font-family:var(--body);font-weight:400;color:var(--muted);font-size:.78rem}
+.mini.show{transform:translate(-50%,0)}
+.ptr{position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);left:50%;transform:translate(-50%,-50px);z-index:46;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--surface);box-shadow:var(--shadow);font-size:1.3rem;opacity:0;pointer-events:none}
+.ptr.ready{background:var(--sun)}
+.ptr.spin{animation:spin .6s linear infinite}
+.rv{opacity:0;transform:translateY(22px) scale(.985)}
+.rv.in{opacity:1;transform:none;transition:opacity .55s cubic-bezier(.2,.8,.2,1),transform .55s cubic-bezier(.2,.8,.2,1)}
+.hero .scene,.hero-txt{will-change:transform}
+@media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none}.mini{transition:none}}
 @media (max-width:440px){
   .grid{grid-template-columns:1fr}
   .cat{grid-template-columns:6em 1fr auto}
@@ -700,6 +727,8 @@ table.daily td.num{text-align:right}
   <footer class="foot" id="foot" hidden><span id="footWho"></span> <button class="link" id="switchBtn" type="button">החלפת משתמש</button></footer>
 </div>
 
+<div class="ptr" id="ptr" aria-hidden="true">✈️</div>
+<button class="mini" id="mini" type="button" aria-label="חזרה למעלה"><span id="miniTxt"></span><small id="miniDay"></small></button>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <div class="fabs" id="fabs">
@@ -804,8 +833,8 @@ table.daily td.num{text-align:right}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>window.APP_V="20261106200932";</script>
-<script src="config.js?v=20261106200932"></script>
-<script src="app.js?v=20261106200932"></script>
+<script>window.APP_V="20261106201439";</script>
+<script src="config.js?v=20261106201439"></script>
+<script src="app.js?v=20261106201439"></script>
 </body>
 </html>
