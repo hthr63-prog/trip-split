@@ -435,11 +435,11 @@ function renderLedger(){
   for(const it of list){
     if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,sharedDay(it.date)); box.appendChild(h); L.appendChild(box); }
     const r=document.createElement("div"); r.className="row"+(it.kind==="transfer"?" transfer":"")+(FRESH.has(it.id)?" fresh":"")+(PENDING.has(it.id)?" pending":"")+(isNew(it.id)?" enter":""); r.dataset.id=it.id;
-    const dot=document.createElement("div"); dot.className="dot c"+pidx(it.payer); dot.textContent=nm(it.payer).trim().charAt(0);
+    const dot=catTile(it, it.kind==="transfer"?null:it.payer);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; const m=document.createElement("div"); m.className="m";
     if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent=withTime(it,"סגירת חשבון"); }
-    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+splitText(it)+" · "+catName(catKey(it))); }
+    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
@@ -589,10 +589,10 @@ function renderPersonal(){
   for(const it of list){
     if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,""); box.appendChild(h); L.appendChild(box); }
     const r=document.createElement("div"); r.className="row"+(isNew(it.id)?" enter":""); r.dataset.id=it.id;
-    const dot=document.createElement("div"); dot.className="dot c"+pidx(me); dot.textContent=nm(me).trim().charAt(0);
+    const dot=catTile(it,null);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; t.textContent=it.desc||"הוצאה";
-    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(it,"אישי · "+catName(catKey(it)));
+    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(it,"אישי · "+catName(catKey(it)).replace(/^\S+\s/,""));
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
@@ -606,7 +606,59 @@ function renderPersonal(){
     r.append(dot,main,right); box.appendChild(r);
   }
 }
+/* ---- visual layer: category tiles, hero, insights ---- */
+const CAT_TINT={food:"#FF8A3D",stay:"#6C4BFF",transport:"#14B8A6",fun:"#FF4D8D",party:"#B84DFF",laundry:"#3B82F6",shop:"#F59E0B",other:"#8B85A8"};
+function catEmoji(it){ if(it.kind==="transfer") return "💸"; if(it._fee) return "🏧"; const k=it.cat||"other"; const l=(CATNAME[k]||OLD_CATS[k]||"✨").split(" ")[0]; return l; }
+function catTile(it,payer){
+  const d=document.createElement("div"); d.className="cattile"; d.style.setProperty("--tint",it.kind==="transfer"?"#0E9F7E":(CAT_TINT[it.cat]||CAT_TINT.other)); d.textContent=catEmoji(it);
+  if(payer){ const w=document.createElement("span"); w.className="who c"+pidx(payer); w.textContent=nm(payer).trim().charAt(0); d.appendChild(w); }
+  return d;
+}
+function tripStart(){ const ds=S.items.filter(it=>it.kind!=="transfer"&&locOf(it)!=="prep"&&it.date).map(it=>it.date).sort(); return ds[0]||null; }
+function daysBetween(a,b){ const [y1,m1,d1]=a.split("-").map(Number),[y2,m2,d2]=b.split("-").map(Number); return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/864e5); }
+function streak(){
+  const days=new Set([...S.items.filter(it=>it.kind!=="transfer").map(it=>it.date),...P.map(it=>it.date)]);
+  let n=0, d=todayStr(); if(!days.has(d)){ const y=new Date(); y.setDate(y.getDate()-1); d=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0"); }
+  while(days.has(d)){ n++; const [Y,M,D]=d.split("-").map(Number); const t=new Date(Y,M-1,D-1); d=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); }
+  return n;
+}
+function renderHero(){
+  const H=$("hero"); H.hidden= !loaded || view==="stats";
+  if(H.hidden) return;
+  const k=S.localCur; const name=(CTRY[k]||CUR[k]?.name||k); const flag=name.split(" ")[0]; const country=CTRY[k]?name.slice(flag.length+1):name;
+  $("heroFlag").textContent=CTRY[k]?flag:"🌏"; $("heroCountry").textContent=CTRY[k]?country:name;
+  const st=tripStart(); const dayN= st? Math.max(1,daysBetween(st,todayStr())+1) : 1;
+  $("heroDay").textContent="יום "+dayN; $("heroSince").textContent= st? "לטיול" : "הטיול מתחיל";
+  const countries=new Set(S.items.filter(it=>it.kind!=="transfer").map(locOf).filter(c=>CTRY[c])).size;
+  const C=$("heroChips"); C.innerHTML="";
+  const chip=(txt,hot)=>{ const s=document.createElement("span"); s.textContent=txt; if(hot) s.className="hot"; C.appendChild(s); };
+  const sk=streak(); if(sk>=2) chip("🔥 "+sk+" ימים ברצף",true);
+  chip("🌏 "+countries+" "+(countries===1?"מדינה":"מדינות"));
+  chip("🧾 "+S.items.filter(it=>it.kind!=="transfer").length+" הוצאות");
+}
+let insIdx=0, insTimer=null;
+function insights(){
+  const out=[]; const td=todayStr(); const sh=S.items.filter(it=>it.kind!=="transfer"&&locOf(it)!=="prep");
+  const byDay={}; for(const it of sh){ byDay[it.date]=(byDay[it.date]||0)+conv(+it.amount||0,it.cur,showCur); }
+  const days=Object.keys(byDay).filter(d=>d!==td); const avg=days.length? days.reduce((s,d)=>s+byDay[d],0)/days.length : 0;
+  const today=byDay[td]||0;
+  if(avg>0&&today>0){ const diff=(today-avg)/avg; out.push(diff<=-.1?["👏","היום הוצאתם "+fmt(today,showCur)+", "+Math.round(-diff*100)+"% פחות מהממוצע היומי"]:diff>=.1?["🧭","היום כבר "+fmt(today,showCur)+", "+Math.round(diff*100)+"% מעל הממוצע היומי ("+fmt(avg,showCur)+")"]:["🎯","היום בדיוק בקצב: "+fmt(today,showCur)+", כמו הממוצע היומי"]); }
+  else if(avg>0) out.push(["☀️","עוד לא נרשמו הוצאות היום. הממוצע היומי שלכם: "+fmt(avg,showCur)]);
+  const ym=thisMonth(), cats={}; let tot=0; for(const it of sh){ if(monthOf(it)!==ym) continue; const v=conv(+it.amount||0,it.cur,showCur); cats[catKey(it)]=(cats[catKey(it)]||0)+v; tot+=v; }
+  const top=Object.entries(cats).sort((x,y)=>y[1]-x[1])[0]; if(top&&tot>0) out.push([catName(top[0]).split(" ")[0],"הכי הרבה החודש הולך על "+catName(top[0]).split(" ").slice(1).join(" ")+": "+Math.round(top[1]/tot*100)+"% מההוצאות"]);
+  const week=sh.filter(it=>daysBetween(it.date||td,td)<7).length; if(week>0) out.push(["✍️",week+" הוצאות נרשמו השבוע. ככה המאזן תמיד מדויק"]);
+  const c=compute(); if(me&&!c.debts.length&&sh.length) out.push(["🤝","אתם מאוזנים. אף אחד לא חייב כלום"]);
+  return out;
+}
+function renderInsight(){
+  const I=$("insight"); const list=(loaded&&view==="shared")?insights():[]; I.hidden=!list.length; if(!list.length) return;
+  const [ico,txt]=list[insIdx%list.length]; $("insIco").textContent=ico; $("insTxt").textContent=txt;
+  clearInterval(insTimer); if(list.length>1) insTimer=setInterval(()=>{ insIdx++; const L=insights(); if(!L.length) return; const [i2,t2]=L[insIdx%L.length]; $("insIco").textContent=i2; $("insTxt").textContent=t2; flash(I,"swap",400); },7000);
+}
+$("heroPlace").onclick=()=>$("localBtn").click();
+
 function renderAll(){
+  renderHero(); renderInsight();
   renderHeader();
   if(view==="stats"){ renderStats(); }
   else if(view==="personal"&&me){ renderPersonal(); }

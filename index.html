@@ -354,6 +354,47 @@ table.daily td.num{text-align:right}
 }
 .confetti{position:fixed;inset:0;pointer-events:none;z-index:80;overflow:hidden}
 .confetti i{position:absolute;bottom:35%;width:9px;height:14px;border-radius:2px}
+
+/* ================= hero illustration, insight, category tiles ================= */
+:root{--sky1:#FFB37A;--sky2:#FF7FA8;--sky3:#B48CFF;--sun1:#FFE7A3;--cloud:rgba(255,255,255,.75);--mnt1:#9D6BE8;--mnt2:#7B4FD6;--sil:#3B1F7A;--sea1:#6E5BFF;--sea2:#4A2FC9;--wave:rgba(255,255,255,.55);--star:0}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--sky1:#0E0A2A;--sky2:#2A1660;--sky3:#5A2C8F;--sun1:#F4F1FF;--cloud:rgba(200,190,255,.18);--mnt1:#3A2478;--mnt2:#2A175E;--sil:#120B30;--sea1:#2A1D78;--sea2:#160E45;--wave:rgba(180,170,255,.35);--star:1}}
+:root[data-theme="dark"]{--sky1:#0E0A2A;--sky2:#2A1660;--sky3:#5A2C8F;--sun1:#F4F1FF;--cloud:rgba(200,190,255,.18);--mnt1:#3A2478;--mnt2:#2A175E;--sil:#120B30;--sea1:#2A1D78;--sea2:#160E45;--wave:rgba(180,170,255,.35);--star:1}
+.hero{position:relative;border-radius:26px;overflow:hidden;min-height:150px;box-shadow:var(--shadow);isolation:isolate}
+.hero .scene{position:absolute;inset:0;width:100%;height:100%;z-index:-1}
+.hero .stars{opacity:var(--star)}
+.hero-txt{position:relative;display:grid;grid-template-columns:1fr auto;grid-template-areas:"place day" "chips chips";gap:6px 10px;padding:14px 16px 14px;color:#fff;min-height:150px;align-content:space-between;text-shadow:0 1px 8px rgba(40,10,90,.35)}
+.hero-place{grid-area:place;justify-self:start;align-self:start;font:inherit;font-family:var(--display);font-weight:600;font-size:1.05rem;color:#fff;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:999px;padding:5px 12px;cursor:pointer}
+.hero-day{grid-area:day;text-align:left;display:flex;flex-direction:column;align-items:flex-end;line-height:1}
+.hero-day .num{font-family:var(--display);font-weight:700;font-size:2.2rem}
+.hero-day small{font-size:.74rem;opacity:.9;margin-top:4px}
+.hero-chips{grid-area:chips;display:flex;gap:6px;flex-wrap:wrap;align-self:end}
+.hero-chips span{background:rgba(20,8,60,.32);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:3px 10px;font-size:.8rem;font-weight:500;white-space:nowrap}
+.hero-chips span.hot{background:linear-gradient(135deg,#FF8A3D,#FF4D8D);border-color:transparent}
+.insight{display:flex;align-items:center;gap:10px;background:var(--surface);border:1.5px solid var(--line);border-radius:18px;padding:10px 14px;font-size:.92rem}
+.ins-ico{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:var(--surface-2);font-size:1.1rem;flex-shrink:0}
+.cattile{position:relative;width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:1.25rem;background:color-mix(in srgb,var(--tint) 22%,var(--surface));border:1.5px solid color-mix(in srgb,var(--tint) 35%,transparent)}
+.cattile .who{position:absolute;bottom:-4px;inset-inline-start:-4px;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:.62rem;font-weight:700;font-family:var(--display);border:2px solid var(--surface)}
+.who.c0{background:var(--p0)}.who.c1{background:var(--p1)}.who.c2{background:var(--p2)}.who.c3{background:var(--p3)}.who.c4{background:var(--p4)}.who.c5{background:var(--p5)}
+.ticket::before{content:"";position:absolute;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(255,200,120,.45),transparent 65%);right:-90px;bottom:-120px;pointer-events:none;z-index:0}
+@media (prefers-reduced-motion:no-preference){
+  .hero .c1{animation:drift 38s linear infinite}
+  .hero .c2{animation:drift 52s linear infinite;animation-delay:-20s}
+  .hero .waves{animation:waves 6s linear infinite}
+  .hero .sunglow{animation:breathe 5s ease-in-out infinite;transform-origin:300px 78px}
+  .hero .stars circle{animation:twinkle 3s ease-in-out infinite}
+  .hero .stars circle:nth-child(2n){animation-delay:1.2s}.hero .stars circle:nth-child(3n){animation-delay:2s}
+  .ticket::after{animation:float1 14s ease-in-out infinite}
+  .ticket::before{animation:float2 18s ease-in-out infinite}
+  .hero-chips span.hot{animation:popIn .5s .4s both}
+  .insight:not([hidden]){animation:rise .4s ease both}
+  .insight.swap #insTxt{animation:rise .35s ease both}
+}
+@keyframes drift{from{transform:translateX(-140px)}to{transform:translateX(460px)}}
+@keyframes waves{from{transform:translateX(0)}to{transform:translateX(-40px)}}
+@keyframes breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.12);opacity:1}}
+@keyframes twinkle{0%,100%{opacity:.35}50%{opacity:1}}
+@keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,30px)}}
+@keyframes float2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-50px,-30px) scale(1.15)}}
 @media (max-width:440px){
   .grid{grid-template-columns:1fr}
   .cat{grid-template-columns:6em 1fr auto}
@@ -380,6 +421,47 @@ table.daily td.num{text-align:right}
 
   <div class="note" id="roNote" hidden></div>
   <div class="note" id="netNote" hidden>📴 אין קליטה כרגע. מה שתוסיפו נשמר בטלפון ויעלה לבד כשתחזור קליטה.</div>
+
+  <section class="hero" id="hero" hidden>
+    <svg class="scene" viewBox="0 0 400 150" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sky1)"/><stop offset=".6" style="stop-color:var(--sky2)"/><stop offset="1" style="stop-color:var(--sky3)"/></linearGradient>
+        <radialGradient id="sunG"><stop offset="0" style="stop-color:var(--sun1)"/><stop offset=".55" style="stop-color:var(--sun1)"/><stop offset="1" style="stop-color:var(--sun1);stop-opacity:0"/></radialGradient>
+        <linearGradient id="seaG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sea1)"/><stop offset="1" style="stop-color:var(--sea2)"/></linearGradient>
+      </defs>
+      <rect width="400" height="150" fill="url(#skyG)"/>
+      <g class="stars" style="fill:#fff">
+        <circle cx="40" cy="20" r="1.2"/><circle cx="90" cy="38" r=".9"/><circle cx="140" cy="14" r="1.1"/><circle cx="300" cy="24" r="1"/><circle cx="350" cy="12" r="1.3"/><circle cx="250" cy="40" r=".8"/><circle cx="190" cy="30" r=".9"/>
+      </g>
+      <circle class="sunglow" cx="300" cy="78" r="46" fill="url(#sunG)"/>
+      <circle class="sun" cx="300" cy="78" r="22" style="fill:var(--sun1)"/>
+      <g class="cloud c1" style="fill:var(--cloud)"><ellipse cx="80" cy="40" rx="26" ry="9"/><ellipse cx="96" cy="34" rx="15" ry="10"/><ellipse cx="66" cy="36" rx="11" ry="8"/></g>
+      <g class="cloud c2" style="fill:var(--cloud)"><ellipse cx="220" cy="26" rx="20" ry="7"/><ellipse cx="232" cy="21" rx="12" ry="8"/></g>
+      <path d="M0 104 L40 70 L70 92 L110 56 L150 96 L190 74 L230 100 L270 64 L320 98 L360 72 L400 96 L400 150 L0 150Z" style="fill:var(--mnt1)"/>
+      <path d="M0 116 L50 92 L90 110 L140 86 L190 112 L240 94 L300 114 L350 96 L400 112 L400 150 L0 150Z" style="fill:var(--mnt2)"/>
+      <g style="fill:var(--sil)">
+        <path d="M118 118 h28 v-6 h-4 v-6 h-3 l-4 -10 l-3 -6 l-3 6 l-4 10 h-3 v6 h-4z"/><rect x="129" y="74" width="2" height="8"/>
+        <path d="M150 118 h18 v-5 h-3 v-5 h-2 l-2.5 -7 l-2.5 7 h-2 v5 h-3z"/>
+      </g>
+      <rect y="118" width="400" height="32" fill="url(#seaG)"/>
+      <g class="waves" style="stroke:var(--wave);fill:none;stroke-width:1.4;stroke-linecap:round">
+        <path d="M0 128 q10 -4 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0"/>
+        <path d="M-10 139 q10 -4 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0" opacity=".6"/>
+      </g>
+      <g style="fill:var(--sil)">
+        <path d="M38 150 q2 -26 -4 -48 l3 -1 q7 22 5 49z"/>
+        <path d="M36 102 q-16 -6 -26 4 q14 -2 24 0z M36 102 q-6 -14 -20 -14 q10 6 18 15z M37 101 q4 -15 18 -16 q-10 7 -16 17z M38 102 q16 -4 25 6 q-13 -3 -23 -4z M37 102 q-2 -12 4 -20 q0 10 -2 20z"/>
+        <path d="M368 150 q-1 -18 4 -34 l2.6 .8 q-5 16 -3.4 33.2z"/>
+        <path d="M373 116 q-12 -4 -20 3 q10 -1 18 0z M373 116 q12 -4 20 3 q-10 -1 -18 0z M373 116 q-3 -11 3 -16 q-1 8 -1 16z"/>
+      </g>
+    </svg>
+    <div class="hero-txt">
+      <button class="hero-place" id="heroPlace" type="button" aria-label="החלפת מדינה"><span id="heroFlag">🇹🇭</span> <span id="heroCountry">תאילנד</span></button>
+      <div class="hero-day"><span class="num" id="heroDay">יום 1</span><small id="heroSince"></small></div>
+      <div class="hero-chips" id="heroChips"></div>
+    </div>
+  </section>
+  <div class="insight" id="insight" hidden><span class="ins-ico" id="insIco">💡</span><span id="insTxt"></span></div>
 
   <div class="toprow" id="toprow">
     <button class="pill mine" id="viewBtn" type="button" aria-pressed="false" hidden>
@@ -716,8 +798,8 @@ table.daily td.num{text-align:right}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>window.APP_V="20261106194718";</script>
-<script src="config.js?v=20261106194718"></script>
-<script src="app.js?v=20261106194718"></script>
+<script>window.APP_V="20261106200434";</script>
+<script src="config.js?v=20261106200434"></script>
+<script src="app.js?v=20261106200434"></script>
 </body>
 </html>
