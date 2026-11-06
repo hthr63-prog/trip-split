@@ -614,7 +614,9 @@ function catTile(it,payer){
   if(payer){ const w=document.createElement("span"); w.className="who c"+pidx(payer); w.textContent=nm(payer).trim().charAt(0); d.appendChild(w); }
   return d;
 }
-function tripStart(){ const ds=S.items.filter(it=>it.kind!=="transfer"&&locOf(it)!=="prep"&&it.date).map(it=>it.date).sort(); return ds[0]||null; }
+/* the trip started on 12.10.2026 unless changed in settings */
+const TRIP_START="2026-10-12";
+function tripStart(){ if(S.startDate) return S.startDate; if(TRIP_START) return TRIP_START; const ds=S.items.filter(it=>it.kind!=="transfer"&&locOf(it)!=="prep"&&it.date).map(it=>it.date).sort(); return ds[0]||null; }
 function daysBetween(a,b){ const [y1,m1,d1]=a.split("-").map(Number),[y2,m2,d2]=b.split("-").map(Number); return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/864e5); }
 function streak(){
   const days=new Set([...S.items.filter(it=>it.kind!=="transfer").map(it=>it.date),...P.map(it=>it.date)]);
@@ -1196,6 +1198,7 @@ function renderSettings(){
   renderNotif(); renderBin();
   applyTheme(themePref());
   if(document.activeElement!==$("sTrip")) $("sTrip").value=S.trip||"";
+  if(document.activeElement!==$("sStart")) $("sStart").value=tripStart()||"";
   const L=$("people"); L.innerHTML="";
   const bal=compute().bal;
   for(const p of active()){
@@ -1242,6 +1245,7 @@ function shareUrl(btn,url,title){
 $("settingsBtn").onclick=()=>{ delAsk=null; $("pwChange").hidden=true; renderSettings(); openSheet("setSheet"); };
 $("setClose").onclick=()=>closeSheet("setSheet");
 $("shareAll").onclick=()=>shareUrl($("shareAll"),PAGE_URL,S.trip);
+$("sStartSave").onclick=async()=>{ const v=$("sStart").value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return; const ok=await run(()=>metaRef().update({startDate:v})); if(ok){ S.startDate=v; renderHero(); toast("📅 הטיול מתחיל ב-"+v.split("-").reverse().join(".")); } };
 $("sTripSave").onclick=async()=>{ const v=$("sTrip").value.trim(); if(!v) return; await run(()=>metaRef().update({trip:v})); };
 $("acctLogout").onclick=()=>{ store("trip-ak-"+me,""); acct=null; acctFor=null; P=[]; renderAll(); renderSettings(); };
 $("acctChange").onclick=()=>{ $("pwChange").hidden=!$("pwChange").hidden; };
@@ -1323,7 +1327,7 @@ metaRef().onSnapshot(async s=>{
     return;
   }
   const d=s.data(); const prevLocal=S.localCur;
-  S.trip=d.trip||""; S.localCur=CUR[d.localCur]?d.localCur:"THB"; S.people=d.people||[];
+  S.trip=d.trip||""; S.startDate=d.startDate||""; S.localCur=CUR[d.localCur]?d.localCur:"THB"; S.people=d.people||[];
   if(firstMeta||prevLocal!==S.localCur){ if(!editingId) cur.fCur=S.localCur; if(!pEditingId) cur.pCur=S.localCur; cur.cFrom=S.localCur; }
   firstMeta=false;
   gotMeta=true; clearTimeout(timer); if(/נטענו/.test($("status").textContent)) $("status").textContent="";
