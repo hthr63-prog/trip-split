@@ -12,7 +12,7 @@
 <title>גלי ויאירוש במזרח</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@700;900&family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;700&display=swap">
 <script>
 /* apply the saved theme before first paint */
 try{ const t=localStorage.getItem("trip-theme"); if(t==="light"||t==="dark") document.documentElement.dataset.theme=t; }catch(e){}
@@ -473,6 +473,37 @@ table.daily td.num{text-align:right}
 .rc-share{align-self:flex-start;background:#fff!important;color:#2A1670!important;border:none;margin-top:10px;font-weight:600;padding:12px 20px}
 .rc-hint{text-align:center;font-size:.75rem;opacity:.6}
 @media (prefers-reduced-motion:no-preference){ .rc-body > *{animation:rise .5s cubic-bezier(.2,.8,.2,1) both} .rc-body > *:nth-child(2){animation-delay:.08s}.rc-body > *:nth-child(3){animation-delay:.16s}.rc-body > *:nth-child(4){animation-delay:.24s}.rc-body > *:nth-child(5){animation-delay:.32s} .rc-big{animation:popIn .6s cubic-bezier(.3,.7,.4,1.4) both!important} }
+
+/* ================= editorial chapters ================= */
+:root{--serif:"Frank Ruhl Libre","Times New Roman",serif;--t-base:#F3F1FF;--t-peach:#FCE3D6;--t-sage:#DCEBDF;--t-cream:#F6EEDD;--t-sky:#DEEAFB;--t-sand:#F8E7CC}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--t-base:#100C22;--t-peach:#22111B;--t-sage:#0E1D1A;--t-cream:#1D1914;--t-sky:#0E1627;--t-sand:#21190E}}
+:root[data-theme="dark"]{--t-base:#100C22;--t-peach:#22111B;--t-sage:#0E1D1A;--t-cream:#1D1914;--t-sky:#0E1627;--t-sand:#21190E}
+html[data-tone="base"]{--bg:var(--t-base)} html[data-tone="peach"]{--bg:var(--t-peach)} html[data-tone="sage"]{--bg:var(--t-sage)}
+html[data-tone="cream"]{--bg:var(--t-cream)} html[data-tone="sky"]{--bg:var(--t-sky)} html[data-tone="sand"]{--bg:var(--t-sand)}
+body{transition:background-color .9s cubic-bezier(.2,.8,.2,1)}
+#title{font-family:var(--serif);font-weight:900;font-size:2.2rem;letter-spacing:-.01em}
+.ticket .verdict{font-family:var(--serif);font-weight:900;font-size:1.8rem}
+.ticket .verdict .amt{font-family:var(--display)}
+.bighead{padding:26px 4px 0;display:flex;flex-direction:column;gap:4px}
+.bighead small{font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.bighead h2{font-family:var(--serif);font-weight:900;font-size:clamp(2.6rem,12vw,3.6rem);line-height:.95;letter-spacing:-.02em;color:var(--ink)}
+.bighead:has(+ [hidden]){display:none}
+.card{background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+/* the travel stack: rests packed, comes apart into layers as the hero scrolls away */
+.hero{min-height:200px}
+.hero-txt{grid-template-columns:1fr;grid-template-areas:"place" "day" "chips";padding-inline-end:132px;min-height:200px}
+.hero-day{align-items:flex-start;text-align:right}
+.tstack{position:absolute;left:10px;bottom:6px;width:128px;height:160px;z-index:0;overflow:visible;filter:drop-shadow(0 10px 14px rgba(30,10,80,.35))}
+.tstack .ly{transform-box:fill-box;transform-origin:center;transform:translateY(calc(var(--p,0) * var(--i) * -26px)) rotate(calc(var(--p,0) * (var(--i) - 2) * 7deg)) scale(calc(1 + var(--p,0) * .06))}
+@media (prefers-reduced-motion:no-preference){
+  .tstack .ly{animation:stackIn .8s cubic-bezier(.2,.9,.3,1.2) both;animation-delay:calc(var(--i) * .12s + .3s);transition:transform .15s linear}
+  .bighead h2{transition:transform .6s cubic-bezier(.2,.8,.2,1),opacity .6s}
+  .bighead.rv h2{opacity:0;transform:translateY(30px)}
+  @keyframes stackIn{from{opacity:0;transform:translateY(-70px) rotate(-12deg)}to{opacity:1}}
+  .tstack{animation:bob 6s ease-in-out infinite}
+  @keyframes bob{0%,100%{translate:0 0}50%{translate:0 -5px}}
+}
+@media (max-width:380px){ .hero-txt{padding-inline-end:110px} .tstack{width:108px;left:4px} }
 @media (max-width:440px){
   .grid{grid-template-columns:1fr}
   .cat{grid-template-columns:6em 1fr auto}
@@ -501,7 +532,7 @@ table.daily td.num{text-align:right}
   <div class="note tripnote" id="tripNote" hidden><span id="tripNoteTxt"></span> <button class="link" id="tripBack" type="button">חזרה לטיול הנוכחי</button></div>
   <div class="note" id="netNote" hidden>📴 אין קליטה כרגע. מה שתוסיפו נשמר בטלפון ויעלה לבד כשתחזור קליטה.</div>
 
-  <section class="hero" id="hero" data-scene="temple" hidden>
+  <section class="hero" id="hero" data-scene="temple" data-tone="base" hidden>
     <svg class="scene" viewBox="0 0 400 150" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
       <defs>
         <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sky1)"/><stop offset=".6" style="stop-color:var(--sky2)"/><stop offset="1" style="stop-color:var(--sky3)"/></linearGradient>
@@ -603,6 +634,13 @@ table.daily td.num{text-align:right}
         <path d="M373 116 q-12 -4 -20 3 q10 -1 18 0z M373 116 q12 -4 20 3 q-10 -1 -18 0z M373 116 q-3 -11 3 -16 q-1 8 -1 16z"/>
       </g>
     </svg>
+    <svg class="tstack" viewBox="0 0 120 150" aria-hidden="true">
+      <g class="ly" style="--i:0"><rect x="22" y="78" width="76" height="62" rx="16" fill="#FF8A3D"/><rect x="34" y="104" width="52" height="28" rx="8" fill="#E86A1F"/><rect x="50" y="66" width="20" height="16" rx="6" fill="none" stroke="#B4500F" stroke-width="5"/><rect x="40" y="110" width="40" height="4" rx="2" fill="#FFC08A"/></g>
+      <g class="ly" style="--i:1"><path d="M18 74 L44 66 L68 74 L100 64 L100 82 L68 92 L44 84 L18 92Z" fill="#14C9A5"/><path d="M44 66 V84 M68 74 V92" stroke="#0E9F7E" stroke-width="1.5"/><path d="M26 82 Q48 70 58 82 T92 72" stroke="#fff" stroke-width="2" stroke-dasharray="3 3" fill="none"/></g>
+      <g class="ly" style="--i:2"><rect x="34" y="42" width="44" height="32" rx="5" fill="#1E3A8A"/><circle cx="56" cy="56" r="7" fill="none" stroke="#FFC93C" stroke-width="2"/><rect x="44" y="66" width="24" height="2.5" rx="1" fill="#FFC93C"/></g>
+      <g class="ly" style="--i:3"><path d="M24 26 h72 a4 4 0 0 1 4 4 v6 a5 5 0 0 0 0 10 v6 a4 4 0 0 1 -4 4 h-72 a4 4 0 0 1 -4 -4 v-6 a5 5 0 0 0 0 -10 v-6 a4 4 0 0 1 4 -4z" fill="#fff"/><rect x="20" y="26" width="16" height="30" rx="4" fill="#FF4D8D"/><path d="M44 34 h30 M44 40 h20" stroke="#1E1640" stroke-width="2.5" stroke-linecap="round"/><path d="M78 46 v6 M81 46 v6 M83 46 v6 M86 46 v6 M90 46 v6" stroke="#1E1640" stroke-width="1.4"/></g>
+      <g class="ly" style="--i:4"><ellipse cx="88" cy="22" rx="13" ry="5" fill="#E0A100"/><rect x="75" y="14" width="26" height="8" fill="#FFC93C"/><ellipse cx="88" cy="14" rx="13" ry="5" fill="#FFD866"/><text x="88" y="16.5" font-size="7" text-anchor="middle" fill="#B47A00" font-weight="700">฿</text></g>
+    </svg>
     <div class="hero-txt">
       <button class="hero-place" id="heroPlace" type="button" aria-label="החלפת מדינה"><span id="heroFlag">🇹🇭</span> <span id="heroCountry">תאילנד</span></button>
       <div class="hero-day"><span id="heroDay" class="heronum">יום 1</span><small id="heroSince"></small></div>
@@ -651,6 +689,7 @@ table.daily td.num{text-align:right}
       <div class="showin" id="showin"></div>
     </section>
 
+    <div class="bighead" data-tone="peach"><small>הוצאה חדשה</small><h2>רושמים.<br>בשנייה.</h2></div>
     <section class="card" id="form" hidden>
       <div class="card-head"><h2 id="formTitle">➕ הוצאה משותפת</h2></div>
       <div class="amount"><input id="fAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="fCur" type="button" aria-label="מטבע"></button></div>
@@ -676,6 +715,7 @@ table.daily td.num{text-align:right}
       </div>
     </section>
 
+    <div class="bighead" data-tone="sage"><small>חילוף כספים</small><h2>יש לך.<br>מקבלים.</h2></div>
     <section class="card" id="convPanel">
       <div class="card-head"><h2>💱 חילוף כספים</h2><span class="hint" id="fxDate"></span></div>
       <div class="changer">
@@ -687,11 +727,13 @@ table.daily td.num{text-align:right}
       <div class="quick" id="cQuick"></div>
     </section>
 
+    <div class="bighead" data-tone="cream"><small>החודש</small><h2>לאן<br>הכסף הלך.</h2></div>
     <section class="card" id="catPanel" hidden>
       <div class="card-head"><h2 id="catTitle">📊 לאן הלך הכסף החודש</h2><button class="link" id="catMore" type="button">כל החודשים ←</button></div>
       <div class="cats" id="cats"></div>
     </section>
 
+    <div class="bighead" data-tone="sky"><small>ההיסטוריה</small><h2>כל רגע<br>בטיול.</h2></div>
     <section class="stack">
       <div class="card-head">
         <h2>🧾 כל ההוצאות המשותפות</h2>
@@ -728,6 +770,7 @@ table.daily td.num{text-align:right}
         <div class="showin" id="pShowin"></div>
       </section>
 
+      <div class="bighead" data-tone="peach"><small>רק שלך</small><h2>ההוצאות<br>שלי.</h2></div>
       <section class="card" id="pForm">
         <div class="card-head"><h2 id="pFormTitle">➕ הוצאה אישית</h2><span class="hint" id="pOnly">רק את/ה רואה</span></div>
         <div class="amount"><input id="pAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="pCur" type="button" aria-label="מטבע"></button></div>
@@ -746,6 +789,7 @@ table.daily td.num{text-align:right}
         </div>
       </section>
 
+      <div class="bighead" data-tone="sage"><small>יום אחרי יום</small><h2>לבד. ביחד.<br>משולב.</h2></div>
       <section class="card" id="dailyCard">
         <div class="card-head"><h2>📅 סיכום יומי</h2></div>
         <div class="seg" id="dShowin"></div>
@@ -756,6 +800,7 @@ table.daily td.num{text-align:right}
         <button class="link" id="dMore" type="button" hidden>עוד ימים</button>
       </section>
 
+      <div class="bighead" data-tone="sand"><small>בכיס</small><h2>המזומן<br>שלך.</h2></div>
       <section class="card" id="cashCard">
         <div class="card-head"><h2>💵 ארנק מזומן</h2><span class="hint" id="cashFees"></span></div>
         <div id="cashBal" class="cashbal"></div>
@@ -825,6 +870,7 @@ table.daily td.num{text-align:right}
       </div>
       <div class="showin" id="stShowin"></div>
     </section>
+    <div class="bighead" data-tone="cream"><small>מבט על</small><h2>הטיול<br>במספרים.</h2></div>
     <section class="card">
       <div class="card-head"><h2>📅 כמה הוצאנו בכל חודש</h2><span class="hint">לוחצים על חודש לפירוט</span></div>
       <div class="months" id="stMonths" role="list"></div>
@@ -977,8 +1023,9 @@ table.daily td.num{text-align:right}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>window.APP_V="20261107071332";</script>
-<script src="config.js?v=20261107071332"></script>
-<script src="app.js?v=20261107071332"></script>
+<script>window.APP_V="20261107171417";</script>
+<script src="config.js?v=20261107171417"></script>
+<script src="fx.js?v=20261107171417"></script>
+<script src="app.js?v=20261107171417"></script>
 </body>
 </html>
