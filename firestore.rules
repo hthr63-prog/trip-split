@@ -1,31 +1,45 @@
 rules_version = '2';
-// שלב 1 (מעבר): הכספות הפרטיות פתוחות רק למי שיש לו את המפתח הארוך מהקישור.
-// הנתונים הישנים והפתוחים זמינים רק לקריאה, כדי להעביר אותם פעם אחת לכספת.
+// שלב 2: הנתונים הישנים נסגרו אחרי ההעברה, ואין מחיקה סופית בלי סל מחזור.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // מחשבון ההוצאות: כל טיול נמצא בכספת ששמה הוא מפתח אקראי של 32 תווים לפחות.
-    // אין כלל על /spaces עצמו, ולכן אי אפשר לבקש רשימה של הכספות.
+    function now() { return request.time.toMillis(); }
+    function near(t) { return t is number && t > now() - 600000 && t < now() + 600000; }
+    function okKey(space) { return space.size() >= 32 && space.size() <= 64 && space.matches('^[a-z0-9]+$'); }
+    function okAmount(d) { return d.amount is number && d.amount > 0 && d.amount < 100000000; }
+
+    // כל טיול נמצא בכספת ששמה מפתח אקראי ארוך מהקישור. אי אפשר לבקש רשימה של הכספות.
     match /spaces/{space} {
       match /trip/meta {
-        allow read, write: if space.size() >= 32;
+        allow read: if okKey(space);
+        allow write: if okKey(space) && request.resource.data.size() < 200;
       }
       match /expenses/{id} {
-        allow read, delete: if space.size() >= 32;
-        allow create, update: if space.size() >= 32
-                              && request.resource.data.amount is number
-                              && request.resource.data.amount > 0
-                              && request.resource.data.amount < 100000000;
+        allow read: if okKey(space);
+        // הוצאה חדשה לא יכולה להיות "מהעתיד", כדי שלא אפשר יהיה לזייף "נוצרה עכשיו".
+        allow create: if okKey(space) && okAmount(request.resource.data)
+                      && (!('createdAt' in request.resource.data) || request.resource.data.createdAt < now() + 600000);
+        // עדכון: אסור לשנות את זמן היצירה, ותאריך מחיקה חייב להיות "עכשיו".
+        allow update: if okKey(space) && okAmount(request.resource.data)
+                      && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
+                      && (request.resource.data.get('deletedAt', null) == null
+                          || request.resource.data.get('deletedAt', null) == resource.data.get('deletedAt', null)
+                          || near(request.resource.data.deletedAt));
+        // מחיקה סופית: רק אחרי 30 יום בסל המחזור, או "ביטול" מיד אחרי שהוספתם (עד 10 דקות).
+        allow delete: if okKey(space) && (
+                         (resource.data.get('deleted', false) == true && resource.data.get('deletedAt', null) is number
+                          && resource.data.deletedAt < now() - 2592000000)
+                      || (resource.data.get('createdAt', null) is number && resource.data.createdAt > now() - 600000));
       }
     }
 
-    // הנתונים הישנים (לפני המעבר): קריאה בלבד, ורק סימון "הועבר" מותר.
+    // הנתונים הישנים: אחרי ההעברה אף אחד לא יכול לקרוא אותם.
     match /trip/meta {
-      allow read: if true;
+      allow read: if resource.data.get('migrated', false) != true;
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['migrated', 'migratedAt']);
     }
     match /expenses/{id} {
-      allow read: if true;
+      allow read: if get(/databases/$(database)/documents/trip/meta).data.get('migrated', false) != true;
     }
 
     // רכילותא: כל משתמש ניגש רק לדוחות של עצמו (שמורים מוצפנים).

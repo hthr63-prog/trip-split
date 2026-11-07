@@ -1,6 +1,7 @@
 (function(){
 const $=id=>document.getElementById(id);
 const PAGE_URL=location.origin+location.pathname;
+window.APP_V=(document.querySelector('meta[name="app-v"]')||{}).content||"";
 /* ---- motion & feedback ---- */
 const calm=()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){ return false; } };
 let hapticEl=null;
@@ -1329,7 +1330,7 @@ async function again(it,personal){
   let ok;
   if(personal){ const c=await loadAcct(); if(!c) return; const doc=await encFor(c,base); ok=await run(()=>EXP().doc(id).set(doc)); }
   else { base.by=me||null; delete base.source; ok=await run(()=>EXP().doc(id).set(base)); if(ok) notifyOthers("🧾 "+nm(me||it.payer)+" "+(fem(me||it.payer)?"הוסיפה":"הוסיף")+": "+(base.desc||"הוצאה")+" "+fmt(+base.amount,base.cur)); }
-  if(ok) toast("🔁 נוסף שוב להיום: "+(it.desc||"הוצאה"),"ביטול",()=>run(()=>EXP().doc(id).delete()));
+  if(ok) toast("🔁 נוסף שוב להיום: "+(it.desc||"הוצאה"),"ביטול",()=>run(()=>personal?EXP().doc(id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null}):EXP().doc(id).delete()));
 }
 /* deleting moves an expense to the recycle bin for 30 days */
 const BIN_DAYS=30;
@@ -1389,7 +1390,7 @@ $("pDesc").addEventListener("input",()=>suggest("pDesc","pSuggest",P,it=>{
 function notifyOthers(text){
   if(!me) return;
   for(const p of active()){ if(p.id===me||!p.ntfy) continue;
-    try{ fetch("https://ntfy.sh/"+encodeURIComponent(p.ntfy)+"?title="+encodeURIComponent(S.trip||"הטיול")+"&tags=moneybag&click="+encodeURIComponent(personalUrl(p.id,true)),{method:"POST",body:text,keepalive:true}).catch(()=>{}); }catch(e){} }
+    try{ fetch("https://ntfy.sh/"+encodeURIComponent(p.ntfy)+"?tags=moneybag&click="+encodeURIComponent(personalUrl(p.id,true)),{method:"POST",body:/^💸/.test(text)?"💸 נרשמה העברה חדשה":"🧾 נוספה הוצאה חדשה",keepalive:true}).catch(()=>{}); }catch(e){} }
 }
 function sinceLastVisit(){
   if(!me) return;
@@ -1412,7 +1413,7 @@ $("ntfyEnable").onclick=async()=>{
 };
 $("ntfyCopy").onclick=()=>{ const t=$("ntfyTopic").textContent; try{ navigator.clipboard.writeText(t).then(()=>{ $("ntfyCopy").textContent="הועתק ✓"; setTimeout(()=>$("ntfyCopy").textContent="העתקה",1500); }); }catch(e){} };
 $("ntfyTest").onclick=()=>{ const t=person(me)?.ntfy; if(!t) return;
-  fetch("https://ntfy.sh/"+encodeURIComponent(t)+"?title="+encodeURIComponent(S.trip||"הטיול"),{method:"POST",body:"🔔 בדיקה: ההתראות עובדות!"}).then(r=>toast(r.ok?"נשלחה התראת בדיקה ✓":"השליחה נכשלה")).catch(()=>toast("השליחה נכשלה. בדקו קליטה.")); };
+  fetch("https://ntfy.sh/"+encodeURIComponent(t)+"",{method:"POST",body:"🔔 בדיקה: ההתראות עובדות!"}).then(r=>toast(r.ok?"נשלחה התראת בדיקה ✓":"השליחה נכשלה")).catch(()=>toast("השליחה נכשלה. בדקו קליטה.")); };
 $("ntfyOffBtn").onclick=async()=>{
   const ok=await run(()=>db.runTransaction(async tx=>{ const s=await tx.get(metaRef()); const people=((s.data()?.people)||[]).map(p=>{ if(p.id!==me) return p; const q={...p}; delete q.ntfy; return q; }); tx.update(metaRef(),{people}); }));
   if(ok){ const p=person(me); if(p) delete p.ntfy; renderNotif(); }
@@ -1420,7 +1421,7 @@ $("ntfyOffBtn").onclick=async()=>{
 
 /* ---- export a backup for Excel ---- */
 $("exportBtn").onclick=async()=>{
-  const esc=v=>{ const s=String(v==null?"":v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const esc=v=>{ let s=String(v==null?"":v); if(typeof v!=="number"&&/^[=+\-@\t\r]/.test(s)) s="'"+s; return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
   const head=["סוג","תאריך","שעה","שם","קטגוריה","סכום","מטבע","בשקלים","מי שילם","בין מי","מדינה"];
   const rows=[head];
   const line=(type,it,payer,among)=>rows.push([type,it.date,timeOf(it),it.kind==="transfer"?"העברה ל"+nm(it.to):(it.desc||""),it.kind==="transfer"?"":catName(catKey(it)),it.amount,it.cur,Math.round(conv(+it.amount||0,it.cur,"ILS")*100)/100,payer,among,locName(locOf(it))]);
