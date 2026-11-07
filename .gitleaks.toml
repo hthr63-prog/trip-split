@@ -1,0 +1,7 @@
+# סריקת סודות אוטומטית בכל שמירה. config.js מוחרג: הוא מכיל רק הגדרות ציבוריות, והמפתח עצמו מגיע מהכספת בזמן הפרסום.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public web config"
+paths = ['''^config\.js$''']
