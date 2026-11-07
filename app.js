@@ -956,10 +956,11 @@ $("nuCancel").onclick=()=>{ $("newUser").hidden=true; };
 $("nuSave").onclick=async()=>{
   const name=$("nuName").value.trim(); showErr("nuErr");
   if(!name) return showErr("nuErr","צריך לכתוב שם");
+  const nu=$("nuU").value.trim(); { const bad=uCheck(nu); if(bad) return showErr("nuErr",bad); }
   if(!canWrite) return showErr("nuErr","אין חיבור לשמירה כרגע.");
   const id=uid("p");
-  const ok=await run(()=>db.runTransaction(async tx=>{ const s=await tx.get(metaRef()); const people=(s.data()?.people)||[]; tx.update(metaRef(),{people:[...people,{id,name,g:nuG}]}); }));
-  if(ok){ if(!person(id)) S.people.push({id,name,g:nuG}); $("nuName").value=""; setMe(id,true); }
+  const ok=await run(()=>db.runTransaction(async tx=>{ const s=await tx.get(metaRef()); const people=(s.data()?.people)||[]; tx.update(metaRef(),{people:[...people,nu?{id,name,g:nuG,u:nu}:{id,name,g:nuG}]}); }));
+  if(ok){ if(!person(id)) S.people.push(nu?{id,name,g:nuG,u:nu}:{id,name,g:nuG}); $("nuU").value=""; $("nuName").value=""; setMe(id,true); }
 };
 
 /* ---- shared form ---- */
@@ -1516,6 +1517,23 @@ $("settingsBtn").onclick=()=>{ delAsk=null; $("pwChange").hidden=true; renderSet
 $("setClose").onclick=()=>closeSheet("setSheet");
 
 /* ---- account chip at the top: who is signed in on this phone ---- */
+const U_RE=/^[A-Za-z0-9][A-Za-z0-9._]{2,19}$/;
+function uCheck(u,except){ if(!u) return ""; if(!U_RE.test(u)) return "שם משתמש: 3–20 תווים, אותיות באנגלית, מספרים, נקודה או קו תחתון."; if(S.people.some(p=>p.id!==except&&!p.archived&&(p.u||"").toLowerCase()===u.toLowerCase())) return "שם המשתמש "+u+" כבר תפוס."; return ""; }
+async function setHandle(id,u){
+  return run(()=>db.runTransaction(async tx=>{ const s=await tx.get(metaRef()); const people=(s.data()?.people)||[];
+    if(u&&people.some(p=>p.id!==id&&!p.archived&&(p.u||"").toLowerCase()===u.toLowerCase())) throw new Error("taken");
+    tx.update(metaRef(),{people:people.map(p=>p.id===id?{...p,u}:p)}); }));
+}
+/* the first two usernames, chosen by Yair */
+let handlesSet=false;
+function defaultHandles(){
+  if(handlesSet||!canWrite) return; handlesSet=true;
+  const want={yair:"Yair.28",gali:"Gali.06"};
+  const todo=S.people.filter(p=>want[p.id]&&!p.u&&!uCheck(want[p.id],p.id));
+  if(!todo.length) return;
+  run(()=>db.runTransaction(async tx=>{ const s=await tx.get(metaRef()); const people=(s.data()?.people)||[];
+    tx.update(metaRef(),{people:people.map(p=>want[p.id]&&!p.u?{...p,u:want[p.id]}:p)}); }));
+}
 function ini(n){ n=String(n||"").trim(); const w=n.split(/\s+/); return w.length>1 ? w[0].charAt(0)+w[1].charAt(0) : n.slice(0,2); }
 function renderAcct(){
   const c=$("acctBtn"), on=!!me&&!!person(me);
@@ -1531,9 +1549,25 @@ function fillAcct(){
   $("acctName2").textContent=nm(me);
   $("acctSub").textContent=(f?"מחוברת":"מחובר")+" בטלפון הזה";
   $("acctTrip").textContent=S.trip||"הטיול";
-  $("acctPeople").textContent=active().map(p=>p.name).join(", ");
   $("acctLock").textContent= open ? "פתוחות 🔓" : hasPw ? "נעולות 🔒" : "עוד אין סיסמה";
   $("acctConn").textContent= !canWrite ? "קריאה בלבד" : navigator.onLine===false ? "בלי קליטה, נשמר בטלפון" : "מחובר ✓";
+  const u=person(me)?.u||"";
+  $("acctHandle").textContent= u? "@"+u : "";
+  $("acctU").textContent= u||"עוד אין";
+  $("acctUEdit").hidden=!canWrite;
+  const L=$("acctList"); L.innerHTML="";
+  for(const p of active()){
+    const r=document.createElement("div"); r.className="acct-p";
+    const a=document.createElement("span"); a.className="av"; a.textContent=ini(p.name);
+    const w=document.createElement("span"); w.className="who";
+    const b=document.createElement("b"); b.textContent=p.name;
+    const sm=document.createElement("small"); sm.dir="ltr"; sm.style.textAlign="right"; sm.textContent= p.u? "@"+p.u : "בלי שם משתמש";
+    w.append(b,sm); r.append(a,w);
+    if(p.id===me){ const t=document.createElement("span"); t.className="me"; t.textContent= fem(me)?"זו את":"זה אתה"; r.append(t); }
+    else { const sh=document.createElement("button"); sh.type="button"; sh.className="btn small"; sh.textContent="📤 קישור"; sh.setAttribute("aria-label","שליחת הקישור של "+p.name); sh.onclick=()=>shareUrl(sh,personalUrl(p.id),"הקישור של "+p.name+" ל"+(S.trip||"טיול")); r.append(sh); }
+    L.append(r);
+  }
+  $("acctNew").hidden=!canWrite;
   $("acctLockBtn").hidden=!open;
   $("acctMine").textContent= view==="personal" ? "🤝 לחשבון המשותף" : "👤 להוצאות האישיות שלי";
   $("acctMine").hidden=!canWrite;
@@ -1542,6 +1576,29 @@ $("acctBtn").onclick=()=>{ buzz(6);
   if(!me||!person(me)){ const pk=$("picker"); if(!pk.hidden){ pk.scrollIntoView({behavior:"smooth",block:"center"}); } return; }
   fillAcct(); openSheet("acctSheet"); };
 $("acctClose").onclick=()=>closeSheet("acctSheet");
+$("acctUEdit").onclick=()=>{ const b=$("acctUBox"); b.hidden=!b.hidden; showErr("acctUErr"); if(!b.hidden){ $("acctUIn").value=person(me)?.u||""; $("acctUIn").focus(); } };
+$("acctUSave").onclick=async()=>{
+  const u=$("acctUIn").value.trim(); const bad=uCheck(u,me); if(bad) return showErr("acctUErr",bad);
+  const ok=await setHandle(me,u); if(!ok) return showErr("acctUErr","לא נשמר. ייתכן ששם המשתמש כבר תפוס.");
+  const p=person(me); if(p) p.u=u; $("acctUBox").hidden=true; fillAcct(); toast(u?"🪪 שם המשתמש עכשיו "+u:"שם המשתמש הוסר"); };
+let anG="m";
+function renderAnG(){ seg($("anG"),[["m","זכר"],["f","נקבה"]],v=>v===anG,v=>{ anG=v; renderAnG(); }); }
+$("acctNew").onclick=()=>{ const f=$("acctNewF"); f.hidden=!f.hidden; showErr("anErr"); renderAnG(); if(!f.hidden) $("anName").focus(); };
+$("anCancel").onclick=()=>{ $("acctNewF").hidden=true; };
+$("anSave").onclick=async()=>{
+  const name=$("anName").value.trim(), u=$("anU").value.trim(); showErr("anErr");
+  if(!name) return showErr("anErr","צריך לכתוב שם");
+  if(!u) return showErr("anErr","צריך לבחור שם משתמש, למשל Noa.12");
+  const bad=uCheck(u); if(bad) return showErr("anErr",bad);
+  const id=uid("p");
+  const ok=await run(()=>db.runTransaction(async tx=>{ const s=await tx.get(metaRef()); const people=(s.data()?.people)||[];
+    if(people.some(p=>!p.archived&&(p.u||"").toLowerCase()===u.toLowerCase())) throw new Error("taken");
+    tx.update(metaRef(),{people:[...people,{id,name,g:anG,u}]}); }));
+  if(!ok) return showErr("anErr","לא נשמר. נסו שוב.");
+  if(!person(id)) S.people.push({id,name,g:anG,u});
+  $("anName").value=""; $("anU").value=""; $("acctNewF").hidden=true; fillAcct();
+  toast("✨ "+name+" "+(anG==="f"?"הצטרפה":"הצטרף")+" לטיול","📤 שליחת קישור",()=>shareUrl($("acctNew"),personalUrl(id),"הקישור של "+name+" ל"+(S.trip||"טיול")));
+};
 $("acctMine").onclick=()=>{ closeSheet("acctSheet"); $("viewBtn").click(); };
 $("acctSwitch").onclick=()=>{ closeSheet("acctSheet"); $("switchBtn").click(); };
 $("acctLockBtn").onclick=()=>{ store("trip-ak-"+me,""); acct=null; acctFor=null; P=[]; if(view==="personal") view="shared"; closeSheet("acctSheet"); renderAll(); toast("🔒 האישי ננעל בטלפון הזה"); };
@@ -1675,6 +1732,8 @@ metaRef().onSnapshot(async s=>{
   firstMeta=false;
   gotMeta=true; clearTimeout(timer); if(/נטענו/.test($("status").textContent)) $("status").textContent="";
   if(loaded&&me){ acct=null; acctFor=null; refreshPersonal(); }
+  defaultHandles();
+  if(!$("acctSheet").hidden&&me&&$("acctUBox").hidden&&$("acctNewF").hidden) fillAcct();
   ready();
 },e=>{ console.error(e); $("status").textContent="לא הצלחנו לטעון את הנתונים."; });
 let firstItems=true;

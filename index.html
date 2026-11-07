@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@700;900&family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;700&display=swap">
-<script src="theme.js?v=20261107193636"></script>
+<script src="theme.js?v=20261107202502"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -550,9 +550,19 @@ header{flex-direction:column;align-items:stretch;gap:14px}
 .acct-card small{opacity:.9}
 .acct-rows{display:flex;flex-direction:column;border:1.5px solid var(--line);border-radius:18px;overflow:hidden}
 .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;flex-shrink:0}
-.acct-row+.acct-row{border-top:1.5px solid var(--line)}
+.acct-rows .acct-row:not(:first-child){border-top:1.5px solid var(--line)}
 .acct-row span{color:var(--muted)}
 .acct-row b{text-align:end}
+.acct-card .handle{display:block;font-weight:600;opacity:.95;text-align:right;unicode-bidi:plaintext}
+.acct-u{display:flex;align-items:center;gap:8px}
+.acct-edit{gap:8px}.acct-edit input{flex:1;min-width:0}
+.acct-h{font-family:var(--display);font-size:1.05rem;margin:6px 0 -4px}
+.acct-p{display:flex;align-items:center;gap:10px;padding:10px 12px;flex-shrink:0}
+.acct-p+.acct-p{border-top:1.5px solid var(--line)}
+.acct-p .av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);font-family:var(--display);font-weight:700;font-size:.85rem;flex-shrink:0}
+.acct-p .who{flex:1;min-width:0;display:flex;flex-direction:column}
+.acct-p .who small{color:var(--muted)}
+.acct-p .me{font-size:.8rem;color:var(--brand);font-weight:700}
 </style>
 </head>
 <body>
@@ -710,6 +720,7 @@ header{flex-direction:column;align-items:stretch;gap:14px}
     <div class="fieldset" id="newUser" hidden>
       <div class="grid">
         <label>השם שלך<input id="nuName" maxlength="20" placeholder="למשל: נועה"></label>
+        <label>שם משתמש<input id="nuU" dir="ltr" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Noa.12"></label>
         <div class="fieldset"><span class="hint">פנייה</span><div class="seg" id="nuG"></div></div>
       </div>
       <div class="actions"><button class="btn primary" id="nuSave" type="button">הצטרפות לחשבון</button><button class="btn" id="nuCancel" type="button">ביטול</button></div>
@@ -975,10 +986,15 @@ header{flex-direction:column;align-items:stretch;gap:14px}
 <div class="sheet-bg" id="acctSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="acctTitle">
     <div class="sheet-head"><h2 id="acctTitle">החשבון שלי</h2><button class="btn small" id="acctClose" type="button">סגירה</button></div>
-    <div class="acct-card"><span class="av" id="acctAv2" aria-hidden="true"></span><div><b id="acctName2"></b><small id="acctSub"></small></div></div>
+    <div class="acct-card"><span class="av" id="acctAv2" aria-hidden="true"></span><div><b id="acctName2"></b><span class="handle" id="acctHandle" dir="ltr"></span><small id="acctSub"></small></div></div>
     <div class="acct-rows">
+      <div class="acct-row"><span>🪪 שם משתמש</span><span class="acct-u"><b id="acctU" dir="ltr"></b><button class="btn small" id="acctUEdit" type="button">✏️ שינוי</button></span></div>
+      <div class="acct-row acct-edit" id="acctUBox" hidden>
+        <input id="acctUIn" dir="ltr" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Yair.28" aria-label="שם משתמש">
+        <button class="btn small primary" id="acctUSave" type="button">שמירה</button>
+      </div>
+      <div class="err" id="acctUErr" hidden></div>
       <div class="acct-row"><span>🧳 הטיול</span><b id="acctTrip"></b></div>
-      <div class="acct-row"><span>👥 משתתפים</span><b id="acctPeople"></b></div>
       <div class="acct-row"><span>🔐 ההוצאות האישיות</span><b id="acctLock"></b></div>
       <div class="acct-row"><span>📶 חיבור</span><b id="acctConn"></b></div>
     </div>
@@ -986,6 +1002,19 @@ header{flex-direction:column;align-items:stretch;gap:14px}
       <button class="btn block" id="acctMine" type="button">👤 להוצאות האישיות שלי</button>
       <button class="btn block" id="acctLockBtn" type="button">🔒 לנעול את האישי בטלפון הזה</button>
       <button class="btn block" id="acctSwitch" type="button">🔄 החלפת משתמש</button>
+    </div>
+    <h3 class="acct-h">👥 האנשים בטיול</h3>
+    <div class="acct-rows" id="acctList"></div>
+    <button class="btn primary block" id="acctNew" type="button">➕ פתיחת משתמש חדש</button>
+    <div class="fieldset" id="acctNewF" hidden>
+      <div class="grid">
+        <label>שם<input id="anName" maxlength="20" placeholder="למשל: נועה"></label>
+        <label>שם משתמש<input id="anU" dir="ltr" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Noa.12"></label>
+        <div class="fieldset"><span class="hint">פנייה</span><div class="seg" id="anG"></div></div>
+      </div>
+      <div class="hint">אותיות באנגלית, מספרים, נקודה או קו תחתון. אחרי הפתיחה תוכלו לשלוח לה/לו את הקישור האישי בוואטסאפ.</div>
+      <div class="actions"><button class="btn primary" id="anSave" type="button">פתיחת המשתמש</button><button class="btn" id="anCancel" type="button">ביטול</button></div>
+      <div class="err" id="anErr" hidden></div>
     </div>
   </div>
 </div>
@@ -1085,9 +1114,9 @@ header{flex-direction:column;align-items:stretch;gap:14px}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261107193636">
-<script src="config.js?v=20261107193636"></script>
-<script src="fx.js?v=20261107193636"></script>
-<script src="app.js?v=20261107193636"></script>
+<meta name="app-v" content="20261107202502">
+<script src="config.js?v=20261107202502"></script>
+<script src="fx.js?v=20261107202502"></script>
+<script src="app.js?v=20261107202502"></script>
 </body>
 </html>
