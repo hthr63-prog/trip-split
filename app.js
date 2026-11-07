@@ -526,7 +526,7 @@ async function setPassword(pw){
   const old=await loadAcct(); if(old) moving.push(...(await decryptMine(old)));
   const legacy=load("trip-pk-"+me); if(legacy){ moving.push(...(await decryptMine(await legacyCtx(legacy)))); }
   const batch=db.batch();
-  for(const it of moving){ const {id,...rest}=it; batch.set(db.collection("expenses").doc(id),await encFor(nc,rest)); }
+  for(const it of moving){ const {id,...rest}=it; batch.set(EXP().doc(id),await encFor(nc,rest)); }
   await batch.commit();
   await db.runTransaction(async tx=>{ const s=await tx.get(metaRef()); const people=((s.data()?.people)||[]).map(p=>p.id===me?{...p,vk:nc.vk}:p); tx.update(metaRef(),{people}); });
   const p=person(me); if(p) p.vk=nc.vk;
@@ -913,7 +913,19 @@ async function run(fn){
   catch(e){ console.error(e); $("status").textContent= e&&e.code==="permission-denied" ? "אין הרשאה לשמור." : "השמירה נכשלה. בדקו את החיבור ונסו שוב."; return false; }
   finally{ busy=false; document.querySelectorAll("#saveBtn,#nuSave,#pSave").forEach(b=>{ b.disabled=false; b.classList.remove("busy"); }); }
 }
-const metaRef=()=>db.collection("trip").doc("meta");
+/* ---- private space: the trip lives under a long random key that only the shared links carry (after #k=).
+   Without the key nobody can read or change anything, and there is no way to list the spaces. ---- */
+const KEY_RE=/^[a-z0-9]{32,64}$/;
+function readKey(){
+  try{ const k=new URLSearchParams(location.hash.replace(/^#/,"")).get("k"); if(k&&KEY_RE.test(k)) return k; }catch(e){}
+  const s=load("trip-space"); return s&&KEY_RE.test(s)?s:null;
+}
+let SPACE=readKey(); if(SPACE) store("trip-space",SPACE);
+function newKey(){ const a=new Uint8Array(24); crypto.getRandomValues(a); return Array.from(a,b=>(b%36).toString(36)).join("")+Date.now().toString(36).slice(-8); }
+const spaceRef=()=>db.collection("spaces").doc(SPACE);
+const EXP=()=>spaceRef().collection("expenses");
+const metaRef=()=>spaceRef().collection("trip").doc("meta");
+const keyHash=()=>SPACE?"#k="+SPACE:"";
 
 /* ---- the preferred (local) currency ---- */
 $("localBtn").onclick=()=>S.home ? openCurPicker("לאן טסים? ✈️",S.dest,c=>{ S.dest=c; patchTrip(curTrip,{localCur:c}); renderAll(); toast("✈️ מיום הטיסה המטבע יתחלף ל"+CUR[c].name); }) : openCurPicker("באיזו מדינה אתם עכשיו? 🌏",S.localCur,c=>{
@@ -926,10 +938,10 @@ $("localBtn").onclick=()=>S.home ? openCurPicker("לאן טסים? ✈️",S.des
 function isApp(){ try{ return navigator.standalone===true||matchMedia("(display-mode: standalone)").matches; }catch(e){ return false; } }
 function readParam(name){ try{ return new URLSearchParams(location.search).get(name); }catch(e){ return null; } }
 function readHash(){ let u=readParam("u"); if(!u) u=decodeURIComponent(location.hash.replace("#","")); return person(u)?u:null; }
-function personalUrl(id){ return PAGE_URL+"?u="+encodeURIComponent(id); }
+function personalUrl(id,noKey){ return PAGE_URL+"?u="+encodeURIComponent(id)+(noKey?"":keyHash()); }
 function syncUrl(){
   if(!me) return;
-  let u=personalUrl(me); if(view==="personal") u+="&v=me"; if(view==="stats") u+="&v=stats";
+  let u=personalUrl(me,true); if(view==="personal") u+="&v=me"; if(view==="stats") u+="&v=stats"; u+=keyHash();
   try{ history.replaceState(null,"",u); }catch(e){}
 }
 function setMe(id,updateUrl){
@@ -978,17 +990,17 @@ async function save(){
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
   const data={kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr()};
   const id=editingId||uid("e");
-  const ok=await run(()=> editingId ? db.collection("expenses").doc(id).update(data) : db.collection("expenses").doc(id).set({...data,createdAt:Date.now(),tz:hereTz(),by:me||null,trip:curTrip}));
+  const ok=await run(()=> editingId ? EXP().doc(id).update(data) : EXP().doc(id).set({...data,createdAt:Date.now(),tz:hereTz(),by:me||null,trip:curTrip}));
   if(ok&&!editingId) notifyOthers("🧾 "+nm(me||form.payer)+" "+(fem(me||form.payer)?"הוסיפה":"הוסיף")+": "+data.desc+" "+fmt(amount,data.cur));
   if(ok){ done($("saveBtn")); burst($("saveBtn"),catEmoji(data)); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
 async function addTransfer(from,to,amt){
   const id=uid("t");
-  const ok=await run(()=>db.collection("expenses").doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),by:me||null,trip:curTrip}));
+  const ok=await run(()=>EXP().doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),by:me||null,trip:curTrip}));
   if(ok){ setTimeout(()=>{ const c=compute(); if(!c.debts.length) confetti(); flash($("ticket"),"glow",900); },60); buzz([12,60,12]); }
   if(ok) notifyOthers("💸 "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur));
-  if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur),"ביטול",()=>run(()=>db.collection("expenses").doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
+  if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur),"ביטול",()=>run(()=>EXP().doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
 }
 let toastTimer=null;
 function toast(msg,actLabel,act){
@@ -1022,7 +1034,7 @@ async function pSave(){
   const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat,catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||defLoc(),pm:pform.pm||"cash",date:$("pDate").value||todayStr(),trip:curTrip};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
   const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz()});
-  const ok=await run(()=>db.collection("expenses").doc(id).set(doc));
+  const ok=await run(()=>EXP().doc(id).set(doc));
   if(ok){ done($("pSave")); burst($("pSave"),catEmoji(data)); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
@@ -1265,7 +1277,7 @@ let CASHBAL={}, caMode="count";
 async function cashSave(entry){
   const c=await loadAcct(); if(!c) return false;
   const doc=await encFor(c,{type:"cash",...entry,createdAt:Date.now(),tz:hereTz(),loc:defLoc(),date:entry.date||todayStr(),trip:curTrip});
-  return run(()=>db.collection("expenses").doc(uid("w")).set(doc));
+  return run(()=>EXP().doc(uid("w")).set(doc));
 }
 const num=id=>parseFloat(String($(id).value).replace(/,/g,""));
 function openCash(k,focus){ cashForm= cashForm===k?null:k; renderCash(); if(cashForm&&focus) $(focus).focus(); }
@@ -1315,9 +1327,9 @@ async function again(it,personal){
   const id=uid(personal?"m":"e"); const base={...it}; delete base.id;
   Object.assign(base,{date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),trip:curTrip});
   let ok;
-  if(personal){ const c=await loadAcct(); if(!c) return; const doc=await encFor(c,base); ok=await run(()=>db.collection("expenses").doc(id).set(doc)); }
-  else { base.by=me||null; delete base.source; ok=await run(()=>db.collection("expenses").doc(id).set(base)); if(ok) notifyOthers("🧾 "+nm(me||it.payer)+" "+(fem(me||it.payer)?"הוסיפה":"הוסיף")+": "+(base.desc||"הוצאה")+" "+fmt(+base.amount,base.cur)); }
-  if(ok) toast("🔁 נוסף שוב להיום: "+(it.desc||"הוצאה"),"ביטול",()=>run(()=>db.collection("expenses").doc(id).delete()));
+  if(personal){ const c=await loadAcct(); if(!c) return; const doc=await encFor(c,base); ok=await run(()=>EXP().doc(id).set(doc)); }
+  else { base.by=me||null; delete base.source; ok=await run(()=>EXP().doc(id).set(base)); if(ok) notifyOthers("🧾 "+nm(me||it.payer)+" "+(fem(me||it.payer)?"הוסיפה":"הוסיף")+": "+(base.desc||"הוצאה")+" "+fmt(+base.amount,base.cur)); }
+  if(ok) toast("🔁 נוסף שוב להיום: "+(it.desc||"הוצאה"),"ביטול",()=>run(()=>EXP().doc(id).delete()));
 }
 /* deleting moves an expense to the recycle bin for 30 days */
 const BIN_DAYS=30;
@@ -1325,11 +1337,11 @@ async function delItem(it,personal){
   const r0=document.querySelector('.row[data-id="'+CSS.escape(it.id)+'"]'); const row=r0&&r0.closest(".swipe")||r0;
   if(row&&!calm()){ row.classList.add("leave"); buzz(12); await new Promise(r=>setTimeout(r,240)); }
   SEEN.delete(it.id);
-  const ok=await run(()=>db.collection("expenses").doc(it.id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null}));
+  const ok=await run(()=>EXP().doc(it.id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null}));
   if(ok) toast("🗑 הועבר לסל המחזור: "+(it.kind==="transfer"?"העברה":(it.desc||"הוצאה")),"ביטול",()=>restoreItem(it.id));
 }
-async function restoreItem(id){ const k=await run(()=>db.collection("expenses").doc(id).update({deleted:false,deletedAt:null,deletedBy:null})); if(k) toast("שוחזר ✓"); }
-async function purgeItem(id){ await run(()=>db.collection("expenses").doc(id).delete()); }
+async function restoreItem(id){ const k=await run(()=>EXP().doc(id).update({deleted:false,deletedAt:null,deletedBy:null})); if(k) toast("שוחזר ✓"); }
+async function purgeItem(id){ await run(()=>EXP().doc(id).delete()); }
 async function renderBin(){
   const L=$("binList"); if(!L) return; L.innerHTML="";
   const rows=[...BIN.map(it=>({...it,_mine:false}))];
@@ -1377,7 +1389,7 @@ $("pDesc").addEventListener("input",()=>suggest("pDesc","pSuggest",P,it=>{
 function notifyOthers(text){
   if(!me) return;
   for(const p of active()){ if(p.id===me||!p.ntfy) continue;
-    try{ fetch("https://ntfy.sh/"+encodeURIComponent(p.ntfy)+"?title="+encodeURIComponent(S.trip||"הטיול")+"&tags=moneybag&click="+encodeURIComponent(personalUrl(p.id)),{method:"POST",body:text,keepalive:true}).catch(()=>{}); }catch(e){} }
+    try{ fetch("https://ntfy.sh/"+encodeURIComponent(p.ntfy)+"?title="+encodeURIComponent(S.trip||"הטיול")+"&tags=moneybag&click="+encodeURIComponent(personalUrl(p.id,true)),{method:"POST",body:text,keepalive:true}).catch(()=>{}); }catch(e){} }
 }
 function sinceLastVisit(){
   if(!me) return;
@@ -1500,7 +1512,7 @@ function shareUrl(btn,url,title){
 }
 $("settingsBtn").onclick=()=>{ delAsk=null; $("pwChange").hidden=true; renderSettings(); openSheet("setSheet"); };
 $("setClose").onclick=()=>closeSheet("setSheet");
-$("shareAll").onclick=()=>shareUrl($("shareAll"),PAGE_URL,S.trip);
+$("shareAll").onclick=()=>shareUrl($("shareAll"),PAGE_URL+keyHash(),S.trip);
 $("sStartSave").onclick=async()=>{ const v=$("sStart").value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return; const ok=await patchTrip(curTrip,{startDate:v}); if(ok){ S.startDate=v; renderHero(); toast("📅 הטיול מתחיל ב-"+v.split("-").reverse().join(".")); } };
 $("sTripSave").onclick=async()=>{ const v=$("sTrip").value.trim(); if(!v) return; await patchTrip(curTrip,{name:v}); };
 $("acctLogout").onclick=()=>{ store("trip-ak-"+me,""); acct=null; acctFor=null; P=[]; renderAll(); renderSettings(); };
@@ -1552,6 +1564,46 @@ checkUpdate(); setInterval(()=>checkUpdate(),10*60*1000);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") checkUpdate(); });
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&(!S.fx.at||Date.now()-S.fx.at>3600e3)) refreshRates(); });
 
+/* ---- no key: either move the old open trip into a private space (once), or ask for the private link ---- */
+function gate(html){
+  let g=document.getElementById("spaceGate");
+  if(!g){ g=document.createElement("div"); g.id="spaceGate"; g.style.cssText="position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,14,40,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)"; document.body.appendChild(g); }
+  g.innerHTML='<div dir="rtl" style="background:#fff;color:#1d1630;border-radius:22px;padding:22px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.3);font-family:inherit;display:flex;flex-direction:column;gap:12px;text-align:right">'+html+'</div>';
+  return g;
+}
+function askForLink(msg){
+  const g=gate('<div style="font-size:40px">🔒</div><b style="font-size:20px">'+msg+'</b><div style="color:#6a6378;font-size:15px">הדביקו כאן את הקישור שקיבלתם בוואטסאפ, ותיכנסו. צריך לעשות את זה רק פעם אחת בטלפון הזה.</div><input id="gateIn" type="url" inputmode="url" placeholder="הדביקו כאן את הקישור" style="font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:2px solid #e3dcf2;direction:ltr"><div id="gateErr" style="color:#c2185b;font-size:14px;min-height:1em"></div><button id="gateGo" type="button" class="btn">כניסה</button>');
+  g.querySelector("#gateGo").onclick=()=>{
+    const v=g.querySelector("#gateIn").value.trim(); const m=/[#&]k=([a-z0-9]{32,64})/.exec(v);
+    if(!m){ g.querySelector("#gateErr").textContent="זה לא נראה כמו הקישור של הטיול. העתיקו את כל הקישור ונסו שוב."; return; }
+    store("trip-space",m[1]); const u=/[?&]u=([^&#]+)/.exec(v);
+    location.replace(PAGE_URL+(u?"?u="+u[1]:"")+"#k="+m[1]); location.reload(); /* a hash-only change does not reload by itself */
+  };
+}
+async function noSpace(){
+  const legacyMeta=db.collection("trip").doc("meta");
+  let snap=null; try{ snap=await legacyMeta.get(); }catch(e){}
+  if(!snap||!snap.exists||snap.data().migrated){ askForLink(snap&&snap.exists?"הטיול עבר לקישור מאובטח":"צריך את הקישור של הטיול"); return; }
+  const g=gate('<div style="font-size:40px">🔐</div><b style="font-size:20px">הטיול עובר לקישור מאובטח</b><div style="color:#6a6378;font-size:15px">עד עכשיו כל מי שידע את שם הפרויקט יכול היה לראות ולשנות את ההוצאות. עכשיו רק מי שיש לו את הקישור יוכל להיכנס, בלי שום התחברות. כל ההוצאות עוברות כמו שהן, ואחרי זה תקבלו קישור חדש לשלוח לכולם.</div><div id="gateErr" style="color:#c2185b;font-size:14px;min-height:1em"></div><button id="gateGo" type="button" class="btn">יצירת קישור מאובטח</button>');
+  g.querySelector("#gateGo").onclick=async()=>{
+    const b=g.querySelector("#gateGo"); b.disabled=true; b.textContent="מעבירים את ההוצאות…";
+    try{
+      const k=newKey(); const sp=db.collection("spaces").doc(k);
+      const meta=(await legacyMeta.get()).data(); const items=await db.collection("expenses").get();
+      let batch=db.batch(), n=0; const commits=[];
+      batch.set(sp.collection("trip").doc("meta"),meta);
+      for(const d of items.docs){ batch.set(sp.collection("expenses").doc(d.id),d.data()); if(++n%400===0){ commits.push(batch.commit()); batch=db.batch(); } }
+      commits.push(batch.commit()); await Promise.all(commits);
+      const check=await sp.collection("expenses").get();
+      if(check.size!==items.size) throw new Error("count "+check.size+"/"+items.size);
+      await legacyMeta.update({migrated:true,migratedAt:Date.now()});
+      store("trip-space",k); store("trip-moved","1");
+      const u=readParam("u")||load("trip-me");
+      location.replace(PAGE_URL+(u?"?u="+encodeURIComponent(u):"")+"#k="+k); location.reload();
+    }catch(e){ console.error(e); b.disabled=false; b.textContent="יצירת קישור מאובטח"; g.querySelector("#gateErr").textContent="ההעברה לא הצליחה ("+(e.code||e.message||"שגיאה")+"). שום דבר לא נמחק. נסו שוב."; }
+  };
+}
+
 /* ---- data ---- */
 const cfg=window.FIREBASE_CONFIG;
 if(!cfg||!window.firebase){
@@ -1559,6 +1611,7 @@ if(!cfg||!window.firebase){
   return;
 }
 firebase.initializeApp(cfg); db=firebase.firestore(); canWrite=true;
+if(!SPACE){ noSpace(); return; }
 try{ const pr=db.enablePersistence&&db.enablePersistence({synchronizeTabs:true}); if(pr&&pr.catch) pr.catch(()=>{}); }catch(e){}
 if("serviceWorker" in navigator&&location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 function netNote(){ $("netNote").hidden=navigator.onLine!==false; }
@@ -1571,6 +1624,7 @@ const ready=()=>{
     if(!me&&isApp()){ const r=load("trip-me"); if(person(r)&&!person(r).archived){ me=r; syncUrl(); } }
     if(me) store("trip-me",me);
     if(me){ form.payer=me; refreshPersonal(); if(location.hash&&!readParam("u")) syncUrl(); setTimeout(sinceLastVisit,600); }
+    if(load("trip-moved")==="1"){ try{ localStorage.removeItem("trip-moved"); }catch(e){} setTimeout(()=>{ toast("🔒 מאובטח! שלחו לכולם קישור חדש","לקישורים",()=>$("settingsBtn").click()); },900); }
     else view="shared";
   }
   renderAll();
@@ -1578,7 +1632,7 @@ const ready=()=>{
 const timer=setTimeout(()=>{ if(!loaded) $("status").textContent="הנתונים עדיין לא נטענו. בדקו את החיבור לאינטרנט."; },10000);
 metaRef().onSnapshot(async s=>{
   if(!s.exists){
-    try{ await db.runTransaction(async tx=>{ const c=await tx.get(metaRef()); if(c.exists) return; tx.set(metaRef(),SEED_META); for(const it of SEED_ITEMS){ const {id,...rest}=it; tx.set(db.collection("expenses").doc(id),rest); } }); }
+    try{ await db.runTransaction(async tx=>{ const c=await tx.get(metaRef()); if(c.exists) return; tx.set(metaRef(),SEED_META); for(const it of SEED_ITEMS){ const {id,...rest}=it; tx.set(EXP().doc(id),rest); } }); }
     catch(e){ console.error(e); $("status").textContent="לא הצלחנו ליצור את הטיול במסד הנתונים."; }
     return;
   }
@@ -1591,7 +1645,7 @@ metaRef().onSnapshot(async s=>{
   ready();
 },e=>{ console.error(e); $("status").textContent="לא הצלחנו לטעון את הנתונים."; });
 let firstItems=true;
-db.collection("expenses").onSnapshot({includeMetadataChanges:true},snap=>{
+EXP().onSnapshot({includeMetadataChanges:true},snap=>{
   PENDING=new Set(snap.docs.filter(d=>d.metadata&&d.metadata.hasPendingWrites).map(d=>d.id));
   if(!firstItems&&loaded&&me&&snap.docChanges) for(const ch of snap.docChanges()){
     const d=ch.doc.data(); if(ch.type!=="added"||!d||d.deleted||tripOf(d)!==curTrip||d.kind==="private"||!d.by||d.by===me||(ch.doc.metadata&&ch.doc.metadata.hasPendingWrites)) continue;
@@ -1600,7 +1654,7 @@ db.collection("expenses").onSnapshot({includeMetadataChanges:true},snap=>{
   firstItems=false;
   ALL=snap.docs.map(d=>({id:d.id,...d.data()}));
   const gone=splitItems();
-  if(!purged&&!snap.metadata?.fromCache){ purged=true; const cut=Date.now()-BIN_DAYS*864e5; for(const x of gone){ if((x.deletedAt||0)<cut) db.collection("expenses").doc(x.id).delete().catch(()=>{}); } }
+  if(!purged&&!snap.metadata?.fromCache){ purged=true; const cut=Date.now()-BIN_DAYS*864e5; for(const x of gone){ if((x.deletedAt||0)<cut) EXP().doc(x.id).delete().catch(()=>{}); } }
   if(loaded) refreshPersonal();
   if(!$("setSheet").hidden) renderBin();
   gotItems=true; ready();
