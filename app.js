@@ -139,10 +139,10 @@ function isDark(){ const t=themePref(); return t==="dark"||(t==="auto"&&matchMed
 function applyTheme(t){
   if(t==="auto"){ delete document.documentElement.dataset.theme; store("trip-theme",""); }
   else { document.documentElement.dataset.theme=t; store("trip-theme",t); }
-  $("themeBtn").textContent=isDark()?"☀️":"🌙";
+  $("themeBtn").setAttribute("aria-checked",String(isDark()));
   if($("themeSeg")) seg($("themeSeg"),[["light","☀️ בהיר"],["dark","🌙 כהה"],["auto","📱 לפי המכשיר"]],v=>v===themePref(),v=>applyTheme(v));
 }
-$("themeBtn").onclick=()=>{ const r=document.documentElement; if(!calm()){ r.classList.add("theming"); setTimeout(()=>r.classList.remove("theming"),500); } flash($("themeBtn"),"spin",500); applyTheme(isDark()?"light":"dark"); };
+$("themeBtn").onclick=()=>{ const r=document.documentElement; if(!calm()){ r.classList.add("theming"); setTimeout(()=>r.classList.remove("theming"),500); } buzz(6); applyTheme(isDark()?"light":"dark"); };
 try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>applyTheme(themePref())); }catch(e){}
 
 /* ---- search keywords per currency ---- */
@@ -153,11 +153,11 @@ const norm=s=>String(s||"").toLowerCase().replace(/[׳'"`]/g,"").replace(/\s+/g,
 function openSheet(id){ const s=$(id); s.classList.remove("closing"); s.hidden=false; document.body.style.overflow="hidden"; }
 function closeSheet(id){
   const s=$(id); if(s.hidden) return;
-  const finish=()=>{ s.hidden=true; s.classList.remove("closing"); if(id==="addSheet") restoreAdd(); if($("curSheet").hidden&&$("setSheet").hidden&&$("addSheet").hidden) document.body.style.overflow=""; };
+  const finish=()=>{ s.hidden=true; s.classList.remove("closing"); if(id==="addSheet") restoreAdd(); if($("curSheet").hidden&&$("setSheet").hidden&&$("addSheet").hidden&&$("acctSheet").hidden) document.body.style.overflow=""; };
   if(calm()) return finish();
   s.classList.add("closing"); setTimeout(finish,190);
 }
-for(const id of ["curSheet","setSheet","addSheet"]) $(id).addEventListener("click",e=>{ if(e.target.id===id) closeSheet(id); });
+for(const id of ["curSheet","setSheet","addSheet","acctSheet"]) $(id).addEventListener("click",e=>{ if(e.target.id===id) closeSheet(id); });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(!$("curSheet").hidden) closeSheet("curSheet"); else { closeSheet("setSheet"); closeSheet("addSheet"); } } });
 
 /* ---- currency picker ---- */
@@ -239,6 +239,7 @@ function renderHeader(){
   $("viewBtn").hidden=!showMine; $("toprow").classList.toggle("one",!showMine);
   $("viewBtn").setAttribute("aria-pressed",String(view==="personal"));
   $("meBadge").textContent= me? nm(me).trim().charAt(0) : "";
+  renderAcct();
   $("viewTxt").textContent= view==="personal" ? "← לחשבון המשותף" : "האישי שלי";
   $("viewSmall").textContent= view==="personal" ? "חזרה" : (me&&fem(me)?"רק את רואה":"רק אתה רואה");
   const lc=CUR[S.localCur]; $("localSym").textContent=lc.sym||S.localCur.slice(0,1); $("localName").textContent=lc.name;
@@ -1513,6 +1514,37 @@ function shareUrl(btn,url,title){
 }
 $("settingsBtn").onclick=()=>{ delAsk=null; $("pwChange").hidden=true; renderSettings(); openSheet("setSheet"); };
 $("setClose").onclick=()=>closeSheet("setSheet");
+
+/* ---- account chip at the top: who is signed in on this phone ---- */
+function ini(n){ n=String(n||"").trim(); const w=n.split(/\s+/); return w.length>1 ? w[0].charAt(0)+w[1].charAt(0) : n.slice(0,2); }
+function renderAcct(){
+  const c=$("acctBtn"), on=!!me&&!!person(me);
+  c.classList.toggle("out",!on);
+  $("acctAv").textContent= on ? ini(nm(me)) : "👤";
+  $("acctName").textContent= on ? nm(me) : "התחברות";
+  $("acctDot").hidden= !(on&&acct&&acctFor===me);
+  c.setAttribute("aria-label", on ? "החשבון של "+nm(me) : "בחירת משתמש");
+}
+function fillAcct(){
+  const f=fem(me), open=!!(acct&&acctFor===me), hasPw=!!person(me)?.vk;
+  $("acctAv2").textContent=ini(nm(me));
+  $("acctName2").textContent=nm(me);
+  $("acctSub").textContent=(f?"מחוברת":"מחובר")+" בטלפון הזה";
+  $("acctTrip").textContent=S.trip||"הטיול";
+  $("acctPeople").textContent=active().map(p=>p.name).join(", ");
+  $("acctLock").textContent= open ? "פתוחות 🔓" : hasPw ? "נעולות 🔒" : "עוד אין סיסמה";
+  $("acctConn").textContent= !canWrite ? "קריאה בלבד" : navigator.onLine===false ? "בלי קליטה, נשמר בטלפון" : "מחובר ✓";
+  $("acctLockBtn").hidden=!open;
+  $("acctMine").textContent= view==="personal" ? "🤝 לחשבון המשותף" : "👤 להוצאות האישיות שלי";
+  $("acctMine").hidden=!canWrite;
+}
+$("acctBtn").onclick=()=>{ buzz(6);
+  if(!me||!person(me)){ const pk=$("picker"); if(!pk.hidden){ pk.scrollIntoView({behavior:"smooth",block:"center"}); } return; }
+  fillAcct(); openSheet("acctSheet"); };
+$("acctClose").onclick=()=>closeSheet("acctSheet");
+$("acctMine").onclick=()=>{ closeSheet("acctSheet"); $("viewBtn").click(); };
+$("acctSwitch").onclick=()=>{ closeSheet("acctSheet"); $("switchBtn").click(); };
+$("acctLockBtn").onclick=()=>{ store("trip-ak-"+me,""); acct=null; acctFor=null; P=[]; if(view==="personal") view="shared"; closeSheet("acctSheet"); renderAll(); toast("🔒 האישי ננעל בטלפון הזה"); };
 $("shareAll").onclick=()=>shareUrl($("shareAll"),PAGE_URL+keyHash(),S.trip);
 $("sStartSave").onclick=async()=>{ const v=$("sStart").value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return; const ok=await patchTrip(curTrip,{startDate:v}); if(ok){ S.startDate=v; renderHero(); toast("📅 הטיול מתחיל ב-"+v.split("-").reverse().join(".")); } };
 $("sTripSave").onclick=async()=>{ const v=$("sTrip").value.trim(); if(!v) return; await patchTrip(curTrip,{name:v}); };

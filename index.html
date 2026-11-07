@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@700;900&family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;700&display=swap">
-<script src="theme.js?v=20261107193155"></script>
+<script src="theme.js?v=20261107193636"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -518,19 +518,57 @@ body{transition:background-color .9s cubic-bezier(.2,.8,.2,1)}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .5s ease}}
+
+/* header: account chip on one side, theme switch on the other */
+header{flex-direction:column;align-items:stretch;gap:14px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.topbar .hbtns{align-items:center}
+.acct-chip{font:inherit;display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:58%;height:44px;padding:0 14px 0 6px;border-radius:999px;border:2px solid var(--ink);background:var(--surface);color:var(--ink);font-weight:700;font-size:1rem;cursor:pointer;position:relative;transition:transform .15s ease,box-shadow .2s ease}
+.acct-chip:active{transform:scale(.96)}
+.acct-chip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-chip .av,.acct-card .av{flex-shrink:0;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--grad);color:#fff;font-family:var(--display);font-weight:700;font-size:.82rem;letter-spacing:-.02em;line-height:1}
+.acct-chip.out .av{background:var(--surface-2);font-size:1.05rem}
+.acct-chip .dot{position:absolute;bottom:2px;inset-inline-start:4px;width:11px;height:11px;border-radius:50%;background:var(--mint);border:2px solid var(--surface)}
+.tswitch{flex-shrink:0;position:relative;width:70px;height:40px;padding:0;border:0;border-radius:999px;cursor:pointer;direction:ltr;overflow:hidden;
+  background:linear-gradient(90deg,#9ED2F7 0%,#C9DCC2 55%,#FFE6A0 100%);box-shadow:inset 0 2px 6px rgba(30,40,90,.18);transition:background .5s ease}
+.tswitch .tk{position:absolute;inset:0;background:linear-gradient(90deg,#120C33,#2A1A66 60%,#4A2C8F);opacity:0;transition:opacity .5s ease}
+.tswitch .tk i{position:absolute;width:3px;height:3px;border-radius:50%;background:#fff;opacity:.9}
+.tswitch .tk i:nth-child(1){left:12px;top:11px}.tswitch .tk i:nth-child(2){left:22px;top:24px;width:2px;height:2px}.tswitch .tk i:nth-child(3){left:32px;top:9px;width:2px;height:2px}
+.tswitch .knob{position:absolute;top:4px;left:4px;width:32px;height:32px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(20,10,60,.3);display:grid;place-items:center;transition:transform .45s cubic-bezier(.3,1.4,.5,1)}
+.tswitch .knob b{grid-area:1/1;font-size:18px;line-height:1;transition:opacity .3s ease,transform .45s ease}
+.tswitch .k-moon{opacity:0;transform:rotate(-90deg) scale(.5)}
+.tswitch[aria-checked="true"] .tk{opacity:1}
+.tswitch[aria-checked="true"] .knob{transform:translateX(30px);background:#EDE9FF}
+.tswitch[aria-checked="true"] .k-sun{opacity:0;transform:rotate(90deg) scale(.5)}
+.tswitch[aria-checked="true"] .k-moon{opacity:1;transform:none}
+.tswitch:focus-visible,.acct-chip:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.tswitch .knob,.tswitch .knob b,.tswitch .tk{transition:none}}
+/* account sheet */
+.acct-card{display:flex;align-items:center;gap:14px;padding:16px;border-radius:22px;background:var(--grad);color:#fff}
+.acct-card .av{width:58px;height:58px;font-size:1.3rem;background:rgba(255,255,255,.22);border:2px solid rgba(255,255,255,.55)}
+.acct-card b{display:block;font-family:var(--display);font-size:1.35rem}
+.acct-card small{opacity:.9}
+.acct-rows{display:flex;flex-direction:column;border:1.5px solid var(--line);border-radius:18px;overflow:hidden}
+.acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;flex-shrink:0}
+.acct-row+.acct-row{border-top:1.5px solid var(--line)}
+.acct-row span{color:var(--muted)}
+.acct-row b{text-align:end}
 </style>
 </head>
 <body>
 <div class="wrap" id="app">
   <header>
+    <div class="topbar">
+      <button class="acct-chip" id="acctBtn" type="button" aria-haspopup="dialog"><span class="av" id="acctAv" aria-hidden="true">👤</span><span class="nm" id="acctName">התחברות</span><i class="dot" id="acctDot" hidden></i></button>
+      <div class="hbtns">
+        <button class="btn icon-btn" id="statsBtn" type="button" aria-label="גרפים לפי חודשים">📊</button>
+        <button class="btn icon-btn" id="settingsBtn" type="button" aria-label="הגדרות">⚙️</button>
+        <button class="tswitch" id="themeBtn" type="button" role="switch" aria-checked="false" aria-label="מצב כהה"><span class="tk" aria-hidden="true"><i></i><i></i><i></i></span><span class="knob" aria-hidden="true"><b class="k-sun">☀️</b><b class="k-moon">🌙</b></span></button>
+      </div>
+    </div>
     <div class="t">
       <h1 id="title">גלי ויאירוש במזרח</h1>
       <div class="sub" id="sub">החשבון המשותף של הטיול</div>
-    </div>
-    <div class="hbtns">
-      <button class="btn icon-btn" id="statsBtn" type="button" aria-label="גרפים לפי חודשים">📊</button>
-      <button class="btn icon-btn" id="themeBtn" type="button" aria-label="מצב בהיר או כהה">🌙</button>
-      <button class="btn icon-btn" id="settingsBtn" type="button" aria-label="הגדרות">⚙️</button>
     </div>
   </header>
 
@@ -934,6 +972,23 @@ body{transition:background-color .9s cubic-bezier(.2,.8,.2,1)}
 </div>
 
 <!-- settings -->
+<div class="sheet-bg" id="acctSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="acctTitle">
+    <div class="sheet-head"><h2 id="acctTitle">החשבון שלי</h2><button class="btn small" id="acctClose" type="button">סגירה</button></div>
+    <div class="acct-card"><span class="av" id="acctAv2" aria-hidden="true"></span><div><b id="acctName2"></b><small id="acctSub"></small></div></div>
+    <div class="acct-rows">
+      <div class="acct-row"><span>🧳 הטיול</span><b id="acctTrip"></b></div>
+      <div class="acct-row"><span>👥 משתתפים</span><b id="acctPeople"></b></div>
+      <div class="acct-row"><span>🔐 ההוצאות האישיות</span><b id="acctLock"></b></div>
+      <div class="acct-row"><span>📶 חיבור</span><b id="acctConn"></b></div>
+    </div>
+    <div class="stack">
+      <button class="btn block" id="acctMine" type="button">👤 להוצאות האישיות שלי</button>
+      <button class="btn block" id="acctLockBtn" type="button">🔒 לנעול את האישי בטלפון הזה</button>
+      <button class="btn block" id="acctSwitch" type="button">🔄 החלפת משתמש</button>
+    </div>
+  </div>
+</div>
 <div class="sheet-bg" id="setSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
     <div class="sheet-head"><h2 id="setTitle">⚙️ הגדרות</h2><button class="btn small" id="setClose" type="button">סגירה</button></div>
@@ -1030,9 +1085,9 @@ body{transition:background-color .9s cubic-bezier(.2,.8,.2,1)}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261107193155">
-<script src="config.js?v=20261107193155"></script>
-<script src="fx.js?v=20261107193155"></script>
-<script src="app.js?v=20261107193155"></script>
+<meta name="app-v" content="20261107193636">
+<script src="config.js?v=20261107193636"></script>
+<script src="fx.js?v=20261107193636"></script>
+<script src="app.js?v=20261107193636"></script>
 </body>
 </html>
