@@ -21,8 +21,16 @@
     h.style.setProperty("--p",calm()?0:p.toFixed(3));
   }
 
+  /* day / sunrise-sunset / night in the hero, by the clock on this phone */
+  function sky(){
+    const h=document.getElementById("hero"); if(!h) return;
+    const hr=new Date().getHours();
+    const t=(hr>=20||hr<5)?"night":(hr<7||hr>=17)?"dusk":"day";
+    if(h.dataset.sky!==t) h.dataset.sky=t;
+  }
+
   let queued=false;
-  function frame(){ queued=false; pickTone(); stack(); }
+  function frame(){ queued=false; pickTone(); stack(); sky(); }
   function ask(){ if(!queued){ queued=true; requestAnimationFrame(frame); } }
   addEventListener("scroll",ask,{passive:true});
   addEventListener("resize",ask);
