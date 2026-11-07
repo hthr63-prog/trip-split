@@ -1,5 +1,5 @@
 rules_version = '2';
-// שלב 2: הנתונים הישנים נסגרו אחרי ההעברה, ואין מחיקה סופית בלי סל מחזור.
+// שלב 2: רק כספות עם מפתח ארוך, ואין מחיקה סופית בלי סל מחזור.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -33,14 +33,7 @@ service cloud.firestore {
       }
     }
 
-    // הנתונים הישנים: אחרי ההעברה אף אחד לא יכול לקרוא אותם.
-    match /trip/meta {
-      allow read: if resource.data.get('migrated', false) != true;
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['migrated', 'migratedAt']);
-    }
-    match /expenses/{id} {
-      allow read: if get(/databases/$(database)/documents/trip/meta).data.get('migrated', false) != true;
-    }
+    // הנתונים הישנים נמחקו. כל מה שלא מופיע כאן סגור לגמרי.
 
     // רכילותא: כל משתמש ניגש רק לדוחות של עצמו (שמורים מוצפנים).
     match /rk_users/{uid}/reports/{id} {
