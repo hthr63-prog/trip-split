@@ -365,7 +365,7 @@ table.daily td.num{text-align:right}
 .hero-txt{position:relative;display:grid;grid-template-columns:1fr auto;grid-template-areas:"place day" "chips chips";gap:6px 10px;padding:14px 16px 14px;color:#fff;min-height:150px;align-content:space-between;text-shadow:0 1px 8px rgba(40,10,90,.35)}
 .hero-place{grid-area:place;justify-self:start;align-self:start;font:inherit;font-family:var(--display);font-weight:600;font-size:1.05rem;color:#fff;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:999px;padding:5px 12px;cursor:pointer}
 .hero-day{grid-area:day;text-align:left;display:flex;flex-direction:column;align-items:flex-end;line-height:1}
-.hero-day .num{font-family:var(--display);font-weight:700;font-size:2.2rem}
+.hero-day .heronum{font-family:var(--display);font-weight:700;font-size:2.2rem;direction:rtl;font-variant-numeric:tabular-nums}
 .hero-day small{font-size:.74rem;opacity:.9;margin-top:4px}
 .hero-chips{grid-area:chips;display:flex;gap:6px;flex-wrap:wrap;align-self:end}
 .hero-chips span{background:rgba(20,8,60,.32);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:3px 10px;font-size:.8rem;font-weight:500;white-space:nowrap}
@@ -425,6 +425,54 @@ table.daily td.num{text-align:right}
 .rv.in{opacity:1;transform:none;transition:opacity .55s cubic-bezier(.2,.8,.2,1),transform .55s cubic-bezier(.2,.8,.2,1)}
 .hero .scene,.hero-txt{will-change:transform}
 @media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none}.mini{transition:none}}
+
+/* scenes per country */
+:root{--snow:#FFFFFF;--win:rgba(255,236,170,.95)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--snow:#E8E4FF;--win:#FFD86B}}
+:root[data-theme="dark"]{--snow:#E8E4FF;--win:#FFD86B}
+.hero .sc{display:none}
+.hero[data-scene="temple"] .sc-temple,.hero[data-scene="home"] .sc-home,.hero[data-scene="beach"] .sc-beach,.hero[data-scene="karst"] .sc-karst,.hero[data-scene="fuji"] .sc-fuji,.hero[data-scene="city"] .sc-city,.hero[data-scene="peaks"] .sc-peaks,.hero[data-scene="taj"] .sc-taj{display:inline}
+@media (prefers-reduced-motion:no-preference){ .hero .wins rect:nth-child(3n){animation:twinkle 4s ease-in-out infinite} .hero .wins rect:nth-child(4n){animation:twinkle 5s 1s ease-in-out infinite} .hero:not([hidden]) .sc{animation:fadeIn .6s ease both} }
+.triprow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1.5px solid var(--line);border-radius:14px}
+.triprow.on{border-color:var(--brand);background:var(--surface-2)}
+.tripnote{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;border-color:var(--sun);background:color-mix(in srgb,var(--sun) 14%,var(--surface));color:var(--ink)}
+
+/* ================= recap stories ================= */
+.recapcta{display:flex;align-items:center;gap:12px;text-align:right;width:100%;font:inherit;color:#fff;border:none;border-radius:22px;padding:14px 16px;cursor:pointer;background:linear-gradient(135deg,#FF8A3D,#FF4D8D 50%,#6C4BFF);box-shadow:var(--shadow)}
+.recapcta > span:first-child{font-size:2rem}
+.recapcta b{display:block;font-family:var(--display);font-size:1.15rem}
+.recapcta small{opacity:.9;font-size:.8rem}
+.cat.tap{cursor:pointer}.cat.tap:active{opacity:.7}
+.recap{position:fixed;inset:0;z-index:90;color:#fff;display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));transition:background .6s ease;user-select:none;-webkit-user-select:none}
+.recap[data-bg="g1"]{background:linear-gradient(160deg,#6C4BFF,#B84DFF 55%,#FF4D8D)}
+.recap[data-bg="g2"]{background:linear-gradient(160deg,#0E9488,#14C9A5 50%,#6C4BFF)}
+.recap[data-bg="g3"]{background:linear-gradient(160deg,#FF8A3D,#FF4D8D 55%,#B84DFF)}
+.recap[data-bg="g4"]{background:linear-gradient(160deg,#1E1640,#4A2FC9 60%,#B84DFF)}
+.recap[data-bg="g5"]{background:linear-gradient(160deg,#F59E0B,#FF8A3D 50%,#E5484D)}
+.recap[data-bg="g6"]{background:linear-gradient(160deg,#3B82F6,#6C4BFF 55%,#FF4D8D)}
+.rc-bars{display:flex;gap:4px;direction:ltr}
+.rc-bars span{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.3);overflow:hidden}
+.rc-bars span i{display:block;height:100%;width:0;background:#fff}
+.rc-bars span.done i{width:100%}
+.rc-bars span.now i{animation:rcfill 5.2s linear forwards}
+@keyframes rcfill{to{width:100%}}
+.rc-close{position:absolute;top:calc(22px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.2);color:#fff;font-size:1.1rem;cursor:pointer}
+.rc-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;max-width:520px;margin:0 auto;width:100%}
+.rc-kick{font-size:1.05rem;opacity:.9;font-weight:500}
+.rc-big{font-size:5rem;line-height:1.1}
+.rc-num{font-family:var(--display);font-weight:700;font-size:4.2rem;line-height:1;direction:ltr;unicode-bidi:isolate;text-align:right;font-variant-numeric:tabular-nums}
+.rc-unit{font-family:var(--display);font-size:1.8rem;font-weight:600}
+.rc-h{font-family:var(--display);font-weight:700;font-size:2.3rem;line-height:1.15;text-wrap:balance}
+.rc-p{font-size:1.05rem;opacity:.92;line-height:1.5}
+
+.rc-pbars{display:flex;flex-direction:column;gap:12px;direction:rtl;margin:8px 0}
+.rc-bar{display:grid;grid-template-columns:4.5em 1fr 3em;gap:10px;align-items:center;font-weight:600}
+.rc-bar b{height:14px;border-radius:8px;background:rgba(255,255,255,.25);overflow:hidden}
+.rc-bar b i{display:block;height:100%;width:0;background:#fff;border-radius:8px;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.rc-bar em{font-style:normal;text-align:left}
+.rc-share{align-self:flex-start;background:#fff!important;color:#2A1670!important;border:none;margin-top:10px;font-weight:600;padding:12px 20px}
+.rc-hint{text-align:center;font-size:.75rem;opacity:.6}
+@media (prefers-reduced-motion:no-preference){ .rc-body > *{animation:rise .5s cubic-bezier(.2,.8,.2,1) both} .rc-body > *:nth-child(2){animation-delay:.08s}.rc-body > *:nth-child(3){animation-delay:.16s}.rc-body > *:nth-child(4){animation-delay:.24s}.rc-body > *:nth-child(5){animation-delay:.32s} .rc-big{animation:popIn .6s cubic-bezier(.3,.7,.4,1.4) both!important} }
 @media (max-width:440px){
   .grid{grid-template-columns:1fr}
   .cat{grid-template-columns:6em 1fr auto}
@@ -450,9 +498,10 @@ table.daily td.num{text-align:right}
   </header>
 
   <div class="note" id="roNote" hidden></div>
+  <div class="note tripnote" id="tripNote" hidden><span id="tripNoteTxt"></span> <button class="link" id="tripBack" type="button">חזרה לטיול הנוכחי</button></div>
   <div class="note" id="netNote" hidden>📴 אין קליטה כרגע. מה שתוסיפו נשמר בטלפון ויעלה לבד כשתחזור קליטה.</div>
 
-  <section class="hero" id="hero" hidden>
+  <section class="hero" id="hero" data-scene="temple" hidden>
     <svg class="scene" viewBox="0 0 400 150" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
       <defs>
         <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sky1)"/><stop offset=".6" style="stop-color:var(--sky2)"/><stop offset="1" style="stop-color:var(--sky3)"/></linearGradient>
@@ -467,18 +516,87 @@ table.daily td.num{text-align:right}
       <circle class="sun" cx="300" cy="78" r="22" style="fill:var(--sun1)"/>
       <g class="cloud c1" style="fill:var(--cloud)"><ellipse cx="80" cy="40" rx="26" ry="9"/><ellipse cx="96" cy="34" rx="15" ry="10"/><ellipse cx="66" cy="36" rx="11" ry="8"/></g>
       <g class="cloud c2" style="fill:var(--cloud)"><ellipse cx="220" cy="26" rx="20" ry="7"/><ellipse cx="232" cy="21" rx="12" ry="8"/></g>
-      <path d="M0 104 L40 70 L70 92 L110 56 L150 96 L190 74 L230 100 L270 64 L320 98 L360 72 L400 96 L400 150 L0 150Z" style="fill:var(--mnt1)"/>
-      <path d="M0 116 L50 92 L90 110 L140 86 L190 112 L240 94 L300 114 L350 96 L400 112 L400 150 L0 150Z" style="fill:var(--mnt2)"/>
-      <g style="fill:var(--sil)">
-        <path d="M118 118 h28 v-6 h-4 v-6 h-3 l-4 -10 l-3 -6 l-3 6 l-4 10 h-3 v6 h-4z"/><rect x="129" y="74" width="2" height="8"/>
-        <path d="M150 118 h18 v-5 h-3 v-5 h-2 l-2.5 -7 l-2.5 7 h-2 v5 h-3z"/>
+      <!-- Tel Aviv: Azrieli towers and the promenade (at home, before the flight) -->
+      <g class="sc sc-home">
+        <path d="M0 118 V100 h20 v-6 h16 v10 h22 v-14 h14 v14 h24 v-8 h18 v8 h30 v-4 h20 v4 h40 v-10 h16 v10 h30 v-6 h22 v6 h40 v-12 h18 v12 h30 v-4 h40 V118Z" style="fill:var(--mnt1)"/>
+        <g style="fill:var(--sil)">
+          <circle cx="232" cy="80" r="0"/><path d="M222 118 V62 a12 12 0 0 1 24 0 V118Z"/>
+          <path d="M252 118 V70 l14 -16 l14 16 V118Z"/>
+          <path d="M286 118 V60 h22 V118Z"/>
+          <path d="M120 118 V96 h18 v22Z M142 118 V88 h12 v30Z M330 118 V92 h16 v26Z"/>
+        </g>
+        <g style="fill:var(--win)" class="wins"><rect x="228" y="70" width="3" height="3"/><rect x="236" y="82" width="3" height="3"/><rect x="258" y="78" width="3" height="3"/><rect x="266" y="92" width="3" height="3"/><rect x="292" y="68" width="3" height="3"/><rect x="300" y="84" width="3" height="3"/><rect x="292" y="98" width="3" height="3"/></g>
+      </g>
+      <!-- temples and palms (Thailand, Myanmar, Cambodia and the default) -->
+      <g class="sc sc-temple">
+        <path d="M0 104 L40 70 L70 92 L110 56 L150 96 L190 74 L230 100 L270 64 L320 98 L360 72 L400 96 L400 150 L0 150Z" style="fill:var(--mnt1)"/>
+        <path d="M0 116 L50 92 L90 110 L140 86 L190 112 L240 94 L300 114 L350 96 L400 112 L400 150 L0 150Z" style="fill:var(--mnt2)"/>
+        <g style="fill:var(--sil)">
+          <path d="M118 118 h28 v-6 h-4 v-6 h-3 l-4 -10 l-3 -6 l-3 6 l-4 10 h-3 v6 h-4z"/><rect x="129" y="74" width="2" height="8"/>
+          <path d="M150 118 h18 v-5 h-3 v-5 h-2 l-2.5 -7 l-2.5 7 h-2 v5 h-3z"/>
+        </g>
+      </g>
+      <!-- tropical islands (Philippines, Indonesia, Malaysia, Maldives) -->
+      <g class="sc sc-beach">
+        <path d="M150 118 Q200 84 250 100 Q290 86 330 104 Q360 96 400 110 L400 118Z" style="fill:var(--mnt1)"/>
+        <path d="M0 118 Q30 102 70 108 Q100 112 120 118Z" style="fill:var(--mnt2)"/>
+        <path d="M250 118 Q300 106 360 118Z" style="fill:var(--mnt2)"/>
+      </g>
+      <!-- limestone karsts (Vietnam, Laos) -->
+      <g class="sc sc-karst">
+        <path d="M20 118 C16 84 30 60 44 62 C58 64 60 92 58 118Z M70 118 C66 70 84 40 100 44 C116 48 116 86 112 118Z M150 118 C148 92 160 76 172 78 C184 80 186 100 184 118Z M230 118 C226 76 244 52 260 56 C276 60 276 92 272 118Z M300 118 C298 88 312 70 324 72 C338 74 338 100 336 118Z M350 118 C348 80 362 60 376 62 C392 66 392 96 390 118Z" style="fill:var(--mnt1)"/>
+        <path d="M110 118 C108 98 120 86 132 88 C144 90 146 106 144 118Z M190 118 C186 94 200 82 212 84 C224 86 226 104 224 118Z M276 118 C274 102 286 92 296 94 C306 96 308 108 306 118Z" style="fill:var(--mnt2)"/>
+      </g>
+      <!-- Mount Fuji and a torii gate (Japan) -->
+      <g class="sc sc-fuji">
+        <path d="M90 118 L190 46 Q200 40 210 46 L310 118Z" style="fill:var(--mnt1)"/>
+        <path d="M172 59 L190 46 Q200 40 210 46 L228 59 L218 64 L210 58 L202 66 L194 58 L184 65Z" style="fill:var(--snow)"/>
+        <path d="M0 118 Q60 104 120 112 Q170 118 200 118Z M260 118 Q320 106 400 112 L400 118Z" style="fill:var(--mnt2)"/>
+        <g style="fill:#E5484D"><rect x="40" y="88" width="44" height="4" rx="1.5"/><rect x="44" y="95" width="36" height="3"/><rect x="47" y="92" width="3.2" height="26"/><rect x="74" y="92" width="3.2" height="26"/></g>
+      </g>
+      <!-- city skyline (Singapore, Hong Kong, Korea, Taiwan, China, Dubai and the rest) -->
+      <g class="sc sc-city">
+        <path d="M0 118 V96 h16 v-8 h12 v14 h14 v-20 h10 v26 h18 v-12 h14 v12 h20 v-30 h8 v30 h16 v-16 h22 v16 h14 v-26 h12 v26 h20 v-10 h16 v10 h24 v-22 h10 v22 h20 v-14 h18 v14 h16 v-20 h14 v20 h22 v-8 h16 V118Z" style="fill:var(--mnt1)"/>
+        <g style="fill:var(--sil)">
+          <path d="M60 118 V78 h18 v40Z M84 118 V64 h14 v54Z M102 118 V86 h20 v32Z M150 118 V70 h10 v-10 h4 v-14 h2 v14 h4 v10 h10 v48Z M196 118 V82 h22 v36Z M244 118 V58 l12 -8 l12 8 v60Z M276 118 V74 h18 v44Z M300 118 V90 h26 v28Z M334 118 V66 h16 v52Z"/>
+        </g>
+        <g style="fill:var(--win)" class="wins">
+          <rect x="64" y="84" width="3" height="3"/><rect x="71" y="92" width="3" height="3"/><rect x="88" y="72" width="3" height="3"/><rect x="92" y="84" width="3" height="3"/><rect x="88" y="98" width="3" height="3"/><rect x="154" y="78" width="3" height="3"/><rect x="161" y="90" width="3" height="3"/><rect x="171" y="80" width="3" height="3"/><rect x="200" y="90" width="3" height="3"/><rect x="209" y="100" width="3" height="3"/><rect x="249" y="66" width="3" height="3"/><rect x="258" y="78" width="3" height="3"/><rect x="249" y="92" width="3" height="3"/><rect x="281" y="82" width="3" height="3"/><rect x="287" y="96" width="3" height="3"/><rect x="306" y="98" width="3" height="3"/><rect x="338" y="74" width="3" height="3"/><rect x="343" y="88" width="3" height="3"/>
+        </g>
+      </g>
+      <!-- snowy peaks and prayer flags (Nepal, Bhutan, Central Asia) -->
+      <g class="sc sc-peaks">
+        <path d="M0 118 L30 80 L50 96 L95 36 L125 72 L150 58 L195 104 L230 62 L260 82 L300 30 L345 86 L370 70 L400 92 V118Z" style="fill:var(--mnt1)"/>
+        <path d="M82 54 L95 36 L108 54 L101 50 L95 58 L88 50Z M287 48 L300 30 L313 48 L306 44 L300 52 L293 44Z M220 75 L230 62 L240 75 L235 72 L230 78 L225 72Z" style="fill:var(--snow)"/>
+        <path d="M0 118 L60 100 L120 112 L180 98 L250 114 L320 100 L400 112 V118Z" style="fill:var(--mnt2)"/>
+        <path d="M30 70 Q100 92 170 74" style="stroke:var(--sil);stroke-width:.8;fill:none"/>
+        <g><path d="M44 74 l6 1 l-2 6z" fill="#3B82F6"/><path d="M62 79 l6 1 l-2 6z" fill="#fff"/><path d="M80 83 l6 1 l-2 6z" fill="#E5484D"/><path d="M98 84 l6 0 l-3 6z" fill="#0E9F7E"/><path d="M116 83 l6 -1 l-2 6z" fill="#FFC93C"/><path d="M134 80 l6 -1 l-1 6z" fill="#3B82F6"/><path d="M152 77 l6 -2 l-1 6z" fill="#fff"/></g>
+      </g>
+      <!-- Taj Mahal (India, Pakistan, Bangladesh) -->
+      <g class="sc sc-taj">
+        <path d="M0 112 Q100 104 200 108 Q300 104 400 112 V118 H0Z" style="fill:var(--mnt2)"/>
+        <g style="fill:var(--sil)">
+          <path d="M160 118 V92 h80 V118Z"/>
+          <path d="M182 92 Q182 70 200 62 Q218 70 218 92Z"/><rect x="199" y="54" width="2" height="9"/>
+          <path d="M166 92 Q166 84 172 82 Q178 84 178 92Z M222 92 Q222 84 228 82 Q234 84 234 92Z"/>
+          <rect x="146" y="76" width="5" height="42"/><rect x="249" y="76" width="5" height="42"/>
+          <path d="M145 76 Q148.5 70 152 76Z M248 76 Q251.5 70 255 76Z"/>
+          <rect x="192" y="100" width="16" height="18" rx="8" style="fill:var(--sky3)"/>
+        </g>
       </g>
       <rect y="118" width="400" height="32" fill="url(#seaG)"/>
       <g class="waves" style="stroke:var(--wave);fill:none;stroke-width:1.4;stroke-linecap:round">
         <path d="M0 128 q10 -4 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0"/>
         <path d="M-10 139 q10 -4 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0" opacity=".6"/>
       </g>
-      <g style="fill:var(--sil)">
+      <!-- sailboat (islands) and a long-tail boat (karsts) -->
+      <g class="sc sc-beach" style="fill:var(--sil)">
+        <path d="M196 132 h40 l-6 7 h-28z"/><path d="M214 131 V100 l18 28z" style="fill:#fff;opacity:.92"/><path d="M212 131 V106 l-14 22z" style="fill:#fff;opacity:.75"/>
+      </g>
+      <g class="sc sc-karst" style="fill:var(--sil)">
+        <path d="M160 134 q30 6 64 0 l-4 5 q-28 4 -56 0z"/><path d="M190 133 q6 -8 14 0z"/>
+      </g>
+      <g class="sc sc-temple sc-beach sc-home" style="fill:var(--sil)">
         <path d="M38 150 q2 -26 -4 -48 l3 -1 q7 22 5 49z"/>
         <path d="M36 102 q-16 -6 -26 4 q14 -2 24 0z M36 102 q-6 -14 -20 -14 q10 6 18 15z M37 101 q4 -15 18 -16 q-10 7 -16 17z M38 102 q16 -4 25 6 q-13 -3 -23 -4z M37 102 q-2 -12 4 -20 q0 10 -2 20z"/>
         <path d="M368 150 q-1 -18 4 -34 l2.6 .8 q-5 16 -3.4 33.2z"/>
@@ -487,7 +605,7 @@ table.daily td.num{text-align:right}
     </svg>
     <div class="hero-txt">
       <button class="hero-place" id="heroPlace" type="button" aria-label="החלפת מדינה"><span id="heroFlag">🇹🇭</span> <span id="heroCountry">תאילנד</span></button>
-      <div class="hero-day"><span class="num" id="heroDay">יום 1</span><small id="heroSince"></small></div>
+      <div class="hero-day"><span id="heroDay" class="heronum">יום 1</span><small id="heroSince"></small></div>
       <div class="hero-chips" id="heroChips"></div>
     </div>
   </section>
@@ -498,7 +616,7 @@ table.daily td.num{text-align:right}
       <span class="badge" id="meBadge">י</span><span class="txt"><small id="viewSmall">רק שלך</small><b id="viewTxt">האישי שלי</b></span>
     </button>
     <button class="pill cur" id="localBtn" type="button">
-      <span class="badge" id="localSym">฿</span><span class="txt"><small>המטבע עכשיו · להחלפה</small><b id="localName">באט תאילנדי</b></span>
+      <span class="badge" id="localSym">฿</span><span class="txt"><small id="localSmall">המטבע עכשיו · להחלפה</small><b id="localName">באט תאילנדי</b></span>
     </button>
   </div>
 
@@ -694,6 +812,7 @@ table.daily td.num{text-align:right}
   <!-- stats view -->
   <div id="viewStats" class="stack" style="gap:18px" hidden>
     <div class="actions"><button class="btn small" id="statsBack" type="button">→ חזרה</button><div class="seg" id="stScope"></div></div>
+    <button class="recapcta" id="recapBtn" type="button"><span>🎬</span><span><b>הטיול שלנו בסיכום</b><small>סטוריז עם כל המספרים הכי מעניינים · לחיצה על מדינה למטה תיתן סיכום שלה</small></span></button>
     <section class="ticket stats-ticket">
       <div class="top">
         <div class="label" id="stLbl">סה״כ</div>
@@ -730,6 +849,12 @@ table.daily td.num{text-align:right}
   <footer class="foot" id="foot" hidden><span id="footWho"></span> <button class="link" id="switchBtn" type="button">החלפת משתמש</button></footer>
 </div>
 
+<div class="recap" id="recap" data-bg="g1" hidden role="dialog" aria-modal="true" aria-label="הטיול בסיכום">
+  <div class="rc-bars" id="rcBars"></div>
+  <button class="rc-close" id="rcClose" type="button" aria-label="סגירה">✕</button>
+  <div class="rc-body" id="rcBody"></div>
+  <div class="rc-hint">לחיצה = הבא</div>
+</div>
 <div class="ptr" id="ptr" aria-hidden="true">✈️</div>
 <button class="mini" id="mini" type="button" aria-label="חזרה למעלה"><span id="miniTxt"></span><small id="miniDay"></small></button>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
@@ -763,6 +888,22 @@ table.daily td.num{text-align:right}
     <div class="sec">
       <h3>עיצוב</h3>
       <div class="seg" id="themeSeg"></div>
+    </div>
+
+    <div class="sec">
+      <h3>🧳 הטיולים שלנו</h3>
+      <div id="tripList" class="stack" style="gap:8px"></div>
+      <button class="btn small" id="ntOpen" type="button" style="align-self:flex-start">➕ טיול חדש</button>
+      <div id="ntForm" class="stack" hidden>
+        <label>שם הטיול<input id="ntName" maxlength="40" placeholder="למשל: יפן 2027"></label>
+        <div class="grid">
+          <label>מתי מתחיל<input id="ntStart" type="date"></label>
+          <div class="fieldset"><span class="hint" style="font-weight:500">מטבע ראשון</span><button class="curbtn wide" id="ntCur" type="button"></button></div>
+        </div>
+        <div class="hint">הטיול הנוכחי יעבור לארכיון עם כל ההוצאות שלו, ואפשר לפתוח אותו מכאן בכל זמן. המשתתפים נשארים אותם משתתפים.</div>
+        <div class="err" id="ntErr" hidden></div>
+        <button class="btn primary" id="ntSave" type="button">פתיחת טיול חדש 🎉</button>
+      </div>
     </div>
 
     <div class="sec">
@@ -836,8 +977,8 @@ table.daily td.num{text-align:right}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>window.APP_V="20261106203233";</script>
-<script src="config.js?v=20261106203233"></script>
-<script src="app.js?v=20261106203233"></script>
+<script>window.APP_V="20261107063301";</script>
+<script src="config.js?v=20261107063301"></script>
+<script src="app.js?v=20261107063301"></script>
 </body>
 </html>
