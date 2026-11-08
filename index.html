@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261108232402"></script>
+<script src="theme.js?v=20261108232937"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -641,6 +641,32 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
 .datefield{display:flex;flex-direction:column;gap:5px;min-width:0}
 .datefield .dlab{font-size:.85rem;color:var(--muted);font-weight:500}
 .datechips{margin-bottom:0}
+
+/* "so far": one elegant summary under the picture, shared or personal by the screen you are on */
+.sofar{position:relative;z-index:1;margin-top:-4px;background:var(--surface);border:1.5px solid var(--line);border-radius:24px;padding:14px 16px 12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 18px 34px -26px rgba(60,30,160,.55)}
+.sf-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sf-k{font-size:.74rem;letter-spacing:.14em;color:var(--muted);font-weight:700}
+.seg.sfseg{gap:2px;padding:3px;background:var(--surface-2);border-radius:999px;flex-wrap:nowrap}
+.seg.sfseg button{padding:4px 11px;font-size:.8rem;min-height:30px;border:0;background:transparent;border-radius:999px;color:var(--muted);font-weight:600}
+.seg.sfseg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 2px 8px -4px rgba(30,22,64,.35)}
+.sf-big{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sf-big b{font-family:var(--display);font-weight:800;font-size:2.3rem;line-height:1;letter-spacing:-.02em;color:var(--ink)}
+.sf-sub{color:var(--muted);font-size:.92rem}
+.sf-bar{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--surface-2);gap:2px}
+.sf-bar i{display:block;height:100%;border-radius:99px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.sf-bar i:first-child{background:#14B8A6}.sf-bar i:last-child{background:var(--grad)}
+.sf-row{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);padding-top:10px}
+.sf-row div{display:flex;flex-direction:column;gap:1px;padding-inline:8px;min-width:0}
+.sf-row div:first-child{padding-inline-start:0}
+.sf-row div+div{border-inline-start:1px solid var(--line)}
+.sf-row b{font-family:var(--display);font-weight:700;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sf-row span{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:4px}
+#ticket .stats{display:none}
+#pTicket{display:none}
+.sf-show{border-top:1px solid var(--line);padding:10px 0 0;color:var(--muted)}
+.sf-show .chip,.sf-show .curbtn{border-color:var(--line);color:var(--ink);background:var(--surface)}
+.sf-show .chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.sf-row .sw{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -779,6 +805,13 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
       <div class="hero-day"><span id="heroDay" class="heronum">יום 1</span><small id="heroSince"></small></div>
       <div class="hero-chips" id="heroChips"></div>
     </div>
+  </section>
+  <section class="sofar" id="sofar" hidden aria-labelledby="sfKick">
+    <div class="sf-top"><span class="sf-k" id="sfKick">עד עכשיו</span><div class="seg sfseg" id="sfSeg"></div></div>
+    <div class="sf-big"><b class="num" id="sfBig">—</b><span class="sf-sub" id="sfSub"></span></div>
+    <div class="sf-bar" id="sfBar" hidden><i id="sfBarA"></i><i id="sfBarB"></i></div>
+    <div class="sf-row" id="sfRow"></div>
+    <div class="showin sf-show" id="sfShow" hidden></div>
   </section>
   <div class="insight" id="insight" hidden><span class="ins-ico" id="insIco">💡</span><span id="insTxt"></span></div>
 
@@ -1217,9 +1250,9 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261108232402">
-<script src="config.js?v=20261108232402"></script>
-<script src="fx.js?v=20261108232402"></script>
-<script src="app.js?v=20261108232402"></script>
+<meta name="app-v" content="20261108232937">
+<script src="config.js?v=20261108232937"></script>
+<script src="fx.js?v=20261108232937"></script>
+<script src="app.js?v=20261108232937"></script>
 </body>
 </html>

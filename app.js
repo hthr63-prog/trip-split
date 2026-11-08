@@ -930,8 +930,60 @@ function renderInsight(){
 }
 $("heroPlace").onclick=()=>$("localBtn").click();
 
+/* ---- "so far": spent until now, for the trip / this month / today ---- */
+let sfScope=(()=>{ try{ return localStorage.getItem("trip-sf")||"trip"; }catch(e){ return "trip"; } })();
+function sfDays(scope){
+  const td=todayStr(); if(scope==="day") return 1;
+  const st=tripStart(); const from= scope==="month" ? (st&&st.slice(0,7)===td.slice(0,7)&&st>td.slice(0,7)+"-01" ? st : td.slice(0,7)+"-01") : st;
+  if(!from||from>td) return 0;
+  return Math.round((new Date(td+"T12:00")-new Date(from+"T12:00"))/864e5)+1;
+}
+function renderSofar(){
+  const box=$("sofar"); const personal= view==="personal"&&!!me;
+  const locked= personal && !(acct&&acctFor===me);
+  box.hidden= !loaded || view==="stats" || locked || !S.items.length&&!personal;
+  if(box.hidden) return;
+  seg($("sfSeg"),[["trip","הטיול"],["month","החודש"],["day","היום"]],v=>v===sfScope,v=>{ sfScope=v; try{ localStorage.setItem("trip-sf",v); }catch(e){} renderSofar(); });
+  const td=todayStr(), ym=thisMonth();
+  const inScope=it=> sfScope==="trip" ? true : sfScope==="month" ? monthOf(it)===ym : it.date===td;
+  const V=it=>conv(+it.amount||0,it.cur,showCur);
+  const days=sfDays(sfScope);
+  const R=$("sfRow"); R.innerHTML="";
+  const cell=(val,label,sw)=>{ const d=document.createElement("div"); const b=document.createElement("b"); b.className="num"; b.textContent=val; const l=document.createElement("span");
+    if(sw){ const i=document.createElement("i"); i.className="sw"; i.style.background=sw; l.appendChild(i); } l.appendChild(document.createTextNode(label)); d.append(b,l); R.appendChild(d); };
+  const st=tripStart();
+  const daysCell=()=>{ if(days>0) cell(String(days),sfScope==="day"?"יום":(sfScope==="month"?"ימים החודש":"ימים בטיול"));
+    else if(st&&st>td){ cell(String(Math.round((new Date(st+"T12:00")-new Date(td+"T12:00"))/864e5)),"ימים לטיסה"); }
+    else cell("—","ימים"); };
+  const scopeWord= sfScope==="trip" ? "בטיול" : sfScope==="month" ? "ב"+monthName(ym,true).split(" ")[0] : "היום";
+  if(!personal){
+    const its=S.items.filter(it=>it.kind!=="transfer"&&inScope(it));
+    const total=its.reduce((a,it)=>a+V(it),0);
+    const mine= me ? its.reduce((a,it)=>a+V(it)*(sharesOf(it)[me]||0),0) : 0;
+    const paid= me ? its.filter(it=>it.payer===me).reduce((a,it)=>a+V(it),0) : 0;
+    $("sfKick").textContent="הוצאנו עד עכשיו "+scopeWord;
+    money($("sfBig"),total,showCur,"sf");
+    $("sfSub").textContent= its.length ? its.length+" הוצאות"+(days>1?" · "+fmt(total/days,showCur)+" ליום":"") : "עוד לא נרשמו הוצאות";
+    $("sfBar").hidden=true;
+    if(me){ cell(fmt(mine,showCur),"החלק שלך"); cell(fmt(paid,showCur),"שילמת"); daysCell(); }
+    else { cell(String(its.length),"הוצאות"); daysCell(); cell(days>1?fmt(total/days,showCur):"—","ליום"); }
+    R.hidden=false;
+  } else {
+    const own=P.filter(it=>inScope(it)).reduce((a,it)=>a+V(it),0);
+    const tog=myShareItems().filter(it=>inScope(it)).reduce((a,it)=>a+V(it),0);
+    const all=own+tog;
+    $("sfKick").textContent="הוצאת עד עכשיו "+scopeWord;
+    money($("sfBig"),all,showCur,"sf");
+    $("sfSub").textContent= all>0 ? (days>1?fmt(all/days,showCur)+" ליום · ":"")+"לבד + החלק שלך במשותף" : "עוד אין הוצאות";
+    const bar=$("sfBar"); bar.hidden=!(all>0);
+    if(all>0){ $("sfBarA").style.width=(own/all*100)+"%"; $("sfBarB").style.width=(tog/all*100)+"%"; }
+    cell(fmt(own,showCur),"לבד","#14B8A6"); cell(fmt(tog,showCur),"ביחד","linear-gradient(135deg,#6C4BFF,#FF4D8D)"); daysCell();
+  }
+  /* the personal screen has no other card with the currency switch now */
+  const sh=$("sfShow"); sh.hidden=!personal; if(personal) showinRow(sh);
+}
 function renderAll(){
-  renderHero(); renderInsight();
+  renderHero(); renderInsight(); renderSofar();
   { const arch=loaded&&curTrip!==activeTrip(); $("tripNote").hidden=!arch; if(arch) $("tripNoteTxt").textContent="🗂️ אתם צופים בטיול "+(S.trip||"קודם")+" מהארכיון"; }
   requestAnimationFrame(()=>{ watchReveal(); renderMini(); onScroll(); });
   renderHeader();
