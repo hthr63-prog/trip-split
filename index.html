@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261108234421"></script>
+<script src="theme.js?v=20261108234731"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -699,6 +699,10 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .bud-form{display:flex;flex-direction:column;gap:10px}
 .chk{flex-direction:row!important;align-items:center;gap:8px!important;font-size:.9rem!important;color:var(--ink)!important}
 .chk input{width:20px;height:20px;accent-color:var(--brand);flex-shrink:0}
+.bud-sync{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:16px;background:var(--surface-2)}
+.bud-sync label{font-weight:700;color:var(--ink);font-size:.95rem}
+.bud-sync .amount{background:var(--surface)}
+.curtag{font-weight:700;color:var(--muted);padding-inline:10px;white-space:nowrap}
 .bud-note{color:var(--muted);font-size:.78rem;line-height:1.45}
 .sf-budget{font:inherit;display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:14px;border:0;background:var(--surface-2);color:var(--ink);cursor:pointer;text-align:right;--bud:#6C4BFF}
 .sf-budget.warn{--bud:#F59E0B}.sf-budget.over{--bud:var(--bad)}
@@ -1174,6 +1178,15 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
         </div>
         <div class="bud-rows" id="budRows"></div>
         <div class="bud-pace" id="budPace"></div>
+        <button class="btn block" id="budSyncBtn" type="button">🏦 עדכון לפי מה שיש בבנק</button>
+        <div class="bud-sync" id="budSyncF" hidden>
+          <label for="budSAmt">כמה יש בבנק עכשיו?</label>
+          <div class="amount"><input id="budSAmt" class="num" inputmode="decimal" placeholder="40,000"><span class="curtag" id="budSCur"></span></div>
+          <small class="hint">התקציב ההתחלתי לא משתנה. מעכשיו היתרה ממשיכה לרדת מהסכום הזה לפי מה שתרשמו.</small>
+          <div class="actions"><button class="btn primary" id="budSSave" type="button">עדכון היתרה</button><button class="btn" id="budSCancel" type="button">ביטול</button></div>
+          <button class="link" id="budSClear" type="button" hidden>ביטול העדכון הקודם</button>
+          <div class="err" id="budSErr" hidden></div>
+        </div>
       </div>
       <div class="bud-form" id="budForm" hidden>
         <div class="amount"><input id="budAmt" class="num" inputmode="decimal" placeholder="50,000" aria-label="סכום התקציב"><button class="curbtn" id="budCur" type="button" aria-label="מטבע התקציב"></button></div>
@@ -1310,9 +1323,9 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261108234421">
-<script src="config.js?v=20261108234421"></script>
-<script src="fx.js?v=20261108234421"></script>
-<script src="app.js?v=20261108234421"></script>
+<meta name="app-v" content="20261108234731">
+<script src="config.js?v=20261108234731"></script>
+<script src="fx.js?v=20261108234731"></script>
+<script src="app.js?v=20261108234731"></script>
 </body>
 </html>

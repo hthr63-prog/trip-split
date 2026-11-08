@@ -1301,7 +1301,7 @@ function liveGroup(el){
     try{ el.setSelectionRange(c,c); }catch(e){}
   });
 }
-for(const id of ["fAmt","pAmt","cA","cB","cwAmt","cwFee","caAmt","cxAmt","cxGot","budAmt"]) liveGroup($(id));
+for(const id of ["fAmt","pAmt","cA","cB","cwAmt","cwFee","caAmt","cxAmt","cxGot","budAmt","budSAmt"]) liveGroup($(id));
 
 /* ---- floating buttons: back to top, quick add ---- */
 let addHome=null;
@@ -1747,17 +1747,19 @@ function budgetCalc(){
   for(const it of S.items){ if(!inc(it)) continue;
     if(it.kind==="transfer"){ if(it.payer===me) add("tr",C(it.amount,it.cur),it); else if(it.to===me) add("tr",-C(it.amount,it.cur),it); }
     else if(it.payer===me&&it.pm==="card") add("cardS",C(it.amount,it.cur),it); }
-  const used=parts.atm+parts.cardP+parts.cardS+parts.tr, amount=+B.amount, left=amount-used;
+  const adj=+B.adj||0;
+  const used=parts.atm+parts.cardP+parts.cardS+parts.tr-adj, amount=+B.amount, left=amount-used;
   let pace=null, perDay=null;
   if(st&&st<=td){ const days=Math.round((new Date(td+"T12:00")-new Date(st+"T12:00"))/864e5)+1; perDay=usedTrip/days; if(perDay>0) pace=Math.floor(left/perDay); }
-  return {cur,amount,used,left,parts,pace,perDay,pct:Math.max(0,Math.min(1,used/amount)),prep:B.prep!==false};
+  return {cur,amount,used,left,parts,adj,adjAt:B.adjAt||null,pace,perDay,pct:Math.max(0,Math.min(1,used/amount)),prep:B.prep!==false};
 }
-let budEditing=false;
+let budEditing=false, budSyncing=false;
 function renderBudget(){
   const open=!!(acct&&acctFor===me);
   $("budLock").hidden=open; const r=open?budgetCalc():null;
   $("budEmpty").hidden=!open||!!r||budEditing; $("budMain").hidden=!open||!r||budEditing; $("budForm").hidden=!open||!budEditing;
   $("budEdit").hidden=!open||!r||budEditing;
+  $("budSyncF").hidden=!open||!r||!budSyncing||budEditing; $("budSyncBtn").hidden=!open||!r||budSyncing||budEditing;
   if(!r) return;
   const arc=$("budArc"), L=2*Math.PI*50; arc.style.strokeDasharray=L; arc.style.strokeDashoffset=L*(1-(1-r.pct));
   const box=$("budgetBox"); box.classList.toggle("warn",r.left>=0&&r.left<r.amount*0.15); box.classList.toggle("over",r.left<0);
@@ -1770,6 +1772,7 @@ function renderBudget(){
   row("💳","כרטיס · אישי",r.parts.cardP);
   row("💳","כרטיס · משותף ששילמת",r.parts.cardS);
   if(Math.abs(r.parts.tr)>0.004) row("💸","העברות בהתחשבנות",r.parts.tr);
+  if(Math.abs(r.adj)>0.004) row("🏦","עדכון לפי הבנק"+(r.adjAt?" · "+new Date(r.adjAt).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"}):""),-r.adj);
   $("budPace").textContent= r.left<0 ? "⚠️ עברת את התקציב ב-"+fmt(-r.left,r.cur)
     : r.pace!==null ? "⏳ בקצב של "+fmt(r.perDay,r.cur)+" ליום, זה מספיק לעוד כ-"+r.pace+" ימים" : (r.prep?"כולל ההוצאות לפני הטיול":"מתחיל לספור מיום הטיסה");
 }
@@ -1778,10 +1781,28 @@ $("budStart").onclick=budgetForm; $("budEdit").onclick=budgetForm;
 $("budCancel").onclick=()=>{ budEditing=false; renderBudget(); };
 $("budCur").onclick=()=>openCurPicker("באיזה מטבע התקציב?",cur.bud||"ILS",c=>{ cur.bud=c; setCurBtn("budCur",c); });
 $("budOpen").onclick=()=>{ closeSheet("acctSheet"); goView("personal"); };
+async function saveBudget(data){
+  const c=await loadAcct(); if(!c) return false;
+  const id=BUDGET?.id||uid("b"); const ok=await run(async()=>EXP().doc(id).set(await encFor(c,data)));
+  if(ok){ BUDGET={...data,id}; renderBudget(); renderSofar(); }
+  return ok;
+}
+$("budSyncBtn").onclick=()=>{ budSyncing=true; showErr("budSErr"); const r=budgetCalc(); $("budSAmt").value=r?group(String(Math.round(r.left))):""; $("budSCur").textContent=r?curText(r.cur):""; $("budSClear").hidden=!(r&&Math.abs(r.adj)>0.004); renderBudget(); setTimeout(()=>{ $("budSAmt").focus(); $("budSAmt").select(); },60); };
+$("budSCancel").onclick=()=>{ budSyncing=false; renderBudget(); };
+$("budSSave").onclick=async()=>{
+  const v=parseFloat(String($("budSAmt").value).replace(/,/g,"")); if(!(v>=0)) return showErr("budSErr","צריך לכתוב כמה יש בבנק עכשיו");
+  const r=budgetCalc(); if(!r) return;
+  const base=r.left-r.adj;   /* what the app would say without any earlier sync */
+  const {id,...rest}=BUDGET; const ok=await saveBudget({...rest,adj:v-base,adjAt:Date.now(),adjTo:v});
+  if(!ok) return showErr("budSErr","לא נשמר. נסו שוב.");
+  budSyncing=false; renderBudget(); buzz(10); toast("🏦 היתרה עודכנה ל-"+fmt(v,r.cur)+". התקציב ההתחלתי נשאר "+fmt(r.amount,r.cur));
+};
+$("budSClear").onclick=async()=>{ const {id,adj,adjAt,adjTo,...rest}=BUDGET; const ok=await saveBudget(rest); if(ok){ budSyncing=false; renderBudget(); toast("העדכון הידני בוטל"); } };
 $("budSave").onclick=async()=>{
   const amount=parseFloat(String($("budAmt").value).replace(/,/g,"")); if(!(amount>0)) return showErr("budErr","צריך סכום גדול מאפס");
   const c=await loadAcct(); if(!c) return showErr("budErr","פותחים קודם את האישי עם הסיסמה");
   const data={type:"budget",amount,cur:cur.bud||"ILS",prep:$("budPrep").checked,createdAt:Date.now(),trip:curTrip};
+  if(BUDGET&&BUDGET.adj&&(BUDGET.cur||"ILS")===data.cur){ data.adj=BUDGET.adj; data.adjAt=BUDGET.adjAt; data.adjTo=BUDGET.adjTo; }
   const id=BUDGET?.id||uid("b"); const ok=await run(async()=>EXP().doc(id).set(await encFor(c,data)));
   if(!ok) return showErr("budErr","לא נשמר. נסו שוב.");
   BUDGET={...data,id}; budEditing=false; renderBudget(); renderSofar(); buzz(10); toast("💰 התקציב נשמר");
