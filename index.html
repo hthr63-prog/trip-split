@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261108232937"></script>
+<script src="theme.js?v=20261108233510"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -666,6 +666,10 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
 .sf-show{border-top:1px solid var(--line);padding:10px 0 0;color:var(--muted)}
 .sf-show .chip,.sf-show .curbtn{border-color:var(--line);color:var(--ink);background:var(--surface)}
 .sf-show .chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.sf-row em{font-style:normal;font-size:.72rem;font-weight:700;margin-top:3px;align-self:flex-start;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.sf-row em.up{background:color-mix(in srgb,var(--bad) 13%,var(--surface));color:var(--bad)}
+.sf-row em.down{background:color-mix(in srgb,var(--good) 14%,var(--surface));color:var(--good)}
+small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:1.02em}
 .sf-row .sw{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
 </style>
 </head>
@@ -1250,9 +1254,9 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261108232937">
-<script src="config.js?v=20261108232937"></script>
-<script src="fx.js?v=20261108232937"></script>
-<script src="app.js?v=20261108232937"></script>
+<meta name="app-v" content="20261108233510">
+<script src="config.js?v=20261108233510"></script>
+<script src="fx.js?v=20261108233510"></script>
+<script src="app.js?v=20261108233510"></script>
 </body>
 </html>

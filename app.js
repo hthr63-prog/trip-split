@@ -952,9 +952,24 @@ function renderSofar(){
   const cell=(val,label,sw)=>{ const d=document.createElement("div"); const b=document.createElement("b"); b.className="num"; b.textContent=val; const l=document.createElement("span");
     if(sw){ const i=document.createElement("i"); i.className="sw"; i.style.background=sw; l.appendChild(i); } l.appendChild(document.createTextNode(label)); d.append(b,l); R.appendChild(d); };
   const st=tripStart();
-  const daysCell=()=>{ if(days>0) cell(String(days),sfScope==="day"?"יום":(sfScope==="month"?"ימים החודש":"ימים בטיול"));
-    else if(st&&st>td){ cell(String(Math.round((new Date(st+"T12:00")-new Date(td+"T12:00"))/864e5)),"ימים לטיסה"); }
+  const daysCell=()=>{ if(st&&st>td){ cell(String(Math.round((new Date(st+"T12:00")-new Date(td+"T12:00"))/864e5)),"ימים לטיסה"); }
+    else if(days>0) cell(String(days),sfScope==="day"?"יום":(sfScope==="month"?"ימים החודש":"ימים בטיול"));
+    else if(false){ cell(String(Math.round((new Date(st+"T12:00")-new Date(td+"T12:00"))/864e5)),"ימים לטיסה"); }
     else cell("—","ימים"); };
+  /* averages count only what was spent on the trip itself, not flights and insurance bought before it */
+  const onTrip=it=> locOf(it)!=="prep" && (!st || (it.date||"")>=st);
+  const avgCell=(total,sumFor)=>{
+    if(sfScope==="day"){
+      const td2=sfDays("trip"); if(td2<2){ daysCell(); return; }
+      const avg=sumFor(onTrip)/td2;
+      const d=document.createElement("div"); const b=document.createElement("b"); b.className="num"; b.textContent=fmt(avg,showCur);
+      const l=document.createElement("span"); l.textContent="ממוצע ליום"; d.append(b,l);
+      if(avg>0){ const pct=Math.round((total-avg)/avg*100); const t=document.createElement("em"); t.className="sf-delta "+(pct>0?"up":"down");
+        t.textContent= total===0 ? "היום עוד כלום" : pct===0 ? "היום בדיוק כמו הממוצע" : "היום "+(pct>0?"▲ ":"▼ ")+Math.abs(pct)+"%"; d.appendChild(t); }
+      R.appendChild(d); return; }
+    if(days<1){ daysCell(); return; }
+    cell(fmt(sumFor(it=>inScope(it)&&onTrip(it))/days,showCur),"ממוצע ליום");
+  };
   const scopeWord= sfScope==="trip" ? "בטיול" : sfScope==="month" ? "ב"+monthName(ym,true).split(" ")[0] : "היום";
   if(!personal){
     const its=S.items.filter(it=>it.kind!=="transfer"&&inScope(it));
@@ -963,10 +978,11 @@ function renderSofar(){
     const paid= me ? its.filter(it=>it.payer===me).reduce((a,it)=>a+V(it),0) : 0;
     $("sfKick").textContent="הוצאנו עד עכשיו "+scopeWord;
     money($("sfBig"),total,showCur,"sf");
-    $("sfSub").textContent= its.length ? its.length+" הוצאות"+(days>1?" · "+fmt(total/days,showCur)+" ליום":"") : "עוד לא נרשמו הוצאות";
+    const all2=S.items.filter(it=>it.kind!=="transfer");
+    $("sfSub").textContent= its.length ? its.length+" הוצאות"+(sfScope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (sfScope==="day"?"עוד לא נרשמו הוצאות היום":"עוד לא נרשמו הוצאות");
     $("sfBar").hidden=true;
-    if(me){ cell(fmt(mine,showCur),"החלק שלך"); cell(fmt(paid,showCur),"שילמת"); daysCell(); }
-    else { cell(String(its.length),"הוצאות"); daysCell(); cell(days>1?fmt(total/days,showCur):"—","ליום"); }
+    if(me){ cell(fmt(mine,showCur),"החלק שלך"); cell(fmt(paid,showCur),"שילמת"); avgCell(total,f=>all2.filter(f).reduce((a,it)=>a+V(it),0)); }
+    else { cell(String(its.length),"הוצאות"); daysCell(); avgCell(total,f=>all2.filter(f).reduce((a,it)=>a+V(it),0)); }
     R.hidden=false;
   } else {
     const own=P.filter(it=>inScope(it)).reduce((a,it)=>a+V(it),0);
@@ -974,10 +990,11 @@ function renderSofar(){
     const all=own+tog;
     $("sfKick").textContent="הוצאת עד עכשיו "+scopeWord;
     money($("sfBig"),all,showCur,"sf");
-    $("sfSub").textContent= all>0 ? (days>1?fmt(all/days,showCur)+" ליום · ":"")+"לבד + החלק שלך במשותף" : "עוד אין הוצאות";
+    $("sfSub").textContent= all>0 ? "לבד + החלק שלך במשותף"+(sfScope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (sfScope==="day"?"עוד אין הוצאות היום":"עוד אין הוצאות");
     const bar=$("sfBar"); bar.hidden=!(all>0);
     if(all>0){ $("sfBarA").style.width=(own/all*100)+"%"; $("sfBarB").style.width=(tog/all*100)+"%"; }
-    cell(fmt(own,showCur),"לבד","#14B8A6"); cell(fmt(tog,showCur),"ביחד","linear-gradient(135deg,#6C4BFF,#FF4D8D)"); daysCell();
+    cell(fmt(own,showCur),"לבד","#14B8A6"); cell(fmt(tog,showCur),"ביחד","linear-gradient(135deg,#6C4BFF,#FF4D8D)");
+    avgCell(all,f=>P.filter(f).reduce((a,it)=>a+V(it),0)+myShareItems().filter(f).reduce((a,it)=>a+V(it),0));
   }
   /* the personal screen has no other card with the currency switch now */
   const sh=$("sfShow"); sh.hidden=!personal; if(personal) showinRow(sh);
@@ -1229,7 +1246,7 @@ function renderStats(){
     r.innerHTML='<span></span><div class="bar"><i></i></div><span class="amtpct"><b class="num"></b><small></small></span>';
     r.children[0].textContent=locName(k); r.querySelector("i").style.width=(o.v/cm*100).toFixed(1)+"%"; if(k!=="?"){ r.classList.add("tap"); r.title="סיכום של "+locName(k); r.onclick=()=>openRecap(k); }
     r.querySelector("b").textContent=fmt(o.v,showCur);
-    const n=o.days.size; r.querySelector("small").textContent= (k==="prep"||k==="?") ? "" : (n===1?"יום אחד":n+" ימים")+" · "+fmt(o.v/(n||1),showCur)+" ליום";
+    const n=o.days.size; { const sm=r.querySelector("small"); sm.textContent=""; if(!(k==="prep"||k==="?")){ const pd=document.createElement("b"); pd.className="num pd"; pd.textContent=fmt(o.v/(n||1),showCur); sm.append(pd," ליום · "+(n===1?"יום אחד":n+" ימים")); } }
     CC.appendChild(r);
   }
   /* who paid (whole trip only) */
