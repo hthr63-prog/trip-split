@@ -14,24 +14,24 @@
 <title>גלי ויאירוש במזרח</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@700;900&family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;700&display=swap">
-<script src="theme.js?v=20261108225730"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
+<script src="theme.js?v=20261108230945"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
-  --bg:#F3F1FF; --surface:#FFFFFF; --surface-2:#EEEAFE; --ink:#1E1640; --muted:#6B6492; --line:#E1DCF7;
+  --bg:#F3F1FF; --surface:#FFFFFF; --surface-2:#EEEAFE; --ink:#1E1640; --muted:#575079; --line:#E1DCF7;
   --brand:#6C4BFF; --brand-ink:#FFFFFF; --hot:#FF4D8D; --sun:#FFC93C; --sun-ink:#3A2600; --mint:#14C9A5;
   --good:#0E9F7E; --bad:#E5484D;
   --grad:linear-gradient(135deg,#6C4BFF 0%,#B84DFF 55%,#FF4D8D 100%);
   --grad-ink:#FFFFFF;
   --shadow:0 14px 34px -16px rgba(76,52,200,.45);
   --p0:#6C4BFF; --p1:#FF4D8D; --p2:#14B8A6; --p3:#F59E0B; --p4:#3B82F6; --p5:#E11D48;
-  --display:"Fredoka","Rubik",system-ui,sans-serif;
-  --body:"Rubik",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --display:"Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --body:"Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
   --r:20px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#100C22; --surface:#1B1636; --surface-2:#251E47; --ink:#F2EFFF; --muted:#A79FCB; --line:#2E2756;
+  --bg:#100C22; --surface:#1B1636; --surface-2:#251E47; --ink:#F2EFFF; --muted:#BDB6E0; --line:#2E2756;
   --brand:#8F74FF; --brand-ink:#FFFFFF; --hot:#FF6FA3; --sun:#FFD25E; --sun-ink:#2E1F00; --mint:#2EE0B9;
   --good:#3DDBAF; --bad:#FF7B80;
   --grad:linear-gradient(135deg,#5A3BE8 0%,#A23BE8 55%,#E83B7E 100%);
@@ -39,7 +39,7 @@
   --p0:#8F74FF; --p1:#FF6FA3; --p2:#2DD4BF; --p3:#FBBF24; --p4:#60A5FA; --p5:#FB7185;
   color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#100C22; --surface:#1B1636; --surface-2:#251E47; --ink:#F2EFFF; --muted:#A79FCB; --line:#2E2756;
+  --bg:#100C22; --surface:#1B1636; --surface-2:#251E47; --ink:#F2EFFF; --muted:#BDB6E0; --line:#2E2756;
   --brand:#8F74FF; --brand-ink:#FFFFFF; --hot:#FF6FA3; --sun:#FFD25E; --sun-ink:#2E1F00; --mint:#2EE0B9;
   --good:#3DDBAF; --bad:#FF7B80;
   --grad:linear-gradient(135deg,#5A3BE8 0%,#A23BE8 55%,#E83B7E 100%);
@@ -51,7 +51,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;direction:rtl;
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16.5px;line-height:1.5;direction:rtl;
   padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
   background-image:radial-gradient(600px 300px at 100% -10%,color-mix(in srgb,var(--hot) 14%,transparent),transparent 70%),radial-gradient(500px 300px at -10% 10%,color-mix(in srgb,var(--brand) 16%,transparent),transparent 70%);
   background-repeat:no-repeat}
@@ -481,18 +481,18 @@ table.daily td.num{text-align:right}
 @media (prefers-reduced-motion:no-preference){ .rc-body > *{animation:rise .5s cubic-bezier(.2,.8,.2,1) both} .rc-body > *:nth-child(2){animation-delay:.08s}.rc-body > *:nth-child(3){animation-delay:.16s}.rc-body > *:nth-child(4){animation-delay:.24s}.rc-body > *:nth-child(5){animation-delay:.32s} .rc-big{animation:popIn .6s cubic-bezier(.3,.7,.4,1.4) both!important} }
 
 /* ================= editorial chapters ================= */
-:root{--serif:"Frank Ruhl Libre","Times New Roman",serif;--t-base:#F3F1FF;--t-peach:#FCE3D6;--t-sage:#DCEBDF;--t-cream:#F6EEDD;--t-sky:#DEEAFB;--t-sand:#F8E7CC}
+:root{--serif:"Assistant",system-ui,sans-serif;--t-base:#F3F1FF;--t-peach:#FCE3D6;--t-sage:#DCEBDF;--t-cream:#F6EEDD;--t-sky:#DEEAFB;--t-sand:#F8E7CC}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--t-base:#100C22;--t-peach:#22111B;--t-sage:#0E1D1A;--t-cream:#1D1914;--t-sky:#0E1627;--t-sand:#21190E}}
 :root[data-theme="dark"]{--t-base:#100C22;--t-peach:#22111B;--t-sage:#0E1D1A;--t-cream:#1D1914;--t-sky:#0E1627;--t-sand:#21190E}
 html[data-tone="base"]{--bg:var(--t-base)} html[data-tone="peach"]{--bg:var(--t-peach)} html[data-tone="sage"]{--bg:var(--t-sage)}
 html[data-tone="cream"]{--bg:var(--t-cream)} html[data-tone="sky"]{--bg:var(--t-sky)} html[data-tone="sand"]{--bg:var(--t-sand)}
 body{transition:background-color .9s cubic-bezier(.2,.8,.2,1)}
-#title{font-family:var(--serif);font-weight:900;font-size:2.2rem;letter-spacing:-.01em}
-.ticket .verdict{font-family:var(--serif);font-weight:900;font-size:1.8rem}
+#title{font-family:var(--serif);font-weight:800;font-size:2.2rem;letter-spacing:-.01em}
+.ticket .verdict{font-family:var(--serif);font-weight:800;font-size:1.8rem}
 .ticket .verdict .amt{font-family:var(--display)}
 .bighead{padding:26px 4px 0;display:flex;flex-direction:column;gap:4px}
 .bighead small{font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.bighead h2{font-family:var(--serif);font-weight:900;font-size:clamp(2.6rem,12vw,3.6rem);line-height:.95;letter-spacing:-.02em;color:var(--ink)}
+.bighead h2{font-family:var(--serif);font-weight:800;font-size:clamp(2.6rem,12vw,3.6rem);line-height:.95;letter-spacing:-.02em;color:var(--ink)}
 .bighead:has(+ [hidden]){display:none}
 .card{background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 /* the travel stack: rests packed, comes apart into layers as the hero scrolls away */
@@ -618,6 +618,20 @@ body.has-tabs #statsBtn,body.has-tabs #viewBtn{display:none}
 body.has-tabs #toprow{grid-template-columns:1fr}
 #foot{display:none!important}
 @media (prefers-reduced-motion:reduce){.add-cta,.tabbar button{transition:none}}
+
+/* ===== design pass 2 ===== */
+.icon-btn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.recent{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 4px;margin-top:-6px;-webkit-mask-image:linear-gradient(to left,#000 85%,transparent);mask-image:linear-gradient(to left,#000 85%,transparent)}
+.recent::-webkit-scrollbar{display:none}
+.recent .lab{flex-shrink:0;align-self:center;font-size:.8rem;color:var(--muted);font-weight:600}
+.recent button{font:inherit;flex-shrink:0;display:flex;align-items:center;gap:6px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 12px;font-size:.88rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.recent button:active{transform:scale(.96)}
+.recent button .amt{color:var(--muted);font-weight:500}
+.empty.rich{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:26px 16px;border:1.5px dashed var(--line);border-radius:22px;background:var(--surface)}
+.empty.rich .ill{font-size:2.6rem;line-height:1}
+.empty.rich b{font-family:var(--display);font-size:1.1rem;color:var(--ink)}
+.empty.rich span{color:var(--muted);max-width:30ch}
+html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#FF8F4F 50%,#FF4D8D)}
 </style>
 </head>
 <body>
@@ -626,8 +640,8 @@ body.has-tabs #toprow{grid-template-columns:1fr}
     <div class="topbar">
       <button class="acct-chip" id="acctBtn" type="button" aria-haspopup="dialog"><span class="av" id="acctAv" aria-hidden="true">👤</span><span class="nm" id="acctName">התחברות</span><i class="dot" id="acctDot" hidden></i></button>
       <div class="hbtns">
-        <button class="btn icon-btn" id="statsBtn" type="button" aria-label="גרפים לפי חודשים">📊</button>
-        <button class="btn icon-btn" id="settingsBtn" type="button" aria-label="הגדרות">⚙️</button>
+        <button class="btn icon-btn" id="statsBtn" type="button" aria-label="גרפים לפי חודשים"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg></button>
+        <button class="btn icon-btn" id="settingsBtn" type="button" aria-label="הגדרות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
         <button class="tswitch" id="themeBtn" type="button" role="switch" aria-checked="false" aria-label="מצב כהה"><span class="tk" aria-hidden="true"><i></i><i></i><i></i></span><span class="knob" aria-hidden="true"><b class="k-sun">☀️</b><b class="k-moon">🌙</b></span></button>
       </div>
     </div>
@@ -801,6 +815,7 @@ body.has-tabs #toprow{grid-template-columns:1fr}
     </section>
 
     <button class="add-cta" id="addCtaBtn" type="button" data-tone="peach"><span class="plus" aria-hidden="true">+</span><span class="tx"><b>הוצאה חדשה</b><small>סכום, שם, וזהו. כל השאר ממולא מראש</small></span><span class="go" aria-hidden="true">←</span></button>
+    <div class="recent" id="recentChips" hidden></div>
     <section class="card" id="form" hidden>
       <div class="card-head"><h2 id="formTitle">➕ הוצאה משותפת</h2></div>
       <div class="amount"><input id="fAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="fCur" type="button" aria-label="מטבע"></button></div>
@@ -826,6 +841,21 @@ body.has-tabs #toprow{grid-template-columns:1fr}
       </div>
     </section>
 
+    <div class="bighead" data-tone="sky"><small>ההיסטוריה</small><h2>כל רגע<br>בטיול.</h2></div>
+    <section class="stack">
+      <div class="card-head">
+        <h2>🧾 כל ההוצאות המשותפות</h2>
+        <div class="seg" id="filter"></div>
+      </div>
+      <input id="lSearch" type="search" placeholder="🔎 חיפוש הוצאה: מה, מי, קטגוריה או סכום" autocomplete="off">
+      <div id="ledger"></div>
+    </section>
+    <div class="bighead" data-tone="cream"><small>החודש</small><h2>לאן<br>הכסף הלך.</h2></div>
+    <section class="card" id="catPanel" hidden>
+      <div class="card-head"><h2 id="catTitle">📊 לאן הלך הכסף החודש</h2><button class="link" id="catMore" type="button">כל החודשים ←</button></div>
+      <div class="cats" id="cats"></div>
+    </section>
+
     <div class="bighead" data-tone="sage"><small>חילוף כספים</small><h2>יש לך.<br>מקבלים.</h2></div>
     <section class="card" id="convPanel">
       <div class="card-head"><h2>💱 חילוף כספים</h2><span class="hint" id="fxDate"></span></div>
@@ -838,21 +868,6 @@ body.has-tabs #toprow{grid-template-columns:1fr}
       <div class="quick" id="cQuick"></div>
     </section>
 
-    <div class="bighead" data-tone="cream"><small>החודש</small><h2>לאן<br>הכסף הלך.</h2></div>
-    <section class="card" id="catPanel" hidden>
-      <div class="card-head"><h2 id="catTitle">📊 לאן הלך הכסף החודש</h2><button class="link" id="catMore" type="button">כל החודשים ←</button></div>
-      <div class="cats" id="cats"></div>
-    </section>
-
-    <div class="bighead" data-tone="sky"><small>ההיסטוריה</small><h2>כל רגע<br>בטיול.</h2></div>
-    <section class="stack">
-      <div class="card-head">
-        <h2>🧾 כל ההוצאות המשותפות</h2>
-        <div class="seg" id="filter"></div>
-      </div>
-      <input id="lSearch" type="search" placeholder="🔎 חיפוש הוצאה: מה, מי, קטגוריה או סכום" autocomplete="off">
-      <div id="ledger"></div>
-    </section>
   </div>
 
   <!-- personal view -->
@@ -881,8 +896,9 @@ body.has-tabs #toprow{grid-template-columns:1fr}
         <div class="showin" id="pShowin"></div>
       </section>
 
-      <div class="bighead" data-tone="peach"><small>רק שלך</small><h2>ההוצאות<br>שלי.</h2></div>
-      <section class="card" id="pForm">
+      <button class="add-cta" id="pAddCtaBtn" type="button" data-tone="peach"><span class="plus" aria-hidden="true">+</span><span class="tx"><b>הוצאה אישית חדשה</b><small>רק את/ה רואה אותה</small></span><span class="go" aria-hidden="true">←</span></button>
+      <div class="recent" id="pRecentChips" hidden></div>
+      <section class="card" id="pForm" hidden>
         <div class="card-head"><h2 id="pFormTitle">➕ הוצאה אישית</h2><span class="hint" id="pOnly">רק את/ה רואה</span></div>
         <div class="amount"><input id="pAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="pCur" type="button" aria-label="מטבע"></button></div>
         <div class="hint num" id="pConv"></div>
@@ -1189,9 +1205,9 @@ body.has-tabs #toprow{grid-template-columns:1fr}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261108225730">
-<script src="config.js?v=20261108225730"></script>
-<script src="fx.js?v=20261108225730"></script>
-<script src="app.js?v=20261108225730"></script>
+<meta name="app-v" content="20261108230945">
+<script src="config.js?v=20261108230945"></script>
+<script src="fx.js?v=20261108230945"></script>
+<script src="app.js?v=20261108230945"></script>
 </body>
 </html>

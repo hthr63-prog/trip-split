@@ -1,6 +1,7 @@
 (function(){
 const $=id=>document.getElementById(id);
 const PAGE_URL=location.origin+location.pathname;
+let QUICK=(()=>{ try{ return new URLSearchParams(location.search).get("add")==="1"; }catch(e){ return false; } })();
 window.APP_V=(document.querySelector('meta[name="app-v"]')||{}).content||"";
 /* ---- motion & feedback ---- */
 const calm=()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){ return false; } };
@@ -448,7 +449,10 @@ function renderLedger(){
   const q=norm($("lSearch").value);
   const list=S.items.filter(it=>(filter==="all"||(filter==="transfers"?it.kind==="transfer":it.payer===filter))&&matches(it,q)).sort((x,y)=>(y.date||"").localeCompare(x.date||"")||(y.createdAt||0)-(x.createdAt||0));
   if(!loaded){ for(let i=0;i<3;i++){ const s=document.createElement("div"); s.className="row skelrow"; s.innerHTML='<span class="skel dotsk"></span><span><span class="skel" style="width:60%"></span><br><span class="skel" style="width:40%;height:.7em"></span></span><span class="skel" style="width:3.5em"></span>'; L.appendChild(s); } return; }
-  if(!list.length){ const e=document.createElement("div"); e.className="empty"; e.textContent=!loaded?"":q?"לא נמצאה הוצאה שמתאימה לחיפוש":S.items.length?"אין הוצאות בסינון הזה":"כאן יופיעו ההוצאות, מסודרות לפי ימים."; L.appendChild(e); return; }
+  if(!list.length){ const e=document.createElement("div");
+    if(loaded&&!q&&!S.items.length){ richEmpty(e,"🧳","עוד אין הוצאות בטיול","הקפה הראשון, המונית מהשדה, הכול מתחיל כאן.","➕ הוצאה ראשונה",openAdd); }
+    else { e.className="empty"; e.textContent=!loaded?"":q?"לא נמצאה הוצאה שמתאימה לחיפוש":"אין הוצאות בסינון הזה"; }
+    L.appendChild(e); return; }
   let curDay=null, box=null;
   for(const it of list){
     if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,sharedDay(it.date)); box.appendChild(h); L.appendChild(box); }
@@ -603,7 +607,10 @@ function renderPersonal(){
   const L=$("pLedger"); L.innerHTML="";
   const pq=norm($("pSearch").value);
   const list=P.filter(it=>matches(it,pq)).sort((x,y)=>(y.date||"").localeCompare(x.date||"")||(y.createdAt||0)-(x.createdAt||0));
-  if(!list.length){ const e=document.createElement("div"); e.className="empty"; e.textContent=!pLoaded?"טוען…":"עוד אין הוצאות אישיות. מה שתוסיפו כאן שמור בחשבון שלכם, ואף אחד אחר לא רואה אותו."; L.appendChild(e); }
+  if(!list.length){ const e=document.createElement("div");
+    if(pLoaded&&!pq) richEmpty(e,"🔐","עוד אין הוצאות אישיות","מזכרות, קפה, עיסוי. רק את/ה רואה אותן.","➕ הוצאה אישית",openAdd);
+    else { e.className="empty"; e.textContent=!pLoaded?"טוען…":"לא נמצאה הוצאה שמתאימה לחיפוש"; }
+    L.appendChild(e); }
   let curDay=null, box=null;
   for(const it of list){
     if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,""); box.appendChild(h); L.appendChild(box); }
@@ -628,6 +635,11 @@ function renderPersonal(){
 
 /* ================= playful layer ================= */
 /* swipe a row: right = repeat for today, left = delete (with undo) */
+function richEmpty(e,ill,title,text,cta,fn){
+  e.className="empty rich"; const i=document.createElement("span"); i.className="ill"; i.textContent=ill;
+  const b=document.createElement("b"); b.textContent=title; const t=document.createElement("span"); t.textContent=text; e.append(i,b,t);
+  if(canWrite&&cta){ const k=document.createElement("button"); k.type="button"; k.className="btn primary"; k.textContent=cta; k.onclick=fn; e.appendChild(k); }
+}
 /* tap a row to show its actions (edit, again, delete); tap again or another row to hide */
 function tapRow(r){
   if(!r.querySelector(".acts button")) return;
@@ -801,14 +813,14 @@ async function shareRecap(){
   const gr=x.createLinearGradient(0,0,W,H); gr.addColorStop(0,"#6C4BFF"); gr.addColorStop(.55,"#B84DFF"); gr.addColorStop(1,"#FF4D8D"); x.fillStyle=gr; x.fillRect(0,0,W,H);
   x.fillStyle="rgba(255,255,255,.10)"; x.beginPath(); x.arc(160,140,360,0,Math.PI*2); x.fill(); x.beginPath(); x.arc(W-60,H-120,260,0,Math.PI*2); x.fill();
   x.direction="rtl"; x.textAlign="right"; x.fillStyle="#fff"; const R=W-90;
-  const T=(txt,size,y,w)=>{ x.font=(w||600)+" "+size+"px Fredoka, Rubik, sans-serif"; x.fillText(txt,R,y); };
+  const T=(txt,size,y,w)=>{ x.font=(w||600)+" "+size+"px Assistant, sans-serif"; x.fillText(txt,R,y); };
   T(d.loc?"הסיכום של":"הטיול שלנו בסיכום",44,150,500);
   T(d.loc?locName(d.loc):(S.trip||"הטיול שלנו"),78,250,700);
   const rows=[["🗓️",d.days+" ימים"],["🌏",d.countries.length+" "+(d.countries.length===1?"מדינה":"מדינות")+"  "+d.countries.map(c=>CTRY[c].split(" ")[0]).join(" ")],["💸","הוצאנו ביחד "+fmt(d.total,"ILS")],["📊","ממוצע ליום "+fmt(d.avg,"ILS")]];
   if(d.topCat) rows.push([catName(d.topCat[0]).split(" ")[0],"הכי הרבה על "+catName(d.topCat[0]).split(" ").slice(1).join(" ")+" ("+Math.round(d.topCat[1]/d.total*100)+"%)"]);
   if(d.bigOne) rows.push(["🏆","ההוצאה הגדולה: "+(d.bigOne.desc||"")]);
   let y=430; for(const [e,t] of rows){ x.font="64px sans-serif"; x.fillText(e,R,y); T(t,48,y-6,500); y+=130; }
-  x.textAlign="center"; x.font="500 36px Rubik, sans-serif"; x.fillStyle="rgba(255,255,255,.85)"; x.fillText("גלי ויאירוש במזרח 🕺🏼",W/2,H-80);
+  x.textAlign="center"; x.font="500 36px Assistant, sans-serif"; x.fillStyle="rgba(255,255,255,.85)"; x.fillText("גלי ויאירוש במזרח 🕺🏼",W/2,H-80);
   const blob=await new Promise(r=>c.toBlob(r,"image/png")); const file=new File([blob],"trip-recap.png",{type:"image/png"});
   try{ if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:"הטיול שלנו בסיכום"}); return; } }catch(e){ if(e&&e.name==="AbortError") return; }
   const u=URL.createObjectURL(file); const l=document.createElement("a"); l.href=u; l.download="trip-recap.png"; document.body.appendChild(l); l.click(); l.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000);
@@ -919,6 +931,8 @@ function renderAll(){
   else { renderTicket(); renderConv(); renderForm(); renderCats(); renderLedger(); }
   $("form").hidden=!canWrite || !$("addSlot").contains($("form"));
   $("addCtaBtn").hidden=!canWrite || !loaded;
+  $("pForm").hidden=!$("addSlot").contains($("pForm"));
+  renderRecent();
   if(!$("setSheet").hidden) renderSettings();
 }
 
@@ -964,7 +978,7 @@ function readHash(){ let u=readParam("u"); if(!u) u=decodeURIComponent(location.
 function personalUrl(id,noKey){ return PAGE_URL+"?u="+encodeURIComponent(id)+(noKey?"":keyHash()); }
 function syncUrl(){
   if(!me) return;
-  let u=personalUrl(me,true); if(view==="personal") u+="&v=me"; if(view==="stats") u+="&v=stats"; u+=keyHash();
+  let u=personalUrl(me,true); if(view==="personal") u+="&v=me"; if(view==="stats") u+="&v=stats"; if(QUICK) u+="&add=1"; u+=keyHash();
   try{ history.replaceState(null,"",u); }catch(e){}
 }
 function setMe(id,updateUrl){
@@ -1043,7 +1057,7 @@ function pStartEdit(it){
   pEditingId=it.id; pform.cat=it.cat||"other"; pform.loc=locOf(it); pform.pm=it.pm||"cash"; cur.pCur=it.cur;
   $("pDesc").value=it.desc||""; $("pCatLabel").value=it.catLabel||""; $("pAmt").value=group(String(it.amount)); $("pDate").value=it.date||todayStr();
   $("pFormTitle").textContent="✏️ עריכת הוצאה אישית"; $("pSave").textContent="שמירת שינויים"; $("pCancel").hidden=false; renderPersonal();
-  $("pForm").scrollIntoView({behavior:"smooth",block:"start"});
+  if(!$("addSlot").contains($("pForm"))) openAdd(); else $("pForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function pReset(){
   pEditingId=null; $("pDesc").value=""; $("pCatLabel").value=""; $("pAmt").value=""; cur.pCur=S.localCur; pform.loc=null;
@@ -1200,11 +1214,36 @@ function openAdd(){
   if(id==="pForm"&&!(acct&&acctFor===me)){ window.scrollTo({top:0,behavior:"smooth"}); $("lockPw").focus(); return; }
   const f=$(id); addHome={f,parent:f.parentNode,next:f.nextSibling};
   $("addSlot").appendChild(f); f.hidden=false; openSheet("addSheet");
+  try{ fDateChips(); pDateChips(); }catch(e){}
   setTimeout(()=>{ try{ $(id==="pForm"?"pAmt":"fAmt").focus(); }catch(e){} },80);
 }
-function restoreAdd(){ if(!addHome) return; addHome.parent.insertBefore(addHome.f,addHome.next); if(addHome.f.id==="form") addHome.f.hidden=true; addHome=null; }
+function restoreAdd(){ if(!addHome) return; addHome.parent.insertBefore(addHome.f,addHome.next); addHome.f.hidden=true; addHome=null; }
 $("fabAdd").onclick=openAdd;
 $("addCtaBtn").onclick=()=>{ buzz(8); openAdd(); };
+$("pAddCtaBtn").onclick=()=>{ buzz(8); openAdd(); };
+/* "again": the last few different expenses, one tap to start from them */
+function recentOf(list){ const seen=new Set(), out=[];
+  for(const it of [...list].sort((x,y)=>(y.createdAt||0)-(x.createdAt||0))){ if(it.kind==="transfer"||it._fee||it.type==="cash") continue; const k=norm(it.desc||""); if(!k||seen.has(k)) continue; seen.add(k); out.push(it); if(out.length>=4) break; }
+  return out; }
+function chipsFor(box,list,pick){
+  box.innerHTML=""; const its=recentOf(list); box.hidden=!its.length||!canWrite; if(box.hidden) return;
+  const l=document.createElement("span"); l.className="lab"; l.textContent="שוב:"; box.appendChild(l);
+  for(const it of its){ const b=document.createElement("button"); b.type="button";
+    const ic=document.createElement("span"); ic.textContent=(catName(catKey(it)).match(/^\S+/)||[""])[0];
+    const t=document.createElement("span"); t.textContent=it.desc;
+    const a=document.createElement("span"); a.className="amt num"; a.textContent=fmt(+it.amount,it.cur);
+    b.append(ic,t,a); b.onclick=()=>{ buzz(6); pick(it); }; box.appendChild(b); }
+}
+function renderRecent(){
+  if(view!=="personal") chipsFor($("recentChips"),S.items,it=>{
+    if(editingId) resetForm();
+    $("fDesc").value=it.desc||""; $("fAmt").value=group(String(it.amount)); cur.fCur=it.cur||cur.fCur; form.cat=it.cat||"other"; $("fCatLabel").value=it.catLabel||""; form.pm=it.pm||form.pm;
+    $("fDate").value=todayStr(); renderForm(); openAdd(); setTimeout(()=>{ try{ $("fAmt").select(); }catch(e){} },120); });
+  if(view==="personal"&&acct&&acctFor===me) chipsFor($("pRecentChips"),P,it=>{
+    $("pDesc").value=it.desc||""; $("pAmt").value=group(String(it.amount)); cur.pCur=it.cur||cur.pCur; pform.cat=it.cat||"other"; $("pCatLabel").value=it.catLabel||""; pform.pm=it.pm||pform.pm;
+    $("pDate").value=todayStr(); renderPersonal(); openAdd(); setTimeout(()=>{ try{ $("pAmt").select(); }catch(e){} },120); });
+  else $("pRecentChips").hidden=true;
+}
 /* quick date chips in the form */
 function dateChips(inp,box){
   const y=new Date(Date.now()-864e5), ys=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0");
@@ -1766,7 +1805,7 @@ const ready=()=>{
     /* opened from the quick-add icon or shortcut: straight to a new expense */
     if(readParam("add")==="1"&&canWrite){
       view="shared";
-      if(me) syncUrl(); else { try{ history.replaceState(null,"",location.pathname+location.hash); }catch(e){} }
+      QUICK=true; if(me) syncUrl();
       setTimeout(()=>{ renderAll(); openAdd(); },350);
     }
   }
