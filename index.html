@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261108230945"></script>
+<script src="theme.js?v=20261108231823"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -632,6 +632,12 @@ body.has-tabs #toprow{grid-template-columns:1fr}
 .empty.rich b{font-family:var(--display);font-size:1.1rem;color:var(--ink)}
 .empty.rich span{color:var(--muted);max-width:30ch}
 html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#FF8F4F 50%,#FF4D8D)}
+.quick-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qbtn{font:inherit;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:14px 8px 12px;border-radius:16px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.qbtn:active{transform:scale(.97)}
+.qbtn img{width:56px;height:56px;border-radius:14px;flex-shrink:0;box-shadow:0 6px 14px -8px rgba(0,0,0,.5)}
+.qbtn b{display:block;font-size:.95rem}.qbtn small{color:var(--muted);font-size:.78rem}
+.fee-note{font-size:.78rem}
 </style>
 </head>
 <body>
@@ -1082,14 +1088,17 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
       <button class="btn block" id="acctSwitch" type="button">🔄 החלפת משתמש</button>
     </div>
     <div class="quick" id="acctQuickBox">
-      <div class="quick-top"><span class="quick-ico" aria-hidden="true">⚡</span><div><b>הוספה מהירה ממסך הבית</b><small>אייקון שפותח ישר "הוצאה חדשה", בלי לגלול</small></div></div>
-      <div class="actions"><button class="btn primary" id="acctQuick" type="button">📋 העתקת הקישור</button><button class="btn" id="acctQuickOpen" type="button">ניסיון</button></div>
+      <div class="quick-top"><span class="quick-ico" aria-hidden="true">⚡</span><div><b>הוספה מהירה ממסך הבית</b><small>שני אייקונים: אחד למשותף, אחד לאישי</small></div></div>
+      <div class="quick-pair">
+        <button class="qbtn" id="acctQuick" type="button"><img src="icon-add-180.png" alt=""><span><b>➕ משותפת</b><small>📋 העתקת הקישור</small></span></button>
+        <button class="qbtn" id="acctQuickMe" type="button"><img src="icon-me-180.png" alt=""><span><b>➕ אישית</b><small>📋 העתקת הקישור</small></span></button>
+      </div>
       <button class="link" id="acctQuickHow" type="button">איך מוסיפים למסך הבית?</button>
       <div class="quick-help" id="acctQuickHelp" hidden>
         <b>📱 אייפון, הכי פשוט</b>
-        <ol><li>לוחצים "📋 העתקה".</li><li>פותחים את <b>ספארי</b>, מדביקים בשורת הכתובת ונכנסים.</li><li>כפתור השיתוף <span aria-hidden="true">⬆️</span> ← "הוספה למסך הבית" ← משנים את השם ל-<b>➕ הוצאה</b> ← "הוספה".</li></ol>
+        <ol><li>לוחצים על הקישור שרוצים: משותפת או אישית.</li><li>פותחים את <b>ספארי</b>, מדביקים בשורת הכתובת ונכנסים.</li><li>כפתור השיתוף <span aria-hidden="true">⬆️</span> ← "הוספה למסך הבית" ← משנים את השם ל-<b>➕ הוצאה</b> ← "הוספה".</li></ol>
         <b>✨ בונוס באייפון: שתי הקשות על גב הטלפון</b>
-        <ol><li>"📋 העתקה" כאן.</li><li>אפליקציית <b>קיצורים</b> ← ＋ ← "פתיחת כתובות URL" ← מדביקים.</li><li>הגדרות ← נגישות ← מגע ← <b>הקשה בגב</b> ← הקשה כפולה ← בוחרים את הקיצור.</li></ol>
+        <ol><li>מעתיקים את אחד הקישורים כאן.</li><li>אפליקציית <b>קיצורים</b> ← ＋ ← "פתיחת כתובות URL" ← מדביקים.</li><li>הגדרות ← נגישות ← מגע ← <b>הקשה בגב</b> ← הקשה כפולה ← בוחרים את הקיצור.</li></ol>
         <b>🤖 אנדרואיד</b>
         <ol><li>לחיצה ארוכה על אייקון האפליקציה ← "הוצאה חדשה". אפשר לגרור אותו למסך הבית.</li></ol>
       </div>
@@ -1205,9 +1214,9 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261108230945">
-<script src="config.js?v=20261108230945"></script>
-<script src="fx.js?v=20261108230945"></script>
-<script src="app.js?v=20261108230945"></script>
+<meta name="app-v" content="20261108231823">
+<script src="config.js?v=20261108231823"></script>
+<script src="fx.js?v=20261108231823"></script>
+<script src="app.js?v=20261108231823"></script>
 </body>
 </html>

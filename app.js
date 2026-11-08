@@ -1,7 +1,7 @@
 (function(){
 const $=id=>document.getElementById(id);
 const PAGE_URL=location.origin+location.pathname;
-let QUICK=(()=>{ try{ return new URLSearchParams(location.search).get("add")==="1"; }catch(e){ return false; } })();
+let QUICK=(()=>{ try{ const a=new URLSearchParams(location.search).get("add"); return a==="1"||a==="me" ? a : ""; }catch(e){ return ""; } })();
 window.APP_V=(document.querySelector('meta[name="app-v"]')||{}).content||"";
 /* ---- motion & feedback ---- */
 const calm=()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){ return false; } };
@@ -531,7 +531,7 @@ async function refreshPersonal(){
     if(seq!==pSeq) return;
     const mine=out.filter(x=>tripOf(x)===curTrip);
     CASH=mine.filter(x=>x.type==="cash");
-    const fees=CASH.filter(x=>x.sub==="withdraw"&&+x.fee>0).map(x=>({id:"fee-"+x.id,_fee:true,desc:"עמלת משיכה",amount:+x.fee,cur:x.feeCur||x.cur,cat:"other",catLabel:"עמלות משיכה",pm:"fee",date:x.date,createdAt:x.createdAt,tz:x.tz,loc:x.loc}));
+    const fees=CASH.filter(x=>x.sub==="withdraw"&&+x.fee>0).map(x=>({id:"fee-"+x.id,_wid:x.id,_fee:true,desc:"עמלת משיכה",amount:+x.fee,cur:x.feeCur||x.cur,cat:"other",catLabel:"עמלות משיכה",pm:"fee",date:x.date,createdAt:x.createdAt,tz:x.tz,loc:x.loc}));
     P=[...mine.filter(x=>x.type!=="cash"),...fees]; pLoaded=true; if(view==="personal") renderAll();
   }catch(e){ console.error(e); pLoaded=true; }
 }
@@ -569,6 +569,7 @@ $("lockBtn").onclick=async()=>{
     if(p?.vk){ const ok=await unlock(pw); if(!ok){ showErr("lockErr","הסיסמה לא נכונה. נסו שוב."); return; } }
     else { if(pw!==$("lockPw2").value) return showErr("lockErr","שתי הסיסמאות לא זהות"); await setPassword(pw); }
     $("lockPw").value=""; $("lockPw2").value=""; await refreshPersonal(); renderAll();
+    if(QUICK==="me"&&view==="personal"&&!window.__qOpened){ window.__qOpened=true; setTimeout(openAdd,250); }
   }catch(e){ console.error(e); showErr("lockErr","משהו השתבש. בדקו את החיבור ונסו שוב."); }
   finally{ $("lockBtn").disabled=false; renderLock(); }
 };
@@ -624,7 +625,10 @@ function renderPersonal(){
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
     if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(conv(+it.amount,it.cur,"ILS"),"ILS"); right.appendChild(s); }
     const acts=document.createElement("div"); acts.className="acts";
-    if(it._fee){ const n=document.createElement("span"); n.className="m"; n.textContent="🏧 מתוך משיכה בארנק"; acts.appendChild(n); right.appendChild(acts); r.append(dot,main,right); box.appendChild(r); continue; }
+    if(it._fee){ const n=document.createElement("span"); n.className="m fee-note"; n.textContent="🏧 מתוך משיכה בארנק"; right.appendChild(n);
+      const w=CASH.find(x=>x.id===it._wid);
+      r.append(dot,main,right); r.dataset.id=it.id;
+      box.appendChild(w ? swipeWrap(r,it,true,{again:()=>againCash(w),againLabel:"🔁 עוד משיכה כזו",del:()=>delItem({id:w.id,desc:"משיכה מכספומט"},true),delLabel:"🗑 מחיקת המשיכה"}) : r); continue; }
     const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>pStartEdit(it); acts.appendChild(e);
     const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.onclick=()=>again(it,true); acts.prepend(ag);
     acts.appendChild(delBtn(()=>delItem(it,true)));
@@ -650,11 +654,16 @@ function tapRow(r){
   r.addEventListener("click",toggle);
   r.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(e); } });
 }
-function swipeWrap(r,it,personal){
+function swipeWrap(r,it,personal,o){
+  o=o||{};
   const w=document.createElement("div"); w.className="swipe";
-  if(it._fee||!canWrite) { w.appendChild(r); return w; }
-  const canAgain=it.kind!=="transfer";
-  w.innerHTML='<div class="sw-bg"><span class="sw-again">'+(canAgain?"🔁 שוב להיום":"")+'</span><span class="sw-del">'+(it.kind==="transfer"?"↩️ ביטול":"🗑 מחיקה")+'</span></div>';
+  if(!canWrite||(it._fee&&!o.del)) { w.appendChild(r); return w; }
+  const doAgain= "again" in o ? o.again : (it.kind!=="transfer" ? ()=>again(it,personal) : null);
+  const doDel= o.del || (()=>delItem(it,personal));
+  const canAgain=!!doAgain;
+  w.innerHTML='<div class="sw-bg"><span class="sw-again"></span><span class="sw-del"></span></div>';
+  w.querySelector(".sw-again").textContent= canAgain ? (o.againLabel||"🔁 שוב להיום") : "";
+  w.querySelector(".sw-del").textContent= o.delLabel || (it.kind==="transfer"?"↩️ ביטול":"🗑 מחיקה");
   w.appendChild(r);
   let x0=0,y0=0,dx=0,drag=false,locked=false,id=null,armed=0;
   const TH=88;
@@ -668,7 +677,7 @@ function swipeWrap(r,it,personal){
   });
   const end=()=>{ if(!drag) return; drag=false; w.classList.remove("dragging");
     const act=armed; r.style.transform=""; w.classList.remove("armed","to-again","to-del");
-    if(act>0&&canAgain) again(it,personal); else if(act<0) delItem(it,personal); };
+    if(act>0&&canAgain) doAgain(); else if(act<0) doDel(); };
   r.addEventListener("pointerup",end); r.addEventListener("pointercancel",end);
   return w;
 }
@@ -978,7 +987,7 @@ function readHash(){ let u=readParam("u"); if(!u) u=decodeURIComponent(location.
 function personalUrl(id,noKey){ return PAGE_URL+"?u="+encodeURIComponent(id)+(noKey?"":keyHash()); }
 function syncUrl(){
   if(!me) return;
-  let u=personalUrl(me,true); if(view==="personal") u+="&v=me"; if(view==="stats") u+="&v=stats"; if(QUICK) u+="&add=1"; u+=keyHash();
+  let u=personalUrl(me,true); if(view==="personal") u+="&v=me"; if(view==="stats") u+="&v=stats"; if(QUICK) u+="&add="+QUICK; u+=keyHash();
   try{ history.replaceState(null,"",u); }catch(e){}
 }
 function setMe(id,updateUrl){
@@ -1332,7 +1341,7 @@ function renderCash(){
   const L=$("cashList"); L.innerHTML="";
   const label={withdraw:"🏧 משיכה מכספומט",adjust:"± עדכון ידני",reset:"🔄 איפוס ארנק",exchange:"💱 החלפת מטבע"};
   for(const x of [...CASH].sort((p,q)=>(q.createdAt||0)-(p.createdAt||0))){
-    const r=document.createElement("div"); r.className="row";
+    const r=document.createElement("div"); r.className="row"; r.dataset.id=x.id;
     const dot=document.createElement("div"); dot.className="dot c2"; dot.textContent=(label[x.sub]||"·").split(" ")[0];
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; t.textContent=(label[x.sub]||"").replace(/^\S+ /,"")+(x.note?" · "+x.note:"");
@@ -1342,8 +1351,12 @@ function renderCash(){
     const sign=v=>(v>0?"+":v<0?"−":"")+fmt(Math.abs(v),"X").replace(/ X$/,"");
     const line=(v,c)=>{ const b=document.createElement("b"); b.className="num "+(v<0?"neg":"pos"); b.textContent=(v>0?"+":v<0?"−":"")+fmt(Math.abs(v),c); right.appendChild(b); };
     if(x.sub==="exchange"){ line(-(+x.amount),x.cur); line(+x.toAmount,x.toCur); } else line(+x.amount,x.cur);
-    const acts=document.createElement("div"); acts.className="acts"; acts.appendChild(delBtn(()=>delItem({id:x.id,desc:label[x.sub]||"ארנק"},true))); right.appendChild(acts);
-    r.append(dot,main,right); L.appendChild(r);
+    const rep1= x.sub==="withdraw"||x.sub==="exchange"||x.sub==="adjust";
+    const acts=document.createElement("div"); acts.className="acts";
+    if(rep1){ const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.onclick=()=>againCash(x); acts.appendChild(ag); }
+    acts.appendChild(delBtn(()=>delItem({id:x.id,desc:label[x.sub]||"ארנק"},true))); right.appendChild(acts);
+    r.append(dot,main,right); tapRow(r);
+    L.appendChild(swipeWrap(r,{id:x.id},true,{again:rep1?()=>againCash(x):null,againLabel:x.sub==="withdraw"?"🔁 עוד משיכה כזו":"🔁 שוב להיום",del:()=>delItem({id:x.id,desc:(label[x.sub]||"ארנק").replace(/^\S+ /,"")},true)}));
   }
   /* panels */
   for(const [k,id] of [["w","cashW"],["a","cashA"],["x","cashX"],["r","cashR"]]) $(id).hidden=cashForm!==k;
@@ -1357,6 +1370,12 @@ function renderCash(){
   $("cashRText").textContent= curs.length ? "האיפוס מאפס את היתרה ל-0 ("+curs.map(k=>fmt(bal[k],k)).join(", ")+"). זה נרשם בהיסטוריה, ואפשר לבטל דרך המחיקה." : "הארנק כבר על 0.";
 }
 let CASHBAL={}, caMode="count";
+/* repeat a wallet entry for today (another withdrawal of the same amount, the same exchange…) */
+async function againCash(x){
+  const keep=["sub","amount","cur","fee","feeCur","toAmount","toCur","note","mode"]; const e={};
+  for(const k of keep) if(x[k]!==undefined&&x[k]!==null) e[k]=x[k];
+  const ok=await cashSave(e); if(ok){ buzz(10); toast("🔁 נרשם שוב להיום"); }
+}
 async function cashSave(entry){
   const c=await loadAcct(); if(!c) return false;
   const doc=await encFor(c,{type:"cash",...entry,createdAt:Date.now(),tz:hereTz(),loc:defLoc(),date:entry.date||todayStr(),trip:curTrip});
@@ -1623,7 +1642,7 @@ function renderAcct(){
   $("acctDot").hidden= !(on&&acct&&acctFor===me);
   c.setAttribute("aria-label", on ? "החשבון של "+nm(me) : "בחירת משתמש");
 }
-function quickUrl(){ return PAGE_URL+"?u="+encodeURIComponent(me)+"&add=1"+keyHash(); }
+function quickUrl(kind){ return PAGE_URL+"?u="+encodeURIComponent(me)+"&add="+(kind==="me"?"me":"1")+keyHash(); }
 function fillAcct(){
   const f=fem(me), open=!!(acct&&acctFor===me), hasPw=!!person(me)?.vk;
   $("acctAv2").textContent=ini(nm(me));
@@ -1657,10 +1676,11 @@ $("acctBtn").onclick=()=>{ buzz(6);
   if(!me||!person(me)){ const pk=$("picker"); if(!pk.hidden){ pk.scrollIntoView({behavior:"smooth",block:"center"}); } return; }
   fillAcct(); openSheet("acctSheet"); };
 $("acctClose").onclick=()=>closeSheet("acctSheet");
-$("acctQuick").onclick=()=>{ const u=quickUrl(), b=$("acctQuick"), old=b.textContent;
+const copyQuick=(kind,b)=>{ const u=quickUrl(kind), old=b.textContent;
   const done=()=>{ b.textContent="הועתק ✓"; toast("📋 הקישור הועתק. עכשיו פותחים את ספארי ומדביקים"); setTimeout(()=>b.textContent=old,1600); };
   try{ navigator.clipboard.writeText(u).then(done,()=>prompt("העתיקו את הקישור:",u)); }catch(e){ prompt("העתיקו את הקישור:",u); } };
-$("acctQuickOpen").onclick=()=>{ location.href=quickUrl(); };
+$("acctQuick").onclick=()=>copyQuick("1",$("acctQuick"));
+$("acctQuickMe").onclick=()=>copyQuick("me",$("acctQuickMe"));
 $("acctQuickHow").onclick=()=>{ const h=$("acctQuickHelp"); h.hidden=!h.hidden; $("acctQuickHow").textContent=h.hidden?"איך מוסיפים למסך הבית?":"סגירת ההסבר"; };
 $("acctUEdit").onclick=()=>{ const b=$("acctUBox"); b.hidden=!b.hidden; showErr("acctUErr"); if(!b.hidden){ $("acctUIn").value=person(me)?.u||""; $("acctUIn").focus(); } };
 $("acctUSave").onclick=async()=>{
@@ -1803,9 +1823,9 @@ const ready=()=>{
     if(load("trip-moved")==="1"){ try{ localStorage.removeItem("trip-moved"); }catch(e){} setTimeout(()=>{ toast("🔒 מאובטח! שלחו לכולם קישור חדש","לקישורים",()=>$("settingsBtn").click()); },900); }
     else view="shared";
     /* opened from the quick-add icon or shortcut: straight to a new expense */
-    if(readParam("add")==="1"&&canWrite){
-      view="shared";
-      QUICK=true; if(me) syncUrl();
+    if(QUICK&&canWrite){
+      view= QUICK==="me"&&me ? "personal" : "shared";
+      if(me) syncUrl();
       setTimeout(()=>{ renderAll(); openAdd(); },350);
     }
   }

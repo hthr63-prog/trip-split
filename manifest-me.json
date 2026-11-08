@@ -1,0 +1,21 @@
+{
+  "name": "➕ הוצאה אישית · גלי ויאירוש",
+  "short_name": "➕ אישי",
+  "display": "standalone",
+  "background_color": "#E6FBF6",
+  "theme_color": "#14B8A6",
+  "dir": "rtl",
+  "lang": "he",
+  "icons": [
+    {
+      "src": "icon-me-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-me-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

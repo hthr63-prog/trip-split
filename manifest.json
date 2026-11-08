@@ -20,12 +20,24 @@
   ],
   "shortcuts": [
     {
-      "name": "הוצאה חדשה",
-      "short_name": "➕ הוצאה",
+      "name": "הוצאה משותפת",
+      "short_name": "➕ משותפת",
       "url": "./?add=1",
       "icons": [
         {
-          "src": "icon-192.png",
+          "src": "icon-add-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "הוצאה אישית",
+      "short_name": "➕ אישית",
+      "url": "./?add=me",
+      "icons": [
+        {
+          "src": "icon-me-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
