@@ -1543,6 +1543,7 @@ function renderAcct(){
   $("acctDot").hidden= !(on&&acct&&acctFor===me);
   c.setAttribute("aria-label", on ? "החשבון של "+nm(me) : "בחירת משתמש");
 }
+function quickUrl(){ return PAGE_URL+"?u="+encodeURIComponent(me)+"&add=1"+keyHash(); }
 function fillAcct(){
   const f=fem(me), open=!!(acct&&acctFor===me), hasPw=!!person(me)?.vk;
   $("acctAv2").textContent=ini(nm(me));
@@ -1567,7 +1568,7 @@ function fillAcct(){
     else { const sh=document.createElement("button"); sh.type="button"; sh.className="btn small"; sh.textContent="📤 קישור"; sh.setAttribute("aria-label","שליחת הקישור של "+p.name); sh.onclick=()=>shareUrl(sh,personalUrl(p.id),"הקישור של "+p.name+" ל"+(S.trip||"טיול")); r.append(sh); }
     L.append(r);
   }
-  $("acctNew").hidden=!canWrite;
+  $("acctNew").hidden=!canWrite; $("acctQuickBox").hidden=!canWrite;
   $("acctLockBtn").hidden=!open;
   $("acctMine").textContent= view==="personal" ? "🤝 לחשבון המשותף" : "👤 להוצאות האישיות שלי";
   $("acctMine").hidden=!canWrite;
@@ -1576,6 +1577,11 @@ $("acctBtn").onclick=()=>{ buzz(6);
   if(!me||!person(me)){ const pk=$("picker"); if(!pk.hidden){ pk.scrollIntoView({behavior:"smooth",block:"center"}); } return; }
   fillAcct(); openSheet("acctSheet"); };
 $("acctClose").onclick=()=>closeSheet("acctSheet");
+$("acctQuick").onclick=()=>{ const u=quickUrl(), b=$("acctQuick"), old=b.textContent;
+  const done=()=>{ b.textContent="הועתק ✓"; toast("📋 הקישור הועתק. עכשיו פותחים את ספארי ומדביקים"); setTimeout(()=>b.textContent=old,1600); };
+  try{ navigator.clipboard.writeText(u).then(done,()=>prompt("העתיקו את הקישור:",u)); }catch(e){ prompt("העתיקו את הקישור:",u); } };
+$("acctQuickOpen").onclick=()=>{ location.href=quickUrl(); };
+$("acctQuickHow").onclick=()=>{ const h=$("acctQuickHelp"); h.hidden=!h.hidden; $("acctQuickHow").textContent=h.hidden?"איך מוסיפים למסך הבית?":"סגירת ההסבר"; };
 $("acctUEdit").onclick=()=>{ const b=$("acctUBox"); b.hidden=!b.hidden; showErr("acctUErr"); if(!b.hidden){ $("acctUIn").value=person(me)?.u||""; $("acctUIn").focus(); } };
 $("acctUSave").onclick=async()=>{
   const u=$("acctUIn").value.trim(); const bad=uCheck(u,me); if(bad) return showErr("acctUErr",bad);
@@ -1716,6 +1722,12 @@ const ready=()=>{
     if(me){ form.payer=me; refreshPersonal(); if(location.hash&&!readParam("u")) syncUrl(); setTimeout(sinceLastVisit,600); }
     if(load("trip-moved")==="1"){ try{ localStorage.removeItem("trip-moved"); }catch(e){} setTimeout(()=>{ toast("🔒 מאובטח! שלחו לכולם קישור חדש","לקישורים",()=>$("settingsBtn").click()); },900); }
     else view="shared";
+    /* opened from the quick-add icon or shortcut: straight to a new expense */
+    if(readParam("add")==="1"&&canWrite){
+      view="shared";
+      if(me) syncUrl(); else { try{ history.replaceState(null,"",location.pathname+location.hash); }catch(e){} }
+      setTimeout(()=>{ renderAll(); openAdd(); },350);
+    }
   }
   renderAll();
 };
