@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261108233510"></script>
+<script src="theme.js?v=20261108234421"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -671,6 +671,41 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
 .sf-row em.down{background:color-mix(in srgb,var(--good) 14%,var(--surface));color:var(--good)}
 small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:1.02em}
 .sf-row .sw{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+
+/* personal budget */
+.budget{display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:22px;border:1.5px solid var(--line);background:var(--surface);flex-shrink:0;--bud:#6C4BFF}
+.budget.warn{--bud:#F59E0B}.budget.over{--bud:var(--bad)}
+.bud-head{display:flex;justify-content:space-between;align-items:center}
+.bud-head b{font-family:var(--display);font-size:1.08rem}
+.bud-lock,.bud-empty{display:flex;flex-direction:column;gap:10px;align-items:flex-start;color:var(--muted)}
+.bud-top{display:flex;align-items:center;gap:16px}
+.bud-ring{position:relative;width:96px;height:96px;flex-shrink:0}
+.bud-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.bud-ring circle{fill:none;stroke-width:11}
+.bud-ring .trk{stroke:var(--surface-2)}
+.bud-ring .val{stroke:url(#budG);stroke-linecap:round;transition:stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1)}
+.budget.warn .bud-ring .val{stroke:#F59E0B}.budget.over .bud-ring .val{stroke:var(--bad)}
+.bud-ring .pct{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:1.15rem}
+.bud-nums{display:flex;flex-direction:column;min-width:0}
+.bud-nums small{color:var(--muted);font-size:.8rem;font-weight:600;letter-spacing:.04em}
+.bud-nums b{font-family:var(--display);font-weight:800;font-size:2rem;line-height:1.1;letter-spacing:-.02em}
+.budget.over .bud-nums b{color:var(--bad)}
+.bud-nums span{color:var(--muted);font-size:.85rem}
+.bud-rows{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.bud-row{display:flex;justify-content:space-between;gap:8px;padding:8px 0;font-size:.92rem;flex-shrink:0}
+.bud-row+.bud-row{border-top:1px dashed var(--line)}
+.bud-row span{color:var(--muted)}
+.bud-pace{font-size:.88rem;font-weight:600;padding:8px 12px;border-radius:12px;background:var(--surface-2)}
+.bud-form{display:flex;flex-direction:column;gap:10px}
+.chk{flex-direction:row!important;align-items:center;gap:8px!important;font-size:.9rem!important;color:var(--ink)!important}
+.chk input{width:20px;height:20px;accent-color:var(--brand);flex-shrink:0}
+.bud-note{color:var(--muted);font-size:.78rem;line-height:1.45}
+.sf-budget{font:inherit;display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:14px;border:0;background:var(--surface-2);color:var(--ink);cursor:pointer;text-align:right;--bud:#6C4BFF}
+.sf-budget.warn{--bud:#F59E0B}.sf-budget.over{--bud:var(--bad)}
+.sf-budget .t{font-weight:700;font-size:.9rem;white-space:nowrap}
+.sf-budget .bar{flex:1;height:6px;border-radius:99px;background:var(--surface);overflow:hidden}
+.sf-budget .bar i{display:block;height:100%;border-radius:99px;background:var(--bud);transition:width .6s ease}
+.sf-budget .go{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -815,6 +850,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
     <div class="sf-big"><b class="num" id="sfBig">—</b><span class="sf-sub" id="sfSub"></span></div>
     <div class="sf-bar" id="sfBar" hidden><i id="sfBarA"></i><i id="sfBarB"></i></div>
     <div class="sf-row" id="sfRow"></div>
+    <button class="sf-budget" id="sfBud" type="button" hidden><span class="t"></span><span class="bar"><i></i></span><span class="go" aria-hidden="true">←</span></button>
     <div class="showin sf-show" id="sfShow" hidden></div>
   </section>
   <div class="insight" id="insight" hidden><span class="ins-ico" id="insIco">💡</span><span id="insTxt"></span></div>
@@ -1127,6 +1163,26 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
       <button class="btn block" id="acctLockBtn" type="button">🔒 לנעול את האישי בטלפון הזה</button>
       <button class="btn block" id="acctSwitch" type="button">🔄 החלפת משתמש</button>
     </div>
+    <section class="budget" id="budgetBox" aria-labelledby="budTitle">
+      <div class="bud-head"><b id="budTitle">💰 התקציב שלי לטיול</b><button class="link" id="budEdit" type="button">✏️ עריכה</button></div>
+      <div class="bud-lock" id="budLock" hidden><span>🔒 התקציב שמור מוצפן, יחד עם ההוצאות האישיות.</span><button class="btn small" id="budOpen" type="button">פתיחת האישי</button></div>
+      <div class="bud-empty" id="budEmpty" hidden><span>קובעים סכום פעם אחת, והיתרה יורדת לבד בכל משיכה מכספומט ובכל תשלום בכרטיס.</span><button class="btn primary" id="budStart" type="button">הגדרת תקציב</button></div>
+      <div class="bud-main" id="budMain" hidden>
+        <div class="bud-top">
+          <div class="bud-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="budG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6C4BFF"/><stop offset=".6" stop-color="#B84DFF"/><stop offset="1" stop-color="#FF4D8D"/></linearGradient></defs><circle cx="60" cy="60" r="50" class="trk"/><circle cx="60" cy="60" r="50" class="val" id="budArc"/></svg><span class="pct num" id="budPct"></span></div>
+          <div class="bud-nums"><small>נשארו בבנק</small><b class="num" id="budLeft">—</b><span id="budOf"></span></div>
+        </div>
+        <div class="bud-rows" id="budRows"></div>
+        <div class="bud-pace" id="budPace"></div>
+      </div>
+      <div class="bud-form" id="budForm" hidden>
+        <div class="amount"><input id="budAmt" class="num" inputmode="decimal" placeholder="50,000" aria-label="סכום התקציב"><button class="curbtn" id="budCur" type="button" aria-label="מטבע התקציב"></button></div>
+        <label class="chk"><input type="checkbox" id="budPrep" checked><span>לכלול גם תשלומים לפני הטיול (טיסות, ביטוח)</span></label>
+        <div class="actions"><button class="btn primary" id="budSave" type="button">שמירה</button><button class="btn" id="budCancel" type="button">ביטול</button></div>
+        <div class="err" id="budErr" hidden></div>
+      </div>
+      <small class="bud-note">יורד מהיתרה: משיכות מכספומט עם העמלה, ותשלומים בכרטיס (אישיים, ומשותפים ששילמת). תשלום במזומן לא יורד שוב, כי הכסף כבר ירד במשיכה. רק את/ה רואה את התקציב.</small>
+    </section>
     <div class="quick" id="acctQuickBox">
       <div class="quick-top"><span class="quick-ico" aria-hidden="true">⚡</span><div><b>הוספה מהירה ממסך הבית</b><small>שני אייקונים: אחד למשותף, אחד לאישי</small></div></div>
       <div class="quick-pair">
@@ -1254,9 +1310,9 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261108233510">
-<script src="config.js?v=20261108233510"></script>
-<script src="fx.js?v=20261108233510"></script>
-<script src="app.js?v=20261108233510"></script>
+<meta name="app-v" content="20261108234421">
+<script src="config.js?v=20261108234421"></script>
+<script src="fx.js?v=20261108234421"></script>
+<script src="app.js?v=20261108234421"></script>
 </body>
 </html>

@@ -130,7 +130,7 @@ function compute(){
 /* ---- extra state ---- */
 let view="shared";
 let PENDING=new Set(), FRESH=new Set(), BIN=[], BINRAW=[], purged=false, CASH=[], dayCur="ILS", cashForm=null;                 // "shared" | "personal"
-let P=[], pLoaded=false, pEditingId=null, pform={cat:"food"};
+let P=[], pLoaded=false, pEditingId=null, pform={cat:"food"}, BUDGET=null;
 let cur={fCur:null,pCur:null,cFrom:null,cTo:"ILS"};
 let cLast="A";                     // which converter field the person typed in
 
@@ -532,7 +532,8 @@ async function refreshPersonal(){
     const mine=out.filter(x=>tripOf(x)===curTrip);
     CASH=mine.filter(x=>x.type==="cash");
     const fees=CASH.filter(x=>x.sub==="withdraw"&&+x.fee>0).map(x=>({id:"fee-"+x.id,_wid:x.id,_fee:true,desc:"עמלת משיכה",amount:+x.fee,cur:x.feeCur||x.cur,cat:"other",catLabel:"עמלות משיכה",pm:"fee",date:x.date,createdAt:x.createdAt,tz:x.tz,loc:x.loc}));
-    P=[...mine.filter(x=>x.type!=="cash"),...fees]; pLoaded=true; if(view==="personal") renderAll();
+    BUDGET=mine.filter(x=>x.type==="budget").sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||null;
+    P=[...mine.filter(x=>x.type!=="cash"&&x.type!=="budget"),...fees]; pLoaded=true; if(!$("acctSheet").hidden) fillAcct(); if(view==="personal") renderAll();
   }catch(e){ console.error(e); pLoaded=true; }
 }
 async function setPassword(pw){
@@ -958,18 +959,33 @@ function renderSofar(){
     else cell("—","ימים"); };
   /* averages count only what was spent on the trip itself, not flights and insurance bought before it */
   const onTrip=it=> locOf(it)!=="prep" && (!st || (it.date||"")>=st);
+  const preTrip= !!st && st>td;
+  const dd=(a,b)=>Math.round((new Date(b+"T12:00")-new Date(a+"T12:00"))/864e5)+1;
+  const pre=it=>!onTrip(it);
+  /* before the flight: average of the preparations, counted from the first one */
+  const firstPrep=[...S.items.filter(x=>x.kind!=="transfer"),...(personal?P:[])].filter(pre).map(x=>x.date||td).sort()[0];
+  const prepDays= firstPrep&&firstPrep<=td ? dd(firstPrep,td) : 0;
   const avgCell=(total,sumFor)=>{
-    if(sfScope==="day"){
+    let avg=null, label="ממוצע ליום";
+    if(preTrip){
+      label="ממוצע ליום בהכנות";
+      if(!prepDays){ daysCell(); return; }
+      if(sfScope==="month"){ const ms=td.slice(0,7)+"-01"; const from=firstPrep>ms?firstPrep:ms; avg=sumFor(it=>inScope(it)&&pre(it))/dd(from,td); }
+      else avg=sumFor(pre)/prepDays;
+    } else if(sfScope==="day"){
       const td2=sfDays("trip"); if(td2<2){ daysCell(); return; }
-      const avg=sumFor(onTrip)/td2;
-      const d=document.createElement("div"); const b=document.createElement("b"); b.className="num"; b.textContent=fmt(avg,showCur);
-      const l=document.createElement("span"); l.textContent="ממוצע ליום"; d.append(b,l);
-      if(avg>0){ const pct=Math.round((total-avg)/avg*100); const t=document.createElement("em"); t.className="sf-delta "+(pct>0?"up":"down");
-        t.textContent= total===0 ? "היום עוד כלום" : pct===0 ? "היום בדיוק כמו הממוצע" : "היום "+(pct>0?"▲ ":"▼ ")+Math.abs(pct)+"%"; d.appendChild(t); }
-      R.appendChild(d); return; }
-    if(days<1){ daysCell(); return; }
-    cell(fmt(sumFor(it=>inScope(it)&&onTrip(it))/days,showCur),"ממוצע ליום");
+      avg=sumFor(onTrip)/td2;
+    } else {
+      if(days<1){ daysCell(); return; }
+      avg=sumFor(it=>inScope(it)&&onTrip(it))/days;
+    }
+    const d=document.createElement("div"); const b=document.createElement("b"); b.className="num"; b.textContent=fmt(avg,showCur);
+    const l=document.createElement("span"); l.textContent=label; d.append(b,l);
+    if(sfScope==="day"&&avg>0){ const pct=Math.round((total-avg)/avg*100); const t=document.createElement("em"); t.className="sf-delta "+(total===0?"":pct>0?"up":"down");
+      t.textContent= total===0 ? "היום עוד כלום" : pct===0 ? "היום בדיוק כמו הממוצע" : "היום "+(pct>0?"▲ ":"▼ ")+Math.abs(pct)+"%"; d.appendChild(t); }
+    R.appendChild(d);
   };
+  const flightNote= preTrip ? " · ✈️ עוד "+(dd(td,st)-1)+" ימים לטיסה" : "";
   const scopeWord= sfScope==="trip" ? "בטיול" : sfScope==="month" ? "ב"+monthName(ym,true).split(" ")[0] : "היום";
   if(!personal){
     const its=S.items.filter(it=>it.kind!=="transfer"&&inScope(it));
@@ -979,7 +995,7 @@ function renderSofar(){
     $("sfKick").textContent="הוצאנו עד עכשיו "+scopeWord;
     money($("sfBig"),total,showCur,"sf");
     const all2=S.items.filter(it=>it.kind!=="transfer");
-    $("sfSub").textContent= its.length ? its.length+" הוצאות"+(sfScope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (sfScope==="day"?"עוד לא נרשמו הוצאות היום":"עוד לא נרשמו הוצאות");
+    $("sfSub").textContent=( its.length ? its.length+" הוצאות"+(sfScope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (sfScope==="day"?"עוד לא נרשמו הוצאות היום":"עוד לא נרשמו הוצאות") )+flightNote;
     $("sfBar").hidden=true;
     if(me){ cell(fmt(mine,showCur),"החלק שלך"); cell(fmt(paid,showCur),"שילמת"); avgCell(total,f=>all2.filter(f).reduce((a,it)=>a+V(it),0)); }
     else { cell(String(its.length),"הוצאות"); daysCell(); avgCell(total,f=>all2.filter(f).reduce((a,it)=>a+V(it),0)); }
@@ -990,12 +1006,15 @@ function renderSofar(){
     const all=own+tog;
     $("sfKick").textContent="הוצאת עד עכשיו "+scopeWord;
     money($("sfBig"),all,showCur,"sf");
-    $("sfSub").textContent= all>0 ? "לבד + החלק שלך במשותף"+(sfScope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (sfScope==="day"?"עוד אין הוצאות היום":"עוד אין הוצאות");
+    $("sfSub").textContent=( all>0 ? "לבד + החלק שלך במשותף"+(sfScope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (sfScope==="day"?"עוד אין הוצאות היום":"עוד אין הוצאות") )+flightNote;
     const bar=$("sfBar"); bar.hidden=!(all>0);
     if(all>0){ $("sfBarA").style.width=(own/all*100)+"%"; $("sfBarB").style.width=(tog/all*100)+"%"; }
     cell(fmt(own,showCur),"לבד","#14B8A6"); cell(fmt(tog,showCur),"ביחד","linear-gradient(135deg,#6C4BFF,#FF4D8D)");
     avgCell(all,f=>P.filter(f).reduce((a,it)=>a+V(it),0)+myShareItems().filter(f).reduce((a,it)=>a+V(it),0));
   }
+  { const bb=$("sfBud"), r= personal ? budgetCalc() : null; bb.hidden=!r;
+    if(r){ bb.querySelector(".t").textContent= r.left<0 ? "עברת את התקציב ב-"+fmt(-r.left,r.cur) : "נשארו "+fmt(r.left,r.cur)+" מהתקציב";
+      bb.querySelector("i").style.width=Math.round((1-r.pct)*100)+"%"; bb.classList.toggle("warn",r.left>=0&&r.left<r.amount*0.15); bb.classList.toggle("over",r.left<0); } }
   /* the personal screen has no other card with the currency switch now */
   const sh=$("sfShow"); sh.hidden=!personal; if(personal) showinRow(sh);
 }
@@ -1282,7 +1301,7 @@ function liveGroup(el){
     try{ el.setSelectionRange(c,c); }catch(e){}
   });
 }
-for(const id of ["fAmt","pAmt","cA","cB","cwAmt","cwFee","caAmt","cxAmt","cxGot"]) liveGroup($(id));
+for(const id of ["fAmt","pAmt","cA","cB","cwAmt","cwFee","caAmt","cxAmt","cxGot","budAmt"]) liveGroup($(id));
 
 /* ---- floating buttons: back to top, quick add ---- */
 let addHome=null;
@@ -1299,6 +1318,7 @@ function restoreAdd(){ if(!addHome) return; addHome.parent.insertBefore(addHome.
 $("fabAdd").onclick=openAdd;
 $("addCtaBtn").onclick=()=>{ buzz(8); openAdd(); };
 $("pAddCtaBtn").onclick=()=>{ buzz(8); openAdd(); };
+$("sfBud").onclick=()=>{ buzz(6); fillAcct(); openSheet("acctSheet"); setTimeout(()=>$("budgetBox").scrollIntoView({behavior:"smooth",block:"center"}),250); };
 /* "again": the last few different expenses, one tap to start from them */
 function recentOf(list){ const seen=new Set(), out=[];
   for(const it of [...list].sort((x,y)=>(y.createdAt||0)-(x.createdAt||0))){ if(it.kind==="transfer"||it._fee||it.type==="cash") continue; const k=norm(it.desc||""); if(!k||seen.has(k)) continue; seen.add(k); out.push(it); if(out.length>=4) break; }
@@ -1711,6 +1731,61 @@ function renderAcct(){
   $("acctDot").hidden= !(on&&acct&&acctFor===me);
   c.setAttribute("aria-label", on ? "החשבון של "+nm(me) : "בחירת משתמש");
 }
+/* ---- personal trip budget: what is left in the bank ----
+   Money leaves the bank on ATM withdrawals (with the fee) and on card payments, personal or shared ones I paid.
+   Cash payments are not counted again: that money already left with the withdrawal. Settle-up transfers count both ways. */
+function budgetCalc(){
+  const B=BUDGET; if(!B||!(+B.amount>0)) return null;
+  const cur=B.cur||"ILS", st=tripStart(), td=todayStr();
+  const onTrip=it=> locOf(it)!=="prep" && (!st||(it.date||"")>=st);
+  const inc=it=> B.prep!==false || onTrip(it);
+  const C=(a,c)=>conv(+a||0,c||cur,cur);
+  const parts={atm:0,cardP:0,cardS:0,tr:0}; let usedTrip=0;
+  const add=(k,v,it)=>{ parts[k]+=v; if(onTrip(it)) usedTrip+=v; };
+  for(const x of CASH) if(x.sub==="withdraw"&&inc(x)) add("atm",C(x.amount,x.cur)+C(x.fee||0,x.feeCur||x.cur),x);
+  for(const it of P) if(!it._fee&&it.pm==="card"&&inc(it)) add("cardP",C(it.amount,it.cur),it);
+  for(const it of S.items){ if(!inc(it)) continue;
+    if(it.kind==="transfer"){ if(it.payer===me) add("tr",C(it.amount,it.cur),it); else if(it.to===me) add("tr",-C(it.amount,it.cur),it); }
+    else if(it.payer===me&&it.pm==="card") add("cardS",C(it.amount,it.cur),it); }
+  const used=parts.atm+parts.cardP+parts.cardS+parts.tr, amount=+B.amount, left=amount-used;
+  let pace=null, perDay=null;
+  if(st&&st<=td){ const days=Math.round((new Date(td+"T12:00")-new Date(st+"T12:00"))/864e5)+1; perDay=usedTrip/days; if(perDay>0) pace=Math.floor(left/perDay); }
+  return {cur,amount,used,left,parts,pace,perDay,pct:Math.max(0,Math.min(1,used/amount)),prep:B.prep!==false};
+}
+let budEditing=false;
+function renderBudget(){
+  const open=!!(acct&&acctFor===me);
+  $("budLock").hidden=open; const r=open?budgetCalc():null;
+  $("budEmpty").hidden=!open||!!r||budEditing; $("budMain").hidden=!open||!r||budEditing; $("budForm").hidden=!open||!budEditing;
+  $("budEdit").hidden=!open||!r||budEditing;
+  if(!r) return;
+  const arc=$("budArc"), L=2*Math.PI*50; arc.style.strokeDasharray=L; arc.style.strokeDashoffset=L*(1-(1-r.pct));
+  const box=$("budgetBox"); box.classList.toggle("warn",r.left>=0&&r.left<r.amount*0.15); box.classList.toggle("over",r.left<0);
+  $("budPct").textContent=Math.round((1-r.pct)*100)+"%";
+  money($("budLeft"),r.left,r.cur,"budLeft");
+  $("budOf").textContent="מתוך "+fmt(r.amount,r.cur)+" · ירדו "+fmt(r.used,r.cur);
+  const R=$("budRows"); R.innerHTML="";
+  const row=(ic,t,v)=>{ const d=document.createElement("div"); d.className="bud-row"; const a=document.createElement("span"); a.textContent=ic+" "+t; const b=document.createElement("b"); b.className="num"; b.textContent=(v>0?"−":v<0?"+":"")+fmt(Math.abs(v),r.cur); d.append(a,b); R.appendChild(d); };
+  row("🏧","משיכות מכספומט ועמלות",r.parts.atm);
+  row("💳","כרטיס · אישי",r.parts.cardP);
+  row("💳","כרטיס · משותף ששילמת",r.parts.cardS);
+  if(Math.abs(r.parts.tr)>0.004) row("💸","העברות בהתחשבנות",r.parts.tr);
+  $("budPace").textContent= r.left<0 ? "⚠️ עברת את התקציב ב-"+fmt(-r.left,r.cur)
+    : r.pace!==null ? "⏳ בקצב של "+fmt(r.perDay,r.cur)+" ליום, זה מספיק לעוד כ-"+r.pace+" ימים" : (r.prep?"כולל ההוצאות לפני הטיול":"מתחיל לספור מיום הטיסה");
+}
+function budgetForm(){ budEditing=true; const B=BUDGET; $("budAmt").value=B?group(String(B.amount)):""; cur.bud=B?.cur||"ILS"; setCurBtn("budCur",cur.bud); $("budPrep").checked=B?B.prep!==false:true; showErr("budErr"); renderBudget(); setTimeout(()=>$("budAmt").focus(),60); }
+$("budStart").onclick=budgetForm; $("budEdit").onclick=budgetForm;
+$("budCancel").onclick=()=>{ budEditing=false; renderBudget(); };
+$("budCur").onclick=()=>openCurPicker("באיזה מטבע התקציב?",cur.bud||"ILS",c=>{ cur.bud=c; setCurBtn("budCur",c); });
+$("budOpen").onclick=()=>{ closeSheet("acctSheet"); goView("personal"); };
+$("budSave").onclick=async()=>{
+  const amount=parseFloat(String($("budAmt").value).replace(/,/g,"")); if(!(amount>0)) return showErr("budErr","צריך סכום גדול מאפס");
+  const c=await loadAcct(); if(!c) return showErr("budErr","פותחים קודם את האישי עם הסיסמה");
+  const data={type:"budget",amount,cur:cur.bud||"ILS",prep:$("budPrep").checked,createdAt:Date.now(),trip:curTrip};
+  const id=BUDGET?.id||uid("b"); const ok=await run(async()=>EXP().doc(id).set(await encFor(c,data)));
+  if(!ok) return showErr("budErr","לא נשמר. נסו שוב.");
+  BUDGET={...data,id}; budEditing=false; renderBudget(); renderSofar(); buzz(10); toast("💰 התקציב נשמר");
+};
 function quickUrl(kind){ return PAGE_URL+"?u="+encodeURIComponent(me)+"&add="+(kind==="me"?"me":"1")+keyHash(); }
 function fillAcct(){
   const f=fem(me), open=!!(acct&&acctFor===me), hasPw=!!person(me)?.vk;
@@ -1738,6 +1813,7 @@ function fillAcct(){
   }
   $("acctNew").hidden=!canWrite; $("acctQuickBox").hidden=!canWrite;
   $("acctLockBtn").hidden=!open;
+  renderBudget();
   $("acctMine").textContent= view==="personal" ? "🤝 לחשבון המשותף" : "👤 להוצאות האישיות שלי";
   $("acctMine").hidden=!canWrite;
 }
