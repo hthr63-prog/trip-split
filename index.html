@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@700;900&family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;700&display=swap">
-<script src="theme.js?v=20261108224959"></script>
+<script src="theme.js?v=20261108225730"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -571,6 +571,53 @@ header{flex-direction:column;align-items:stretch;gap:14px}
 .quick .link{align-self:flex-start}
 .quick-help{display:flex;flex-direction:column;gap:6px;font-size:.93rem;line-height:1.5}
 .quick-help ol{margin:0;padding-inline-start:20px}
+
+/* ===== design pass ===== */
+#title .tt{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+#title .te{margin-inline-start:.2em;font-size:.8em;-webkit-text-fill-color:initial;color:initial}
+#title{background:none!important;color:var(--ink)}
+/* editorial headings: same voice, a third smaller, so the app is not one long poster */
+.bighead{padding:18px 4px 0}
+.bighead h2{font-size:clamp(1.9rem,8.6vw,2.5rem);line-height:1}
+/* call-to-action instead of a full form on the home screen */
+.add-cta{font:inherit;display:flex;align-items:center;gap:14px;width:100%;text-align:right;padding:14px 16px;border-radius:22px;border:1.5px dashed color-mix(in srgb,var(--brand) 45%,var(--line));background:var(--surface);color:var(--ink);cursor:pointer;transition:transform .15s ease,box-shadow .2s ease}
+.add-cta:active{transform:scale(.98)}
+.add-cta .plus{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:var(--grad);color:#fff;font-size:1.8rem;font-weight:600;flex-shrink:0;box-shadow:var(--shadow)}
+.add-cta .tx{flex:1;display:flex;flex-direction:column}
+.add-cta b{font-family:var(--display);font-size:1.12rem}
+.add-cta small{color:var(--muted);font-size:.86rem}
+.add-cta .go{color:var(--brand);font-size:1.3rem}
+/* rows: actions appear on tap, as real buttons */
+.row.tappable{cursor:pointer;transition:box-shadow .2s ease,border-color .2s ease}
+.row.open{border-color:color-mix(in srgb,var(--brand) 50%,var(--line));box-shadow:0 10px 24px -16px rgba(76,52,200,.5)}
+.row .acts{display:none}
+.row.open .acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;justify-content:flex-end}
+.row.open .acts .link{min-height:34px;padding:4px 12px;border-radius:999px;background:var(--surface-2);text-decoration:none;font-size:.85rem;font-weight:600;color:var(--ink)}
+.row.open .acts .link.danger,.row.open .acts .danger{background:color-mix(in srgb,var(--bad) 14%,var(--surface));color:var(--bad)}
+.row:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+/* balance: breakdown folded */
+.bd-toggle{font:inherit;background:none;border:0;color:inherit;opacity:.85;font-size:.85rem;padding:2px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.breakdown:not(.open) .num{display:none}
+.share-bal{margin-top:6px;background:rgba(255,255,255,.16);color:inherit;border-color:rgba(255,255,255,.35)}
+/* date chips */
+.datechips{margin-bottom:6px}
+/* bottom tab bar */
+.tabbar{position:fixed;inset-inline:0;bottom:0;z-index:45;display:grid;grid-template-columns:repeat(5,1fr);align-items:end;gap:2px;max-width:560px;margin:0 auto;
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--surface) 86%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);
+  border-top:1px solid var(--line);border-radius:22px 22px 0 0;box-shadow:0 -10px 30px -22px rgba(30,22,64,.45)}
+.tabbar button{font:inherit;background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;min-height:52px;cursor:pointer;font-size:.72rem;font-weight:600;border-radius:14px;transition:color .2s ease,background .2s ease}
+.tabbar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tabbar button.on{color:var(--brand)}
+.tabbar button.on svg{fill:color-mix(in srgb,var(--brand) 16%,transparent)}
+.tabbar .tab-add{align-self:center;justify-self:center;width:58px;height:58px;min-height:0;margin-top:-26px;border-radius:20px;background:var(--grad);color:#fff;box-shadow:var(--shadow),0 0 0 5px var(--bg)}
+.tabbar .tab-add svg{width:28px;height:28px;stroke-width:2.6}
+.tabbar .tab-add:active{transform:scale(.94)}
+body.has-tabs{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+body.has-tabs .fabs{bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+body.has-tabs #statsBtn,body.has-tabs #viewBtn{display:none}
+body.has-tabs #toprow{grid-template-columns:1fr}
+#foot{display:none!important}
+@media (prefers-reduced-motion:reduce){.add-cta,.tabbar button{transition:none}}
 </style>
 </head>
 <body>
@@ -753,14 +800,14 @@ header{flex-direction:column;align-items:stretch;gap:14px}
       <div class="showin" id="showin"></div>
     </section>
 
-    <div class="bighead" data-tone="peach"><small>הוצאה חדשה</small><h2>רושמים.<br>בשנייה.</h2></div>
+    <button class="add-cta" id="addCtaBtn" type="button" data-tone="peach"><span class="plus" aria-hidden="true">+</span><span class="tx"><b>הוצאה חדשה</b><small>סכום, שם, וזהו. כל השאר ממולא מראש</small></span><span class="go" aria-hidden="true">←</span></button>
     <section class="card" id="form" hidden>
       <div class="card-head"><h2 id="formTitle">➕ הוצאה משותפת</h2></div>
       <div class="amount"><input id="fAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="fCur" type="button" aria-label="מטבע"></button></div>
       <div class="hint num" id="fConv"></div>
       <div class="grid">
         <label>שם ההוצאה *<input id="fDesc" required maxlength="60" placeholder="ארוחת ערב, סליפר לצ׳יאנג מאי…" autocomplete="off"><span class="seg suggest" id="fSuggest" hidden></span></label>
-        <label>תאריך<span class="datebox"><input id="fDate" type="date"></span></label>
+        <label>תאריך<span class="seg datechips" id="fDateChips"></span><span class="datebox"><input id="fDate" type="date"></span></label>
       </div>
       <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="fLoc" type="button"></button></div>
       <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="fPm"></div></div>
@@ -841,7 +888,7 @@ header{flex-direction:column;align-items:stretch;gap:14px}
         <div class="hint num" id="pConv"></div>
         <div class="grid">
           <label>שם ההוצאה *<input id="pDesc" required maxlength="60" placeholder="מזכרת, קפה, עיסוי…" autocomplete="off"><span class="seg suggest" id="pSuggest" hidden></span></label>
-          <label>תאריך<span class="datebox"><input id="pDate" type="date"></span></label>
+          <label>תאריך<span class="seg datechips" id="pDateChips"></span><span class="datebox"><input id="pDate" type="date"></span></label>
         </div>
         <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="pLoc" type="button"></button></div>
         <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="pPm"></div></div>
@@ -969,6 +1016,13 @@ header{flex-direction:column;align-items:stretch;gap:14px}
 <button class="mini" id="mini" type="button" aria-label="חזרה למעלה"><span id="miniTxt"></span><small id="miniDay"></small></button>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+<nav class="tabbar" id="tabbar" aria-label="ניווט" hidden>
+  <button type="button" data-v="shared"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>משותף</span></button>
+  <button type="button" data-v="personal"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>אישי</span></button>
+  <button type="button" id="tabAdd" class="tab-add" aria-label="הוצאה חדשה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button type="button" data-v="stats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg><span>גרפים</span></button>
+  <button type="button" data-v="acct"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>חשבון</span></button>
+</nav>
 <div class="fabs" id="fabs">
   <button class="fab up" id="fabUp" type="button" aria-label="חזרה למעלה" hidden>↑</button>
   <button class="fab add" id="fabAdd" type="button" aria-label="הוספת הוצאה" hidden>+</button>
@@ -1135,9 +1189,9 @@ header{flex-direction:column;align-items:stretch;gap:14px}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261108224959">
-<script src="config.js?v=20261108224959"></script>
-<script src="fx.js?v=20261108224959"></script>
-<script src="app.js?v=20261108224959"></script>
+<meta name="app-v" content="20261108225730">
+<script src="config.js?v=20261108225730"></script>
+<script src="fx.js?v=20261108225730"></script>
+<script src="app.js?v=20261108225730"></script>
 </body>
 </html>

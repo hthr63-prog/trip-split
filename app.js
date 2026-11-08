@@ -230,7 +230,10 @@ function showinRow(el){
 
 /* ---- render: header ---- */
 function renderHeader(){
-  $("title").textContent=S.trip||"החשבון של הטיול";
+  { const T=$("title"), name=S.trip||"החשבון של הטיול"; T.innerHTML="";
+    const m=/^(.*?)([\p{Extended_Pictographic}\u200d\ufe0f\u{1F3FB}-\u{1F3FF}\s]*)$/u.exec(name)||[name,name,""];
+    const a=document.createElement("span"); a.className="tt"; a.textContent=m[1].trim()||name; T.appendChild(a);
+    if(m[2]&&m[2].trim()){ const e=document.createElement("span"); e.className="te"; e.textContent=m[2].trim(); T.appendChild(e); } }
   document.title=(S.trip||"החשבון של הטיול");
   const names=active().map(p=>p.name);
   $("sub").textContent= me? (view==="personal"?"ההוצאות האישיות של "+nm(me):"היי "+nm(me)+" 👋 · "+names.length+" משתתפים") : (names.length? "החשבון המשותף של "+(names.length>1?names.slice(0,-1).join(", ")+" ו"+names[names.length-1]:names[0]) : "");
@@ -257,7 +260,8 @@ function renderHeader(){
   $("viewStats").hidden= view!=="stats";
   $("toprow").hidden= view==="stats";
   $("statsBtn").setAttribute("aria-pressed",String(view==="stats"));
-  $("fabAdd").hidden= !canWrite || !loaded;
+  $("fabAdd").hidden= !canWrite || !loaded || document.body.classList.contains("has-tabs");
+  renderTabs(); $("fabAdd").hidden= !canWrite || !loaded || !$("tabbar").hidden;
 }
 
 /* ---- render: shared ---- */
@@ -301,15 +305,21 @@ function renderTicket(){
       const row=document.createElement("div"); row.className="debt";
       const b=document.createElement("button"); b.type="button"; b.className="btn"; b.textContent="✓ סמנו ש"+nm(d.from)+" "+g.transferred(d.from)+" ל"+nm(d.to)+" "+fmt(d.amt,showCur);
       b.onclick=()=>addTransfer(d.from,d.to,Math.round(d.amt*100)/100); row.appendChild(b); D.appendChild(row);
+      b.dataset.share="• "+nm(d.from)+" "+(fem(d.from)?"צריכה":"צריך")+" להעביר ל"+nm(d.to)+" "+fmt(d.amt,showCur);
     }
   }
   if(me&&S.items.length){
     const parts=Object.entries(c.net[me]||{}).filter(([k,x])=>Math.abs(conv(x,k,"ILS"))>=0.5);
     if(parts.length>1||(parts.length===1&&parts[0][0]!==showCur)){
-      const lead=document.createElement("span"); lead.textContent="לפי מטבע ההוצאה:"; B.appendChild(lead);
+      const lead=document.createElement("button"); lead.type="button"; lead.className="bd-toggle"; lead.setAttribute("aria-expanded",String(!!window.__bdOpen)); lead.textContent=(window.__bdOpen?"▴ ":"▾ ")+"פירוט לפי מטבע";
+      lead.onclick=()=>{ window.__bdOpen=!window.__bdOpen; renderAll(); }; B.appendChild(lead); B.classList.toggle("open",!!window.__bdOpen);
       for(const [k,x] of parts){ const s=document.createElement("span"); s.className="num"; s.textContent=(x>0?"+":"")+fmt(x,k)+(k!==showCur?" ≈ "+fmt(conv(x,k,showCur),showCur):""); B.appendChild(s); }
     }
   }
+  if(D.children.length&&me){ const sh=document.createElement("button"); sh.type="button"; sh.className="btn small ghost share-bal"; sh.textContent="📤 לשלוח את המאזן";
+    sh.onclick=()=>{ const lines=[...D.querySelectorAll(".debt .btn")].map(x=>x.dataset.share||""); const txt=(S.trip||"הטיול")+" 💸\n"+V.textContent.trim()+"\n"+lines.join("\n");
+      if(navigator.share) navigator.share({text:txt}).catch(()=>{}); else location.href="https://wa.me/?text="+encodeURIComponent(txt); };
+    D.appendChild(sh); }
   showinRow($("showin"));
 }
 function setShow(c){ showCur=c; store("trip-show",c); renderAll(); }
@@ -454,14 +464,14 @@ function renderLedger(){
     if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(conv(+it.amount,it.cur,"ILS"),"ILS"); right.appendChild(s); }
     if(me&&it.kind!=="transfer"){ const sh=sharesOf(it); const d=(it.payer===me?+it.amount:0)-(+it.amount)*(sh[me]||0); if(Math.abs(d)>0.0001){ const s=document.createElement("span"); s.className="mine num "+(d>0?"plus":"minus"); s.textContent=(d>0?"מגיע לך ":"עליך ")+fmt(Math.abs(d),it.cur); right.appendChild(s); } }
     if(canWrite){
-      const acts=document.createElement("div");
+      const acts=document.createElement("div"); acts.className="acts";
       if(it.kind!=="transfer"){ const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>startEdit(it); acts.appendChild(e); }
       if(it.kind!=="transfer"){ const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.title="להוסיף את אותה הוצאה להיום"; ag.onclick=()=>again(it,false); acts.prepend(ag); }
       const d=delBtn(()=>delItem(it,false)); if(it.kind==="transfer"){ d.textContent="ביטול ההעברה"; d.dataset.label="ביטול ההעברה"; }
       acts.appendChild(d);
       right.appendChild(acts);
     }
-    r.append(dot,main,right); box.appendChild(swipeWrap(r,it,false));
+    r.append(dot,main,right); tapRow(r); box.appendChild(swipeWrap(r,it,false));
   }
 }
 
@@ -606,18 +616,28 @@ function renderPersonal(){
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
     if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(conv(+it.amount,it.cur,"ILS"),"ILS"); right.appendChild(s); }
-    const acts=document.createElement("div");
+    const acts=document.createElement("div"); acts.className="acts";
     if(it._fee){ const n=document.createElement("span"); n.className="m"; n.textContent="🏧 מתוך משיכה בארנק"; acts.appendChild(n); right.appendChild(acts); r.append(dot,main,right); box.appendChild(r); continue; }
     const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>pStartEdit(it); acts.appendChild(e);
     const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.onclick=()=>again(it,true); acts.prepend(ag);
     acts.appendChild(delBtn(()=>delItem(it,true)));
     right.appendChild(acts);
-    r.append(dot,main,right); box.appendChild(swipeWrap(r,it,true));
+    r.append(dot,main,right); tapRow(r); box.appendChild(swipeWrap(r,it,true));
   }
 }
 
 /* ================= playful layer ================= */
 /* swipe a row: right = repeat for today, left = delete (with undo) */
+/* tap a row to show its actions (edit, again, delete); tap again or another row to hide */
+function tapRow(r){
+  if(!r.querySelector(".acts button")) return;
+  r.classList.add("tappable"); r.tabIndex=0; r.setAttribute("aria-expanded","false");
+  const toggle=e=>{ if(e.target.closest(".acts")) return; const open=!r.classList.contains("open");
+    document.querySelectorAll(".row.open").forEach(x=>{ x.classList.remove("open"); x.setAttribute("aria-expanded","false"); });
+    if(open){ r.classList.add("open"); r.setAttribute("aria-expanded","true"); buzz(5); } };
+  r.addEventListener("click",toggle);
+  r.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(e); } });
+}
 function swipeWrap(r,it,personal){
   const w=document.createElement("div"); w.className="swipe";
   if(it._fee||!canWrite) { w.appendChild(r); return w; }
@@ -897,7 +917,8 @@ function renderAll(){
   if(view==="stats"){ renderStats(); }
   else if(view==="personal"&&me){ renderPersonal(); }
   else { renderTicket(); renderConv(); renderForm(); renderCats(); renderLedger(); }
-  $("form").hidden=!canWrite;
+  $("form").hidden=!canWrite || !$("addSlot").contains($("form"));
+  $("addCtaBtn").hidden=!canWrite || !loaded;
   if(!$("setSheet").hidden) renderSettings();
 }
 
@@ -977,9 +998,9 @@ function startEdit(it){
   $("fDesc").value=it.desc||""; $("fCatLabel").value=it.catLabel||""; $("fAmt").value=group(String(it.amount)); $("fDate").value=it.date||todayStr(); cur.fCur=it.cur;
   renderForm();
   $("formTitle").textContent="✏️ עריכת הוצאה"; $("saveBtn").textContent="שמירת שינויים"; $("cancelEdit").hidden=false;
-  $("form").scrollIntoView({behavior:"smooth",block:"start"});
+  if(!$("addSlot").contains($("form"))) openAdd(); else $("form").scrollIntoView({behavior:"smooth",block:"start"});
 }
-function resetForm(){
+function resetForm(){ setTimeout(()=>fDateChips(),0);
   editingId=null; $("fDesc").value=""; $("fCatLabel").value=""; $("fAmt").value=""; form.mode="equal"; form.pcts={}; form.among=null; if(me) form.payer=me; cur.fCur=S.localCur; form.loc=null;
   $("formTitle").textContent="➕ הוצאה משותפת"; $("saveBtn").textContent="הוספה"; $("cancelEdit").hidden=true; renderForm();
 }
@@ -1181,8 +1202,28 @@ function openAdd(){
   $("addSlot").appendChild(f); f.hidden=false; openSheet("addSheet");
   setTimeout(()=>{ try{ $(id==="pForm"?"pAmt":"fAmt").focus(); }catch(e){} },80);
 }
-function restoreAdd(){ if(!addHome) return; addHome.parent.insertBefore(addHome.f,addHome.next); addHome=null; }
+function restoreAdd(){ if(!addHome) return; addHome.parent.insertBefore(addHome.f,addHome.next); if(addHome.f.id==="form") addHome.f.hidden=true; addHome=null; }
 $("fabAdd").onclick=openAdd;
+$("addCtaBtn").onclick=()=>{ buzz(8); openAdd(); };
+/* quick date chips in the form */
+function dateChips(inp,box){
+  const y=new Date(Date.now()-864e5), ys=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0");
+  const opts=[["today","היום",todayStr()],["yday","אתמול",ys]];
+  const paint=()=>{ box.innerHTML=""; for(const [k,l,v] of opts){ const b=document.createElement("button"); b.type="button"; b.textContent=l; b.setAttribute("aria-pressed",String(inp.value===v)); b.onclick=()=>{ inp.value=v; inp.dispatchEvent(new Event("change",{bubbles:true})); buzz(5); paint(); }; box.appendChild(b); } };
+  inp.addEventListener("change",paint); inp.addEventListener("input",paint); paint(); return paint;
+}
+const fDateChips=dateChips($("fDate"),$("fDateChips"));
+const pDateChips=$("pDate")&&$("pDateChips")?dateChips($("pDate"),$("pDateChips")):()=>{};
+/* bottom tab bar */
+function renderTabs(){
+  const on=loaded&&!!me&&!!person(me)&&canWrite; $("tabbar").hidden=!on; document.body.classList.toggle("has-tabs",on);
+  for(const b of $("tabbar").querySelectorAll("[data-v]")){ const v=b.dataset.v; const act= v==="acct" ? !$("acctSheet").hidden : v===view; b.classList.toggle("on",act); b.setAttribute("aria-current",act?"page":"false"); }
+}
+$("tabbar").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; buzz(6);
+  if(b.id==="tabAdd") return openAdd();
+  const v=b.dataset.v; if(v==="acct") return $("acctBtn").click();
+  if(v===view){ window.scrollTo({top:0,behavior:"smooth"}); return; }
+  if(v==="personal"&&!me) return; goView(v); });
 $("addClose").onclick=()=>closeSheet("addSheet");
 $("fabUp").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
 window.addEventListener("scroll",()=>{ $("fabUp").hidden= window.scrollY<400; },{passive:true});
@@ -1262,7 +1303,7 @@ function renderCash(){
     const sign=v=>(v>0?"+":v<0?"−":"")+fmt(Math.abs(v),"X").replace(/ X$/,"");
     const line=(v,c)=>{ const b=document.createElement("b"); b.className="num "+(v<0?"neg":"pos"); b.textContent=(v>0?"+":v<0?"−":"")+fmt(Math.abs(v),c); right.appendChild(b); };
     if(x.sub==="exchange"){ line(-(+x.amount),x.cur); line(+x.toAmount,x.toCur); } else line(+x.amount,x.cur);
-    const acts=document.createElement("div"); acts.appendChild(delBtn(()=>delItem({id:x.id,desc:label[x.sub]||"ארנק"},true))); right.appendChild(acts);
+    const acts=document.createElement("div"); acts.className="acts"; acts.appendChild(delBtn(()=>delItem({id:x.id,desc:label[x.sub]||"ארנק"},true))); right.appendChild(acts);
     r.append(dot,main,right); L.appendChild(r);
   }
   /* panels */
