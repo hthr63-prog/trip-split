@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261108231823"></script>
+<script src="theme.js?v=20261108232402"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -638,6 +638,9 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
 .qbtn img{width:56px;height:56px;border-radius:14px;flex-shrink:0;box-shadow:0 6px 14px -8px rgba(0,0,0,.5)}
 .qbtn b{display:block;font-size:.95rem}.qbtn small{color:var(--muted);font-size:.78rem}
 .fee-note{font-size:.78rem}
+.datefield{display:flex;flex-direction:column;gap:5px;min-width:0}
+.datefield .dlab{font-size:.85rem;color:var(--muted);font-weight:500}
+.datechips{margin-bottom:0}
 </style>
 </head>
 <body>
@@ -828,7 +831,7 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
       <div class="hint num" id="fConv"></div>
       <div class="grid">
         <label>שם ההוצאה *<input id="fDesc" required maxlength="60" placeholder="ארוחת ערב, סליפר לצ׳יאנג מאי…" autocomplete="off"><span class="seg suggest" id="fSuggest" hidden></span></label>
-        <label>תאריך<span class="seg datechips" id="fDateChips"></span><span class="datebox"><input id="fDate" type="date"></span></label>
+        <div class="datefield"><span class="dlab" id="fDateLab">תאריך</span><div class="seg datechips" id="fDateChips" role="group" aria-labelledby="fDateLab"></div><span class="datebox"><input id="fDate" type="date" aria-labelledby="fDateLab"></span></div>
       </div>
       <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="fLoc" type="button"></button></div>
       <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="fPm"></div></div>
@@ -910,7 +913,7 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
         <div class="hint num" id="pConv"></div>
         <div class="grid">
           <label>שם ההוצאה *<input id="pDesc" required maxlength="60" placeholder="מזכרת, קפה, עיסוי…" autocomplete="off"><span class="seg suggest" id="pSuggest" hidden></span></label>
-          <label>תאריך<span class="seg datechips" id="pDateChips"></span><span class="datebox"><input id="pDate" type="date"></span></label>
+          <div class="datefield"><span class="dlab" id="pDateLab">תאריך</span><div class="seg datechips" id="pDateChips" role="group" aria-labelledby="pDateLab"></div><span class="datebox"><input id="pDate" type="date" aria-labelledby="pDateLab"></span></div>
         </div>
         <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="pLoc" type="button"></button></div>
         <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="pPm"></div></div>
@@ -1214,9 +1217,9 @@ html[data-quick="1"] .add-cta .plus{background:linear-gradient(135deg,#FFD45E,#F
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261108231823">
-<script src="config.js?v=20261108231823"></script>
-<script src="fx.js?v=20261108231823"></script>
-<script src="app.js?v=20261108231823"></script>
+<meta name="app-v" content="20261108232402">
+<script src="config.js?v=20261108232402"></script>
+<script src="fx.js?v=20261108232402"></script>
+<script src="app.js?v=20261108232402"></script>
 </body>
 </html>
