@@ -238,7 +238,7 @@ function renderHeader(){
   const showMine=!!me&&canWrite;
   $("viewBtn").hidden=!showMine; $("toprow").classList.toggle("one",!showMine);
   $("viewBtn").setAttribute("aria-pressed",String(view==="personal"));
-  $("meBadge").textContent= me? nm(me).trim().charAt(0) : "";
+  $("meBadge").textContent= me? ini(nm(me)) : "";
   renderAcct();
   $("viewTxt").textContent= view==="personal" ? "← לחשבון המשותף" : "האישי שלי";
   $("viewSmall").textContent= view==="personal" ? "חזרה" : (me&&fem(me)?"רק את רואה":"רק אתה רואה");
