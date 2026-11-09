@@ -541,7 +541,7 @@ async function refreshPersonal(){
     if(seq!==pSeq) return;
     const mine=out.filter(x=>tripOf(x)===curTrip);
     CASH=mine.filter(x=>x.type==="cash");
-    const fees=CASH.filter(x=>x.sub==="withdraw"&&+x.fee>0).map(x=>({id:"fee-"+x.id,_wid:x.id,_fee:true,desc:"עמלת משיכה",amount:+x.fee,cur:x.feeCur||x.cur,cat:"other",catLabel:"עמלות משיכה",pm:"fee",date:x.date,createdAt:x.createdAt,tz:x.tz,loc:x.loc}));
+    const fees=CASH.filter(x=>(x.sub==="withdraw"||x.sub==="exchange")&&+x.fee>0).map(x=>({id:"fee-"+x.id,_wid:x.id,_fee:true,desc:x.sub==="exchange"?"הפרשי שער בצ׳יינג׳":"עמלת משיכה",amount:+x.fee,cur:x.feeCur||x.cur,cat:"other",catLabel:x.sub==="exchange"?"הפרשי שער":"עמלות משיכה",pm:"fee",date:x.date,createdAt:x.createdAt,tz:x.tz,loc:x.loc}));
     INCOME=mine.filter(x=>x.type==="budget-in");
     BUDGET=mine.filter(x=>x.type==="budget").sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||null;
     P=[...mine.filter(x=>x.type!=="cash"&&x.type!=="budget"&&x.type!=="budget-in"),...fees]; pLoaded=true; if(!$("acctSheet").hidden) fillAcct(); if(view==="personal") renderAll();
@@ -644,10 +644,10 @@ function renderPersonal(){
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
     if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(conv(+it.amount,it.cur,"ILS"),"ILS"); right.appendChild(s); }
     const acts=document.createElement("div"); acts.className="acts";
-    if(it._fee){ const n=document.createElement("span"); n.className="m fee-note"; n.textContent="🏧 מתוך משיכה בארנק"; right.appendChild(n);
+    if(it._fee){ const n=document.createElement("span"); n.className="m fee-note"; n.textContent= it.catLabel==="הפרשי שער" ? "💱 מתוך החלפה בארנק" : "🏧 מתוך משיכה בארנק"; right.appendChild(n);
       const w=CASH.find(x=>x.id===it._wid);
       r.append(dot,main,right); r.dataset.id=it.id;
-      box.appendChild(w ? swipeWrap(r,it,true,{again:()=>againCash(w),againLabel:"🔁 עוד משיכה כזו",del:()=>delItem({id:w.id,desc:"משיכה מכספומט"},true),delLabel:"🗑 מחיקת המשיכה"}) : r); continue; }
+      box.appendChild(w ? swipeWrap(r,it,true,{again:()=>againCash(w),againLabel:w.sub==="exchange"?"🔁 עוד החלפה כזו":"🔁 עוד משיכה כזו",del:()=>delItem({id:w.id,desc:w.sub==="exchange"?"החלפת מטבע":"משיכה מכספומט"},true),delLabel:w.sub==="exchange"?"🗑 מחיקת ההחלפה":"🗑 מחיקת המשיכה"}) : r); continue; }
     const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>pStartEdit(it); acts.appendChild(e);
     const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.onclick=()=>again(it,true); acts.prepend(ag);
     acts.appendChild(delBtn(()=>delItem(it,true)));
@@ -856,7 +856,7 @@ async function shareRecap(){
 
 /* ---- visual layer: category tiles, hero, insights ---- */
 const CAT_TINT={food:"#FF8A3D",stay:"#6C4BFF",transport:"#14B8A6",fun:"#FF4D8D",party:"#B84DFF",laundry:"#3B82F6",shop:"#F59E0B",other:"#8B85A8"};
-function catEmoji(it){ if(it.kind==="transfer") return "💸"; if(it._fee) return "🏧"; const k=it.cat||"other"; const l=(CATNAME[k]||OLD_CATS[k]||"✨").split(" ")[0]; return l; }
+function catEmoji(it){ if(it.kind==="transfer") return "💸"; if(it._fee) return it.catLabel==="הפרשי שער"?"💱":"🏧"; const k=it.cat||"other"; const l=(CATNAME[k]||OLD_CATS[k]||"✨").split(" ")[0]; return l; }
 function catTile(it,payer){
   const d=document.createElement("div"); d.className="cattile"; d.style.setProperty("--tint",it.kind==="transfer"?"#0E9F7E":(CAT_TINT[it.cat]||CAT_TINT.other)); d.textContent=catEmoji(it);
   if(payer){ const w=document.createElement("span"); w.className="who c"+pidx(payer); w.textContent=nm(payer).trim().charAt(0); d.appendChild(w); }
@@ -1344,7 +1344,19 @@ function openAdd(){
   try{ fDateChips(); pDateChips(); }catch(e){}
   setTimeout(()=>{ try{ $(id==="pForm"?"pAmt":"fAmt").focus(); }catch(e){} },80);
 }
-function restoreAdd(){ if(!addHome) return; addHome.parent.insertBefore(addHome.f,addHome.next); addHome.f.hidden=true; addHome=null; }
+let cxHome=null;
+function sheetExchange(on){
+  const X=$("cashX"), f=$("addSlot").querySelector("#form,#pForm");
+  if(on){
+    if(!(me&&acct&&acctFor===me)){ toast("🔒 החלפה נשמרת בארנק האישי. פותחים קודם את האישי עם הסיסמה","לאישי",()=>{ closeSheet("addSheet"); goView("personal"); }); return; }
+    if(!cxHome) cxHome={parent:X.parentNode,next:X.nextSibling};
+    if(f) f.hidden=true; $("addSlot").appendChild(X); X.hidden=false; $("addXBtn").textContent="🧾 חזרה להוצאה";
+    if(!cur.cxF||cur.cxF===cur.cxT){ cur.cxF="ILS"; cur.cxT=S.localCur!=="ILS"?S.localCur:(S.dest||"THB"); }
+    setCurBtn("cxFrom",cur.cxF); setCurBtn("cxTo",cur.cxT); cxLossShow(); setTimeout(()=>{ try{ $("cxAmt").focus(); }catch(e){} },60);
+  } else { if(cxHome){ cxHome.parent.insertBefore(X,cxHome.next); X.hidden=cashForm!=="x"; cxHome=null; } if(f) f.hidden=false; $("addXBtn").textContent="💱 צ׳יינג׳"; }
+}
+$("addXBtn").onclick=()=>{ buzz(6); sheetExchange(!$("addSlot").contains($("cashX"))); };
+function restoreAdd(){ if($("addSlot").contains($("cashX"))) sheetExchange(false); if(!addHome) return; addHome.parent.insertBefore(addHome.f,addHome.next); addHome.f.hidden=true; addHome=null; }
 $("fabAdd").onclick=openAdd;
 $("addCtaBtn").onclick=()=>{ buzz(8); openAdd(); };
 $("pAddCtaBtn").onclick=()=>{ buzz(8); openAdd(); };
@@ -1447,7 +1459,7 @@ function cashBalances(){
 }
 function renderCash(){
   const bal=cashBalances(); CASHBAL=bal;
-  const fees=CASH.filter(x=>x.sub==="withdraw"&&+x.fee>0).reduce((s,x)=>s+conv(+x.fee,x.feeCur||x.cur,"ILS"),0);
+  const fees=CASH.filter(x=>(x.sub==="withdraw"||x.sub==="exchange")&&+x.fee>0).reduce((s,x)=>s+conv(+x.fee,x.feeCur||x.cur,"ILS"),0);
   const B=$("cashBal"); B.innerHTML="";
   const curs=Object.keys(bal).filter(c=>Math.abs(bal[c])>0.004);
   if(!CASH.length&&!cashTransfers().length){ B.innerHTML='<div class="hint">עוד לא נרשמו משיכות. כשמושכים מזומן מכספומט, לוחצים "משיכה מכספומט", ומאז היתרה מתעדכנת לבד בכל תשלום במזומן.</div>'; }
@@ -1458,7 +1470,7 @@ function renderCash(){
     const s=document.createElement("small"); s.className="hint num"; s.textContent= c!=="ILS" ? "≈ "+fmt(conv(bal[c],c,"ILS"),"ILS") : "";
     d.append(n,s); B.appendChild(d);
   }
-  $("cashFees").textContent= fees>0 ? "עמלות משיכה: "+fmt(fees,"ILS") : "";
+  $("cashFees").textContent= fees>0 ? "עמלות והפרשי שער: "+fmt(fees,"ILS") : "";
   /* history: every change shows as + / − */
   const L=$("cashList"); L.innerHTML="";
   const label={withdraw:"🏧 משיכה מכספומט",adjust:"± עדכון ידני",reset:"🔄 איפוס ארנק",exchange:"💱 החלפת מטבע",bring:"💼 מזומן מהבית",gift:"🎁 התקבל במזומן"};
@@ -1488,7 +1500,7 @@ function renderCash(){
     L.appendChild(swipeWrap(r,{id:x.id},true,{again:rep1?()=>againCash(x):null,againLabel:x.sub==="withdraw"?"🔁 עוד משיכה כזו":"🔁 שוב להיום",del:()=>delItem({id:x.id,desc:(label[x.sub]||"ארנק").replace(/^\S+ /,"")},true)}));
   }
   /* panels */
-  for(const [k,id] of [["b","cashB"],["w","cashW"],["a","cashA"],["x","cashX"],["r","cashR"]]) $(id).hidden=cashForm!==k;
+  for(const [k,id] of [["b","cashB"],["w","cashW"],["a","cashA"],["x","cashX"],["r","cashR"]]) if(!$("addSlot").contains($(id))) $(id).hidden=cashForm!==k;
   for(const [k,id] of [["b","cashBBtn"],["w","cashWBtn"],["a","cashABtn"],["x","cashXBtn"],["r","cashRBtn"]]) $(id).setAttribute("aria-pressed",String(cashForm===k));
   setCurBtn("cwCur",cur.cw||S.localCur); setCurBtn("cwFeeCur",cur.cwFee||S.localCur); setCurBtn("caCur",cur.ca||S.localCur);
   setCurBtn("cxFrom",cur.cxF||S.localCur); setCurBtn("cxTo",cur.cxT||(S.localCur==="USD"?"ILS":"USD"));
@@ -1537,11 +1549,19 @@ $("cashRBtn").onclick=()=>openCash("r");
 $("cwCur").onclick=()=>openCurPicker("באיזה מטבע משכת?",cur.cw||S.localCur,c=>{ cur.cw=c; renderCash(); });
 $("cwFeeCur").onclick=()=>openCurPicker("באיזה מטבע העמלה?",cur.cwFee||S.localCur,c=>{ cur.cwFee=c; renderCash(); });
 $("caCur").onclick=()=>openCurPicker("איזה מטבע?",cur.ca||S.localCur,c=>{ cur.ca=c; renderCash(); });
-$("cxFrom").onclick=()=>openCurPicker("נתתי…",cur.cxF||S.localCur,c=>{ cur.cxF=c; renderCash(); cxFill(); });
-$("cxTo").onclick=()=>openCurPicker("קיבלתי…",cur.cxT||"USD",c=>{ cur.cxT=c; renderCash(); cxFill(); });
+$("cxFrom").onclick=()=>openCurPicker("נתתי…",cur.cxF||S.localCur,c=>{ cur.cxF=c; renderCash(); cxFill(); cxLossShow(); });
+$("cxTo").onclick=()=>openCurPicker("קיבלתי…",cur.cxT||"USD",c=>{ cur.cxT=c; renderCash(); cxFill(); cxLossShow(); });
+/* how much the exchange cost compared with the market rate, in the received currency */
+function cxLossOf(a,f,b,t){ return Math.max(0,conv(a,f,t)-b); }
+function cxLossShow(){ const a=num("cxAmt"), b=num("cxGot"); const f=cur.cxF||S.localCur, t=cur.cxT||(S.localCur==="USD"?"ILS":"USD"); const L=$("cxLoss");
+  if(!(a>0&&b>0)||f===t){ L.hidden=true; return; }
+  const fair=conv(a,f,t), loss=fair-b; L.hidden=false; L.textContent="";
+  const pct=Math.abs(loss)/fair*100;
+  if(loss>0.004){ L.append("📉 לפי השער היום היית אמור לקבל "+fmt(fair,t)+". ", Object.assign(document.createElement("b"),{textContent:"הפרשי שער: "+fmt(loss,t)+" ("+pct.toFixed(1)+"%)"}), " · נרשם כהוצאה"+(t!=="ILS"?" (≈ "+fmt(conv(loss,t,"ILS"),"ILS")+")":"")); }
+  else L.append("🎉 קיבלת שער טוב מהשער היום. אין הפרשי שער."); }
 function cxFill(){ const a=num("cxAmt"); const f=cur.cxF||S.localCur, t=cur.cxT||(S.localCur==="USD"?"ILS":"USD"); if(a>0&&!$("cxTo").dataset.touched) $("cxGot").value=group(String(Math.round(conv(a,f,t)*100)/100)); }
-$("cxAmt").addEventListener("input",()=>{ delete $("cxTo").dataset.touched; cxFill(); });
-$("cxGot").addEventListener("input",()=>{ $("cxTo").dataset.touched="1"; });
+$("cxAmt").addEventListener("input",()=>{ delete $("cxTo").dataset.touched; cxFill(); cxLossShow(); });
+$("cxGot").addEventListener("input",()=>{ $("cxTo").dataset.touched="1"; cxLossShow(); });
 $("cwSave").onclick=async()=>{
   showErr("cwErr"); const amt=num("cwAmt"), fee=num("cwFee")||0;
   if(!(amt>0)) return showErr("cwErr","כמה משכת?");
@@ -1560,8 +1580,11 @@ $("cxSave").onclick=async()=>{
   showErr("cxErr"); const a=num("cxAmt"), b=num("cxGot"); const f=cur.cxF||S.localCur, t=cur.cxT||(S.localCur==="USD"?"ILS":"USD");
   if(!(a>0)||!(b>0)) return showErr("cxErr","צריך למלא כמה נתת וכמה קיבלת");
   if(f===t) return showErr("cxErr","בוחרים שני מטבעות שונים");
-  const ok=await cashSave({sub:"exchange",amount:a,cur:f,toAmount:b,toCur:t,desc:"החלפת מטבע"});
-  if(ok){ $("cxAmt").value=""; $("cxGot").value=""; delete $("cxTo").dataset.touched; cashForm=null; toast("💱 הוחלפו "+fmt(a,f)+" ב-"+fmt(b,t)); }
+  const loss=cxLossOf(a,f,b,t);
+  const ok=await cashSave({sub:"exchange",amount:a,cur:f,toAmount:b,toCur:t,desc:"החלפת מטבע",...(loss>0.004?{fee:Math.round(loss*100)/100,feeCur:t,rate:S.fx.live?"live":"saved"}:{})});
+  if(ok){ $("cxAmt").value=""; $("cxGot").value=""; delete $("cxTo").dataset.touched; $("cxLoss").hidden=true; cashForm=null;
+    if($("addSlot").contains($("cashX"))) closeSheet("addSheet");
+    toast("💱 הוחלפו "+fmt(a,f)+" ב-"+fmt(b,t)+(loss>0.004?" · הפרשי שער "+fmt(loss,t)+" נרשמו כהוצאה":"")); }
 };
 $("cashRSave").onclick=async()=>{
   const bal=cashBalances(); const curs=Object.keys(bal).filter(c=>Math.abs(bal[c])>0.004);

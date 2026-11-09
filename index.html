@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261109095803"></script>
+<script src="theme.js?v=20261109100130"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -712,6 +712,10 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .bud-in .bud-row b{color:var(--good)}
 .bud-in .x{font:inherit;background:none;border:0;color:var(--muted);cursor:pointer;padding:0 6px;font-size:1rem}
 .cb-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.cx-loss{padding:10px 12px;border-radius:12px;background:var(--surface-2);font-size:.92rem}
+.cx-loss b{font-family:var(--display)}
+#addSlot>#cashX{gap:12px}
+#addSlot>#cashX::before{content:"💱 החלפת מטבע";font-family:var(--display);font-weight:800;font-size:1.25rem}
 .bud-note{color:var(--muted);font-size:.78rem;line-height:1.45}
 .sf-budget{font:inherit;display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:14px;border:0;background:var(--surface-2);color:var(--ink);cursor:pointer;text-align:right;--bud:#6C4BFF}
 .sf-budget.warn{--bud:#F59E0B}.sf-budget.over{--bud:var(--bad)}
@@ -1065,6 +1069,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
           <div class="hint">החלפה בצ׳יינג׳: כמה נתת ובאיזה מטבע, וכמה קיבלת. הסכום שמתקבל מחושב לפי השער, ואפשר לתקן אותו לפי מה שקיבלתם בפועל.</div>
           <div class="amount small-amt"><input id="cxAmt" class="num" inputmode="decimal" placeholder="נתתי" aria-label="נתתי"><button class="curbtn" id="cxFrom" type="button"></button></div>
           <div class="amount small-amt"><input id="cxGot" class="num" inputmode="decimal" placeholder="קיבלתי" aria-label="קיבלתי"><button class="curbtn" id="cxTo" type="button"></button></div>
+          <div class="cx-loss" id="cxLoss" hidden></div>
           <div class="err" id="cxErr" hidden></div>
           <button class="btn primary" id="cxSave" type="button">שמירת החלפה</button>
         </div>
@@ -1155,7 +1160,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 
 <div class="sheet-bg" id="addSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-label="הוספת הוצאה">
-    <div class="sheet-head"><span></span><button class="btn small" id="addClose" type="button">סגירה</button></div>
+    <div class="sheet-head"><button class="btn small" id="addXBtn" type="button">💱 צ׳יינג׳</button><button class="btn small" id="addClose" type="button">סגירה</button></div>
     <div id="addSlot"></div>
   </div>
 </div>
@@ -1355,9 +1360,9 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261109095803">
-<script src="config.js?v=20261109095803"></script>
-<script src="fx.js?v=20261109095803"></script>
-<script src="app.js?v=20261109095803"></script>
+<meta name="app-v" content="20261109100130">
+<script src="config.js?v=20261109100130"></script>
+<script src="fx.js?v=20261109100130"></script>
+<script src="app.js?v=20261109100130"></script>
 </body>
 </html>
