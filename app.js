@@ -948,6 +948,13 @@ function renderInsight(){
 }
 $("heroPlace").onclick=()=>$("localBtn").click();
 
+/* a tap that lands just outside a small pill (in the gap or the padding around it) goes to the nearest one */
+function nearTap(box,sel){ box.addEventListener("click",e=>{ if(e.target.closest(sel)) return;
+  let best=null,bd=1e9; for(const b of box.querySelectorAll(sel)){ const r=b.getBoundingClientRect(); if(!r.width) continue;
+    const dx=Math.max(r.left-e.clientX,0,e.clientX-r.right), dy=Math.max(r.top-e.clientY,0,e.clientY-r.bottom), d=Math.hypot(dx,dy); if(d<bd){ bd=d; best=b; } }
+  if(best&&bd<=12) best.click(); }); }
+nearTap($("sofar").querySelector(".sf-top"),"#sfSeg button");
+nearTap($("showin"),".chip,.curbtn"); nearTap($("sfShow"),".chip,.curbtn");
 /* ---- "so far": spent until now, for the trip / this month / today ---- */
 let sfScope=(()=>{ try{ return localStorage.getItem("trip-sf")||"trip"; }catch(e){ return "trip"; } })();
 function sfDays(scope){
