@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261109004016"></script>
+<script src="theme.js?v=20261109095803"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -707,6 +707,11 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .bud-sync label{font-weight:700;color:var(--ink);font-size:.95rem}
 .bud-sync .amount{background:var(--surface)}
 .curtag{font-weight:700;color:var(--muted);padding-inline:10px;white-space:nowrap}
+.bud-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.bud-acts .btn{padding-inline:8px}
+.bud-in{display:flex;flex-direction:column}
+.bud-in .bud-row b{color:var(--good)}
+.bud-in .x{font:inherit;background:none;border:0;color:var(--muted);cursor:pointer;padding:0 6px;font-size:1rem}
+.cb-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 .bud-note{color:var(--muted);font-size:.78rem;line-height:1.45}
 .sf-budget{font:inherit;display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:14px;border:0;background:var(--surface-2);color:var(--ink);cursor:pointer;text-align:right;--bud:#6C4BFF}
 .sf-budget.warn{--bud:#F59E0B}.sf-budget.over{--bud:var(--bad)}
@@ -1027,10 +1032,19 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
         <div class="card-head"><h2>💵 ארנק מזומן</h2><span class="hint" id="cashFees"></span></div>
         <div id="cashBal" class="cashbal"></div>
         <div class="seg cashacts">
+          <button id="cashBBtn" type="button">💼 מזומן מהבית</button>
           <button id="cashWBtn" type="button">🏧 משיכה</button>
           <button id="cashABtn" type="button">± עדכון</button>
           <button id="cashXBtn" type="button">💱 החלפת מטבע</button>
           <button id="cashRBtn" type="button">🔄 איפוס</button>
+        </div>
+        <div id="cashB" class="stack" hidden>
+          <div class="hint">המזומן שאתם לוקחים איתכם, בכל המטבעות. כל מטבע מנוהל בנפרד, וכל הוצאה במזומן יורדת מהמטבע שלה.</div>
+          <div id="cbRows" class="stack" style="gap:8px"></div>
+          <button class="link" id="cbAdd" type="button">➕ עוד מטבע</button>
+          <label class="chk"><input type="checkbox" id="cbBank" checked><span>נקנה מהחשבון בבנק (יורד מהתקציב)</span></label>
+          <div class="err" id="cbErr" hidden></div>
+          <button class="btn primary" id="cbSave" type="button">הוספה לארנק</button>
         </div>
         <div id="cashW" class="stack" hidden>
           <div class="amount"><input id="cwAmt" class="num" inputmode="decimal" placeholder="כמה משכת" aria-label="סכום משיכה"><button class="curbtn" id="cwCur" type="button"></button></div>
@@ -1058,7 +1072,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
           <div class="hint" id="cashRText"></div>
           <button class="btn danger" id="cashRSave" type="button">כן, לאפס את הארנק</button>
         </div>
-        <div class="hint">משיכה היא לא הוצאה. היתרה יורדת לבד כשרושמים הוצאה ששולמה במזומן: הוצאה אישית, או הוצאה משותפת ש<b>את/ה</b> שילמת.</div>
+        <div class="hint">כל מטבע בארנק מנוהל בנפרד, וכל הוצאה במזומן יורדת מהמטבע שלה. משיכה והחלפה הן לא הוצאות. היתרה יורדת לבד כשרושמים הוצאה ששולמה במזומן: הוצאה אישית, או הוצאה משותפת ש<b>את/ה</b> שילמת.</div>
         <div id="cashList" class="stack" style="gap:7px"></div>
       </section>
 
@@ -1187,7 +1201,16 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
         </div>
         <div class="bud-rows" id="budRows"></div>
         <div class="bud-pace" id="budPace"></div>
-        <button class="btn block" id="budSyncBtn" type="button">🏦 עדכון לפי מה שיש בבנק</button>
+        <div class="bud-in" id="budInList"></div>
+        <div class="actions bud-acts"><button class="btn" id="budInBtn" type="button">🎁 כסף שנכנס</button><button class="btn" id="budSyncBtn" type="button">🏦 עדכון לפי הבנק</button></div>
+        <div class="bud-sync" id="budInF" hidden>
+          <label for="budInAmt">כמה נכנס?</label>
+          <div class="amount"><input id="budInAmt" class="num" inputmode="decimal" placeholder="1,000"><button class="curbtn" id="budInCur" type="button" aria-label="מטבע"></button></div>
+          <input id="budInNote" maxlength="40" placeholder="ממי או על מה? למשל: מתנה מסבתא">
+          <div class="seg" id="budInTo"></div>
+          <div class="actions"><button class="btn primary" id="budInSave" type="button">הוספה</button><button class="btn" id="budInCancel" type="button">ביטול</button></div>
+          <div class="err" id="budInErr" hidden></div>
+        </div>
         <div class="bud-sync" id="budSyncF" hidden>
           <label for="budSAmt">כמה יש בבנק עכשיו?</label>
           <div class="amount"><input id="budSAmt" class="num" inputmode="decimal" placeholder="40,000"><span class="curtag" id="budSCur"></span></div>
@@ -1332,9 +1355,9 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261109004016">
-<script src="config.js?v=20261109004016"></script>
-<script src="fx.js?v=20261109004016"></script>
-<script src="app.js?v=20261109004016"></script>
+<meta name="app-v" content="20261109095803">
+<script src="config.js?v=20261109095803"></script>
+<script src="fx.js?v=20261109095803"></script>
+<script src="app.js?v=20261109095803"></script>
 </body>
 </html>
