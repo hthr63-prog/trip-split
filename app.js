@@ -329,6 +329,7 @@ function fmtRate(r){ return r>=100?r.toFixed(1):r>=1?r.toFixed(4):r.toPrecision(
 function plain(v){ if(!isFinite(v)) return ""; const a=Math.abs(v); return String(Math.round(v*(a>=1000?1:100))/(a>=1000?1:100)); }
 function renderConv(){
   if(!cur.cFrom) cur.cFrom=S.localCur;
+  if(cur.cFrom===cur.cTo&&!window.__cPicked){ cur.cTo= cur.cFrom==="ILS" ? (S.dest&&S.dest!=="ILS"?S.dest:"USD") : "ILS"; }
   const f=cur.cFrom, t=cur.cTo; setCurBtn("cFrom",f); setCurBtn("cTo",t);
   const pa=v=>parseFloat(String(v).replace(/,/g,""));
   if(cLast==="A"){ const a=pa($("cA").value); if(document.activeElement!==$("cB")) $("cB").value= a>=0? group(plain(conv(a,f,t))) : ""; }
@@ -916,8 +917,8 @@ function insights(){
   const byDay={}; for(const it of sh){ byDay[it.date]=(byDay[it.date]||0)+conv(+it.amount||0,it.cur,showCur); }
   const days=Object.keys(byDay).filter(d=>d!==td); const avg=days.length? days.reduce((s,d)=>s+byDay[d],0)/days.length : 0;
   const today=byDay[td]||0;
-  if(avg>0&&today>0){ const diff=(today-avg)/avg; out.push(diff<=-.1?["👏","היום הוצאתם "+fmt(today,showCur)+", "+Math.round(-diff*100)+"% פחות מהממוצע היומי"]:diff>=.1?["🧭","היום כבר "+fmt(today,showCur)+", "+Math.round(diff*100)+"% מעל הממוצע היומי ("+fmt(avg,showCur)+")"]:["🎯","היום בדיוק בקצב: "+fmt(today,showCur)+", כמו הממוצע היומי"]); }
-  else if(avg>0) out.push(["☀️","עוד לא נרשמו הוצאות היום. הממוצע היומי שלכם: "+fmt(avg,showCur)]);
+  if(false&&avg>0&&today>0){ const diff=(today-avg)/avg; out.push(diff<=-.1?["👏","היום הוצאתם "+fmt(today,showCur)+", "+Math.round(-diff*100)+"% פחות מהממוצע היומי"]:diff>=.1?["🧭","היום כבר "+fmt(today,showCur)+", "+Math.round(diff*100)+"% מעל הממוצע היומי ("+fmt(avg,showCur)+")"]:["🎯","היום בדיוק בקצב: "+fmt(today,showCur)+", כמו הממוצע היומי"]); }
+  else if(false) out.push(["☀️",""]);
   const ym=thisMonth(), cats={}; let tot=0; for(const it of sh){ if(monthOf(it)!==ym) continue; const v=conv(+it.amount||0,it.cur,showCur); cats[catKey(it)]=(cats[catKey(it)]||0)+v; tot+=v; }
   const top=Object.entries(cats).sort((x,y)=>y[1]-x[1])[0]; if(top&&tot>0) out.push([catName(top[0]).split(" ")[0],"הכי הרבה החודש הולך על "+catName(top[0]).split(" ").slice(1).join(" ")+": "+Math.round(top[1]/tot*100)+"% מההוצאות"]);
   const week=sh.filter(it=>daysBetween(it.date||td,td)<7).length; if(week>0) out.push(["✍️",week+" הוצאות נרשמו השבוע. ככה המאזן תמיד מדויק"]);
@@ -965,24 +966,24 @@ function renderSofar(){
   /* before the flight: average of the preparations, counted from the first one */
   const firstPrep=[...S.items.filter(x=>x.kind!=="transfer"),...(personal?P:[])].filter(pre).map(x=>x.date||td).sort()[0];
   const prepDays= firstPrep&&firstPrep<=td ? dd(firstPrep,td) : 0;
+  /* third column, by the tab: trip = per day, month = per month, today = per day with today against it */
   const avgCell=(total,sumFor)=>{
-    let avg=null, label="ממוצע ליום";
-    if(preTrip){
-      label="ממוצע ליום בהכנות";
-      if(!prepDays){ daysCell(); return; }
-      if(sfScope==="month"){ const ms=td.slice(0,7)+"-01"; const from=firstPrep>ms?firstPrep:ms; avg=sumFor(it=>inScope(it)&&pre(it))/dd(from,td); }
-      else avg=sumFor(pre)/prepDays;
-    } else if(sfScope==="day"){
-      const td2=sfDays("trip"); if(td2<2){ daysCell(); return; }
-      avg=sumFor(onTrip)/td2;
-    } else {
-      if(days<1){ daysCell(); return; }
-      avg=sumFor(it=>inScope(it)&&onTrip(it))/days;
+    const pFilter= preTrip ? pre : onTrip, pDays= preTrip ? prepDays : sfDays("trip"), pStart= preTrip ? firstPrep : st;
+    if(!pDays){ daysCell(); return; }
+    const daily=sumFor(pFilter)/pDays, tail= preTrip ? " בהכנות" : "";
+    let val=daily, label="ממוצע ליום"+tail, badge=null;
+    if(sfScope==="month"){
+      val=daily*30.44; label=(pDays>=30?"ממוצע לחודש":"קצב לחודש")+tail;
+      const ms=td.slice(0,7)+"-01", from= pStart&&pStart>ms ? pStart : ms;
+      if(pStart&&pStart<ms&&daily>0){ const rate=sumFor(it=>inScope(it)&&pFilter(it))/dd(from,td); const pct=Math.round((rate-daily)/daily*100);
+        badge=[pct>0?"up":"down", pct===0?"החודש בדיוק בקצב":"החודש "+(pct>0?"▲ ":"▼ ")+Math.abs(pct)+"%"]; }
+    } else if(sfScope==="day"&&pDays>=2&&daily>0){
+      const pct=Math.round((total-daily)/daily*100);
+      badge= total===0 ? ["","היום עוד כלום"] : [pct>0?"up":"down", pct===0?"היום בדיוק כמו הממוצע":"היום "+(pct>0?"▲ ":"▼ ")+Math.abs(pct)+"%"];
     }
-    const d=document.createElement("div"); const b=document.createElement("b"); b.className="num"; b.textContent=fmt(avg,showCur);
-    const l=document.createElement("span"); l.textContent=label; d.append(b,l);
-    if(sfScope==="day"&&avg>0){ const pct=Math.round((total-avg)/avg*100); const t=document.createElement("em"); t.className="sf-delta "+(total===0?"":pct>0?"up":"down");
-      t.textContent= total===0 ? "היום עוד כלום" : pct===0 ? "היום בדיוק כמו הממוצע" : "היום "+(pct>0?"▲ ":"▼ ")+Math.abs(pct)+"%"; d.appendChild(t); }
+    const d=document.createElement("div"); const bb=document.createElement("b"); bb.className="num"; bb.textContent=fmt(val,showCur);
+    const l=document.createElement("span"); l.textContent=label; d.append(bb,l);
+    if(badge){ const t=document.createElement("em"); t.className="sf-delta "+badge[0]; t.textContent=badge[1]; d.appendChild(t); }
     R.appendChild(d);
   };
   const flightNote= preTrip ? " · ✈️ עוד "+(dd(td,st)-1)+" ימים לטיסה" : "";
@@ -1100,7 +1101,7 @@ function showErr(id,msg){ const e=$(id); e.textContent=msg||""; e.hidden=!msg; i
 function done(btn){ if(!btn) return; buzz(10); if(calm()) return; btn.classList.add("ok"); setTimeout(()=>btn.classList.remove("ok"),900); }
 $("fCur").onclick=()=>openCurPicker("באיזה מטבע שילמתם?",cur.fCur,c=>{ cur.fCur=c; renderForm(); });
 $("cFrom").onclick=()=>openCurPicker("יש לי…",cur.cFrom,c=>{ cur.cFrom=c; renderConv(); });
-$("cTo").onclick=()=>openCurPicker("מקבלים…",cur.cTo,c=>{ cur.cTo=c; renderConv(); });
+$("cTo").onclick=()=>openCurPicker("מקבלים…",cur.cTo,c=>{ cur.cTo=c; window.__cPicked=true; renderConv(); });
 function startEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
   editingId=it.id; form.payer=it.payer; form.cat=it.cat||"other"; form.loc=locOf(it); form.pm=it.pm||"cash";

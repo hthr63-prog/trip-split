@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261108234731"></script>
+<script src="theme.js?v=20261109000336"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -362,7 +362,10 @@ table.daily td.num{text-align:right}
 .hero[data-sky="day"]{--sky1:#2F7FE8;--sky2:#5FA8FA;--sky3:#9FD3FF;--sun1:#FFE57A;--cloud:rgba(255,255,255,.9);--mnt1:#5B83DD;--mnt2:#3D63C2;--sil:#1C327C;--sea1:#2E9BEF;--sea2:#1868C4;--wave:rgba(255,255,255,.6);--star:0;--moon:0}
 .hero[data-sky="dusk"]{--sky1:#FFB37A;--sky2:#FF7FA8;--sky3:#B48CFF;--sun1:#FFE7A3;--cloud:rgba(255,255,255,.75);--mnt1:#9D6BE8;--mnt2:#7B4FD6;--sil:#3B1F7A;--sea1:#6E5BFF;--sea2:#4A2FC9;--wave:rgba(255,255,255,.55);--star:0;--moon:0}
 .hero[data-sky="night"]{--sky1:#0E0A2A;--sky2:#2A1660;--sky3:#5A2C8F;--sun1:#F4F1FF;--cloud:rgba(200,190,255,.18);--mnt1:#3A2478;--mnt2:#2A175E;--sil:#120B30;--sea1:#2A1D78;--sea2:#160E45;--wave:rgba(180,170,255,.35);--star:1;--moon:1}
-.hero .moon{opacity:var(--moon,0)}
+.hero .moon{opacity:var(--moon,0);transform:translate(-118px,-34px) scale(.72);transform-box:fill-box;transform-origin:center}
+.hero[data-sky="night"] .sunglow{transform:translate(-118px,-34px) scale(.6)}
+.hero[data-sky="night"] .hero-txt{text-shadow:0 1px 3px rgba(0,0,0,.55),0 2px 14px rgba(10,4,40,.8)}
+.hero[data-sky="night"] .wins{opacity:.55}
 .hero[data-sky="night"] .sun{opacity:0}
 .hero[data-sky="night"] .sunglow{opacity:.18!important;animation:none!important}
 .hero{position:relative;border-radius:26px;overflow:hidden;min-height:150px;box-shadow:var(--shadow);isolation:isolate}
@@ -1323,9 +1326,9 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261108234731">
-<script src="config.js?v=20261108234731"></script>
-<script src="fx.js?v=20261108234731"></script>
-<script src="app.js?v=20261108234731"></script>
+<meta name="app-v" content="20261109000336">
+<script src="config.js?v=20261109000336"></script>
+<script src="fx.js?v=20261109000336"></script>
+<script src="app.js?v=20261109000336"></script>
 </body>
 </html>
