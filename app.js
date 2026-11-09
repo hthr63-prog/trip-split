@@ -101,7 +101,7 @@ function sharesOf(it){
   const out={};
   if(it.kind==="transfer"){ out[it.to]=1; return out; }
   if(it.pcts){ let sum=0; for(const k in it.pcts) sum+=+it.pcts[k]||0; if(sum>0){ for(const k in it.pcts) out[k]=(+it.pcts[k]||0)/sum; return out; } }
-  const among=(it.among&&it.among.length)?it.among:S.people.map(p=>p.id);
+  const among=(it.among&&it.among.length)?it.among:active().map(p=>p.id);
   for(const k of among) out[k]=1/among.length; return out;
 }
 function compute(){
@@ -307,8 +307,12 @@ function renderTicket(){
       const b=document.createElement("button"); b.type="button"; b.className="btn"; b.textContent="✓ סמנו ש"+nm(d.from)+" "+g.transferred(d.from)+" ל"+nm(d.to)+" "+fmt(d.amt,showCur);
       b.onclick=()=>{ buzz(6); row.innerHTML=""; row.classList.add("ask");
         const q=document.createElement("span"); q.className="ask-q"; q.textContent="איך "+(fem(d.from)?"היא העבירה":"הוא העביר")+"?"; row.appendChild(q);
-        const mk=(txt,pm)=>{ const x=document.createElement("button"); x.type="button"; x.className="btn small"; x.textContent=txt; x.onclick=()=>addTransfer(d.from,d.to,Math.round(d.amt*100)/100,pm); row.appendChild(x); };
-        mk("💵 מזומן","cash"); mk("🏦 העברה לחשבון","bank");
+        const mk=(txt,pm,c)=>{ const x=document.createElement("button"); x.type="button"; x.className="btn small"; x.textContent=txt; x.onclick=()=>addTransfer(d.from,d.to,Math.round(conv(d.amt,showCur,c)*100)/100,pm,c); row.appendChild(x); };
+        /* cash changes hands in a real currency: offer the local one too, so the wallet gets the right notes */
+        const lc=S.localCur;
+        if(lc&&lc!==showCur){ mk("💵 "+fmt(conv(d.amt,showCur,lc),lc)+" במזומן","cash",lc); mk("💵 "+fmt(d.amt,showCur)+" במזומן","cash",showCur); }
+        else mk("💵 מזומן","cash",showCur);
+        mk("🏦 העברה לחשבון","bank",showCur);
         const no=document.createElement("button"); no.type="button"; no.className="link"; no.textContent="ביטול"; no.onclick=()=>renderAll(); row.appendChild(no); };
       row.appendChild(b); D.appendChild(row);
       b.dataset.share="• "+nm(d.from)+" "+(fem(d.from)?"צריכה":"צריך")+" להעביר ל"+nm(d.to)+" "+fmt(d.amt,showCur);
@@ -1085,7 +1089,8 @@ function syncUrl(){
   try{ history.replaceState(null,"",u); }catch(e){}
 }
 function setMe(id,updateUrl){
-  me=id; if(id) setTimeout(sinceLastVisit,300); acct=null; acctFor=null; store("trip-me",id||""); if(id){ form.payer=id; if(updateUrl) syncUrl(); refreshPersonal(); }
+  me=id; if(id) setTimeout(sinceLastVisit,300);
+  if(id&&QUICK&&!window.__qOpened&&canWrite){ window.__qOpened=true; view= QUICK==="me" ? "personal" : "shared"; setTimeout(()=>{ if(view!=="personal"||(acct&&acctFor===me)) openAdd(); },400); } acct=null; acctFor=null; store("trip-me",id||""); if(id){ form.payer=id; if(updateUrl) syncUrl(); refreshPersonal(); }
   $("newUser").hidden=true; renderAll(); window.scrollTo({top:0});
 }
 $("switchBtn").onclick=()=>{ me=null; store("trip-me",""); view="shared"; P=[]; acct=null; try{ history.replaceState(null,"",location.pathname); }catch(e){} renderAll(); $("picker").scrollIntoView({behavior:"smooth"}); };
@@ -1136,12 +1141,13 @@ async function save(){
   if(ok){ done($("saveBtn")); burst($("saveBtn"),catEmoji(data)); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
-async function addTransfer(from,to,amt,pm){
+async function addTransfer(from,to,amt,pm,tc){
+  const showCur_=showCur; const showCur2=tc||showCur_;
   const id=uid("t");
-  const ok=await run(()=>EXP().doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,pm:pm==="cash"?"cash":"bank",date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),by:me||null,trip:curTrip}));
+  const ok=await run(()=>EXP().doc(id).set({kind:"transfer",amount:amt,cur:showCur2,payer:from,to,pm:pm==="cash"?"cash":"bank",date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),by:me||null,trip:curTrip}));
   if(ok){ setTimeout(()=>{ const c=compute(); if(!c.debts.length) confetti(); flash($("ticket"),"glow",900); },60); buzz([12,60,12]); }
-  if(ok) notifyOthers("💸 "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur));
-  if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur)+(pm==="cash"?" במזומן · עודכן בארנק":" בהעברה · עודכן בתקציב"),"ביטול",()=>run(()=>EXP().doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
+  if(ok) notifyOthers("💸 "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur2));
+  if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur2)+(pm==="cash"?" במזומן · עודכן בארנק":" בהעברה · עודכן בתקציב"),"ביטול",()=>run(()=>EXP().doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
 }
 let toastTimer=null;
 function toast(msg,actLabel,act){
@@ -1291,7 +1297,10 @@ function renderStats(){
 
 /* ---- amounts are typed with thousands separators: 25,000 or 1,250.50 ---- */
 function group(s){
-  s=String(s).replace(/,/g,"").replace(/[^\d.]/g,"");
+  s=String(s);
+  /* a decimal comma ("1,5", "12,50", or one just typed) when there is no dot and only one comma */
+  if(!s.includes(".")&&(s.match(/,/g)||[]).length===1&&/,\d{0,2}$/.test(s)&&!/^\d{1,3}(,\d{3})+$/.test(s)) s=s.replace(",",".");
+  s=s.replace(/,/g,"").replace(/[^\d.]/g,"");
   const i=s.indexOf("."); let int=i<0?s:s.slice(0,i); const frac=i<0?null:s.slice(i+1).replace(/\./g,"").slice(0,2);
   int=int.replace(/^0+(?=\d)/,"");
   const g=int.replace(/\B(?=(\d{3})+(?!\d))/g,",");
@@ -2005,7 +2014,7 @@ const ready=()=>{
     if(load("trip-moved")==="1"){ try{ localStorage.removeItem("trip-moved"); }catch(e){} setTimeout(()=>{ toast("🔒 מאובטח! שלחו לכולם קישור חדש","לקישורים",()=>$("settingsBtn").click()); },900); }
     else view="shared";
     /* opened from the quick-add icon or shortcut: straight to a new expense */
-    if(QUICK&&canWrite){
+    if(QUICK&&canWrite&&me){
       view= QUICK==="me"&&me ? "personal" : "shared";
       if(me) syncUrl();
       setTimeout(()=>{ renderAll(); openAdd(); },350);
