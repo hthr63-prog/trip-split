@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261109000336"></script>
+<script src="theme.js?v=20261109001123"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -107,6 +107,7 @@ header .sub{color:var(--muted);font-size:.92rem;margin-top:2px}
 .ticket .verdict .amt{display:inline-block;background:rgba(255,255,255,.95);color:#2A1670;padding:0 12px;border-radius:14px;margin-top:4px;font-weight:700}
 .ticket .breakdown{font-size:.88rem;opacity:.92;display:flex;flex-wrap:wrap;gap:4px 14px}
 .ticket .debts{display:flex;flex-direction:column;gap:8px}
+.ticket .debt.ask{justify-content:flex-start;gap:8px}.ticket .debt.ask .ask-q{font-weight:700;width:100%}.ticket .debt.ask .btn{background:#fff;color:#2A1670;border-color:#fff;font-weight:700}.ticket .debt.ask .link{color:inherit}
 .ticket .debt{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .ticket .debt .btn{background:rgba(255,255,255,.18);color:var(--grad-ink);border-color:rgba(255,255,255,.4);font-size:.88rem;padding:6px 12px}
 .ticket .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px 22px;background:rgba(0,0,0,.12);position:relative;z-index:1}
@@ -1197,7 +1198,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
         <div class="actions"><button class="btn primary" id="budSave" type="button">שמירה</button><button class="btn" id="budCancel" type="button">ביטול</button></div>
         <div class="err" id="budErr" hidden></div>
       </div>
-      <small class="bud-note">יורד מהיתרה: משיכות מכספומט עם העמלה, ותשלומים בכרטיס (אישיים, ומשותפים ששילמת). תשלום במזומן לא יורד שוב, כי הכסף כבר ירד במשיכה. רק את/ה רואה את התקציב.</small>
+      <small class="bud-note">יורד מהיתרה: משיכות מכספומט עם העמלה, תשלומים בכרטיס (אישיים, ומשותפים ששילמת), והתחשבנות בהעברה לחשבון. התחשבנות במזומן עוברת לארנק. תשלום במזומן לא יורד שוב, כי הכסף כבר ירד במשיכה. רק את/ה רואה את התקציב.</small>
     </section>
     <div class="quick" id="acctQuickBox">
       <div class="quick-top"><span class="quick-ico" aria-hidden="true">⚡</span><div><b>הוספה מהירה ממסך הבית</b><small>שני אייקונים: אחד למשותף, אחד לאישי</small></div></div>
@@ -1326,9 +1327,9 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261109000336">
-<script src="config.js?v=20261109000336"></script>
-<script src="fx.js?v=20261109000336"></script>
-<script src="app.js?v=20261109000336"></script>
+<meta name="app-v" content="20261109001123">
+<script src="config.js?v=20261109001123"></script>
+<script src="fx.js?v=20261109001123"></script>
+<script src="app.js?v=20261109001123"></script>
 </body>
 </html>

@@ -305,7 +305,12 @@ function renderTicket(){
     for(const d of mine){
       const row=document.createElement("div"); row.className="debt";
       const b=document.createElement("button"); b.type="button"; b.className="btn"; b.textContent="✓ סמנו ש"+nm(d.from)+" "+g.transferred(d.from)+" ל"+nm(d.to)+" "+fmt(d.amt,showCur);
-      b.onclick=()=>addTransfer(d.from,d.to,Math.round(d.amt*100)/100); row.appendChild(b); D.appendChild(row);
+      b.onclick=()=>{ buzz(6); row.innerHTML=""; row.classList.add("ask");
+        const q=document.createElement("span"); q.className="ask-q"; q.textContent="איך "+(fem(d.from)?"היא העבירה":"הוא העביר")+"?"; row.appendChild(q);
+        const mk=(txt,pm)=>{ const x=document.createElement("button"); x.type="button"; x.className="btn small"; x.textContent=txt; x.onclick=()=>addTransfer(d.from,d.to,Math.round(d.amt*100)/100,pm); row.appendChild(x); };
+        mk("💵 מזומן","cash"); mk("🏦 העברה לחשבון","bank");
+        const no=document.createElement("button"); no.type="button"; no.className="link"; no.textContent="ביטול"; no.onclick=()=>renderAll(); row.appendChild(no); };
+      row.appendChild(b); D.appendChild(row);
       b.dataset.share="• "+nm(d.from)+" "+(fem(d.from)?"צריכה":"צריך")+" להעביר ל"+nm(d.to)+" "+fmt(d.amt,showCur);
     }
   }
@@ -461,7 +466,7 @@ function renderLedger(){
     const dot=catTile(it, it.kind==="transfer"?null:it.payer);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; const m=document.createElement("div"); m.className="m";
-    if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent=withTime(it,"סגירת חשבון"); }
+    if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent=withTime(it,"סגירת חשבון"+(it.pm==="cash"?" · 💵 מזומן":it.pm==="bank"?" · 🏦 העברה לחשבון":"")); }
     else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
@@ -1131,12 +1136,12 @@ async function save(){
   if(ok){ done($("saveBtn")); burst($("saveBtn"),catEmoji(data)); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
-async function addTransfer(from,to,amt){
+async function addTransfer(from,to,amt,pm){
   const id=uid("t");
-  const ok=await run(()=>EXP().doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),by:me||null,trip:curTrip}));
+  const ok=await run(()=>EXP().doc(id).set({kind:"transfer",amount:amt,cur:showCur,payer:from,to,pm:pm==="cash"?"cash":"bank",date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),by:me||null,trip:curTrip}));
   if(ok){ setTimeout(()=>{ const c=compute(); if(!c.debts.length) confetti(); flash($("ticket"),"glow",900); },60); buzz([12,60,12]); }
   if(ok) notifyOthers("💸 "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur));
-  if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur),"ביטול",()=>run(()=>EXP().doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
+  if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur)+(pm==="cash"?" במזומן · עודכן בארנק":" בהעברה · עודכן בתקציב"),"ביטול",()=>run(()=>EXP().doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
 }
 let toastTimer=null;
 function toast(msg,actLabel,act){
@@ -1400,6 +1405,8 @@ function cashPaidByMe(){
   for(const it of P){ if(it.pm==="cash") out.push(it); }
   return out;
 }
+/* settle-ups paid in cash between me and someone else */
+function cashTransfers(){ return me ? S.items.filter(it=>it.kind==="transfer"&&it.pm==="cash"&&(it.payer===me||it.to===me)&&tripOf(it)===curTrip) : []; }
 function cashBalances(){
   const since=Math.min(...CASH.map(x=>x.createdAt||Infinity));
   const bal={};
@@ -1410,6 +1417,7 @@ function cashBalances(){
   }
   /* cash payments count from the first wallet entry on */
   for(const it of cashPaidByMe()){ if((it.createdAt||0)<since) continue; add(it.cur,-(+it.amount||0)); }
+  for(const it of cashTransfers()){ add(it.cur,(it.to===me?1:-1)*(+it.amount||0)); }
   for(const c in bal) bal[c]=Math.round(bal[c]*100)/100;
   return bal;
 }
@@ -1418,7 +1426,7 @@ function renderCash(){
   const fees=CASH.filter(x=>x.sub==="withdraw"&&+x.fee>0).reduce((s,x)=>s+conv(+x.fee,x.feeCur||x.cur,"ILS"),0);
   const B=$("cashBal"); B.innerHTML="";
   const curs=Object.keys(bal).filter(c=>Math.abs(bal[c])>0.004);
-  if(!CASH.length){ B.innerHTML='<div class="hint">עוד לא נרשמו משיכות. כשמושכים מזומן מכספומט, לוחצים "משיכה מכספומט", ומאז היתרה מתעדכנת לבד בכל תשלום במזומן.</div>'; }
+  if(!CASH.length&&!cashTransfers().length){ B.innerHTML='<div class="hint">עוד לא נרשמו משיכות. כשמושכים מזומן מכספומט, לוחצים "משיכה מכספומט", ומאז היתרה מתעדכנת לבד בכל תשלום במזומן.</div>'; }
   else if(!curs.length){ B.innerHTML='<div class="cashline main"><b class="num">0</b><small class="hint">הארנק ריק</small></div>'; }
   else for(const c of curs.sort((x,y)=>(y===S.localCur)-(x===S.localCur))){
     const d=document.createElement("div"); d.className="cashline"+(c===curs[0]?" main":"");
@@ -1430,7 +1438,14 @@ function renderCash(){
   /* history: every change shows as + / − */
   const L=$("cashList"); L.innerHTML="";
   const label={withdraw:"🏧 משיכה מכספומט",adjust:"± עדכון ידני",reset:"🔄 איפוס ארנק",exchange:"💱 החלפת מטבע"};
-  for(const x of [...CASH].sort((p,q)=>(q.createdAt||0)-(p.createdAt||0))){
+  const hist=[...CASH,...cashTransfers().map(it=>({...it,_tr:true}))];
+  for(const x of hist.sort((p,q)=>(q.createdAt||0)-(p.createdAt||0))){
+    if(x._tr){ const r=document.createElement("div"); r.className="row"; const got=x.to===me;
+      const dot=document.createElement("div"); dot.className="dot c2"; dot.textContent="💸";
+      const main=document.createElement("div"); main.className="main"; const t=document.createElement("div"); t.className="t"; t.textContent= got ? (fem(x.payer)?"קיבלתי מ":"קיבלתי מ")+nm(x.payer)+" במזומן" : "נתתי ל"+nm(x.to)+" במזומן";
+      const m=document.createElement("div"); m.className="m"; m.textContent=withTime(x,dayLabel(x.date)+" · סגירת חשבון"); main.append(t,m);
+      const right=document.createElement("div"); right.className="r"; const b=document.createElement("b"); b.className="num "+(got?"pos":"neg"); b.textContent=(got?"+":"−")+fmt(+x.amount,x.cur); right.appendChild(b);
+      r.append(dot,main,right); L.appendChild(r); continue; }
     const r=document.createElement("div"); r.className="row"; r.dataset.id=x.id;
     const dot=document.createElement("div"); dot.className="dot c2"; dot.textContent=(label[x.sub]||"·").split(" ")[0];
     const main=document.createElement("div"); main.className="main";
@@ -1746,7 +1761,7 @@ function budgetCalc(){
   for(const x of CASH) if(x.sub==="withdraw"&&inc(x)) add("atm",C(x.amount,x.cur)+C(x.fee||0,x.feeCur||x.cur),x);
   for(const it of P) if(!it._fee&&it.pm==="card"&&inc(it)) add("cardP",C(it.amount,it.cur),it);
   for(const it of S.items){ if(!inc(it)) continue;
-    if(it.kind==="transfer"){ if(it.payer===me) add("tr",C(it.amount,it.cur),it); else if(it.to===me) add("tr",-C(it.amount,it.cur),it); }
+    if(it.kind==="transfer"){ if(it.pm==="cash") continue; if(it.payer===me) add("tr",C(it.amount,it.cur),it); else if(it.to===me) add("tr",-C(it.amount,it.cur),it); }
     else if(it.payer===me&&it.pm==="card") add("cardS",C(it.amount,it.cur),it); }
   const adj=+B.adj||0;
   const used=parts.atm+parts.cardP+parts.cardS+parts.tr-adj, amount=+B.amount, left=amount-used;
@@ -1772,7 +1787,7 @@ function renderBudget(){
   row("🏧","משיכות מכספומט ועמלות",r.parts.atm);
   row("💳","כרטיס · אישי",r.parts.cardP);
   row("💳","כרטיס · משותף ששילמת",r.parts.cardS);
-  if(Math.abs(r.parts.tr)>0.004) row("💸","העברות בהתחשבנות",r.parts.tr);
+  if(Math.abs(r.parts.tr)>0.004) row("💸","העברות בהתחשבנות (בנק)",r.parts.tr);
   if(Math.abs(r.adj)>0.004) row("🏦","עדכון לפי הבנק"+(r.adjAt?" · "+new Date(r.adjAt).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"}):""),-r.adj);
   $("budPace").textContent= r.left<0 ? "⚠️ עברת את התקציב ב-"+fmt(-r.left,r.cur)
     : r.pace!==null ? "⏳ בקצב של "+fmt(r.perDay,r.cur)+" ליום, זה מספיק לעוד כ-"+r.pace+" ימים" : (r.prep?"כולל ההוצאות לפני הטיול":"מתחיל לספור מיום הטיסה");
