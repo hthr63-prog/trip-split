@@ -541,7 +541,8 @@ async function refreshPersonal(){
     if(seq!==pSeq) return;
     const mine=out.filter(x=>tripOf(x)===curTrip);
     CASH=mine.filter(x=>x.type==="cash");
-    const fees=CASH.filter(x=>(x.sub==="withdraw"||x.sub==="exchange")&&+x.fee>0).map(x=>({id:"fee-"+x.id,_wid:x.id,_fee:true,desc:x.sub==="exchange"?"הפרשי שער בצ׳יינג׳":"עמלת משיכה",amount:+x.fee,cur:x.feeCur||x.cur,cat:"other",catLabel:x.sub==="exchange"?"הפרשי שער":"עמלות משיכה",pm:"fee",date:x.date,createdAt:x.createdAt,tz:x.tz,loc:x.loc}));
+    const fees=CASH.filter(x=>(x.sub==="withdraw"||x.sub==="exchange")&&+x.fee>0).map(x=>{ const st=tripStart(), early= x.sub==="exchange"&&st&&(x.date||"")<st;   /* rate loss on money changed before the flight counts as trip spending */
+      return {id:"fee-"+x.id,_wid:x.id,_fee:true,desc:x.sub==="exchange"?"הפרשי שער בצ׳יינג׳":"עמלת משיכה",amount:+x.fee,cur:x.feeCur||x.cur,cat:"other",catLabel:x.sub==="exchange"?"הפרשי שער":"עמלות משיכה",pm:"fee",date:early?st:x.date,createdAt:x.createdAt,tz:x.tz,loc:early?(S.dest||x.loc):x.loc}; });
     INCOME=mine.filter(x=>x.type==="budget-in");
     BUDGET=mine.filter(x=>x.type==="budget").sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||null;
     P=[...mine.filter(x=>x.type!=="cash"&&x.type!=="budget"&&x.type!=="budget-in"),...fees]; pLoaded=true; if(!$("acctSheet").hidden) fillAcct(); if(view==="personal") renderAll();
@@ -1502,6 +1503,7 @@ function renderCash(){
   /* panels */
   for(const [k,id] of [["b","cashB"],["w","cashW"],["a","cashA"],["x","cashX"],["r","cashR"]]) if(!$("addSlot").contains($(id))) $(id).hidden=cashForm!==k;
   for(const [k,id] of [["b","cashBBtn"],["w","cashWBtn"],["a","cashABtn"],["x","cashXBtn"],["r","cashRBtn"]]) $(id).setAttribute("aria-pressed",String(cashForm===k));
+  if(cashForm==="a"||cashForm==="r") $("cashMoreBox").hidden=false;
   setCurBtn("cwCur",cur.cw||S.localCur); setCurBtn("cwFeeCur",cur.cwFee||S.localCur); setCurBtn("caCur",cur.ca||S.localCur);
   setCurBtn("cxFrom",cur.cxF||S.localCur); setCurBtn("cxTo",cur.cxT||(S.localCur==="USD"?"ILS":"USD"));
   seg($("caMode"),[["count","🔢 יש לי בארנק"],["minus","➖ הורדה"],["plus","➕ הוספה"]],v=>v===caMode,v=>{ caMode=v; renderCash(); });
@@ -1542,6 +1544,7 @@ $("cbSave").onclick=async()=>{
   if(n===rows.length){ cbList=[]; cashForm=null; renderCash(); toast("💼 נוסף לארנק: "+rows.map(r=>fmt(r.v,r.c)).join(" + ")); }
   else showErr("cbErr","חלק לא נשמר. בדקו את הרשימה ונסו שוב.");
 };
+$("cashMore").onclick=()=>{ const b=$("cashMoreBox"); b.hidden=!b.hidden; $("cashMore").setAttribute("aria-expanded",String(!b.hidden)); buzz(5); };
 $("cashWBtn").onclick=()=>openCash("w","cwAmt");
 $("cashABtn").onclick=()=>openCash("a","caAmt");
 $("cashXBtn").onclick=()=>{ openCash("x","cxAmt"); cxFill(); };
@@ -1552,6 +1555,17 @@ $("caCur").onclick=()=>openCurPicker("איזה מטבע?",cur.ca||S.localCur,c=>
 $("cxFrom").onclick=()=>openCurPicker("נתתי…",cur.cxF||S.localCur,c=>{ cur.cxF=c; renderCash(); cxFill(); cxLossShow(); });
 $("cxTo").onclick=()=>openCurPicker("קיבלתי…",cur.cxT||"USD",c=>{ cur.cxT=c; renderCash(); cxFill(); cxLossShow(); });
 /* how much the exchange cost compared with the market rate, in the received currency */
+function cxAsk(shortBy,f){
+  const box=$("cxShort"); box.hidden=false; box.textContent="";
+  const p=document.createElement("b"); p.textContent="יש בארנק פחות "+CUR[f].name+" ממה שנתת (חסרים "+fmt(shortBy,f)+")."; box.appendChild(p);
+  const q=document.createElement("span"); q.textContent="זה כסף שהבאתם מהבית?"; box.appendChild(q);
+  const r=document.createElement("div"); r.className="row2";
+  const yes=document.createElement("button"); yes.type="button"; yes.className="btn primary small"; yes.textContent="💼 כן, מזומן מהבית";
+  yes.onclick=async()=>{ yes.disabled=true; const ok=await cashSave({sub:"bring",amount:shortBy,cur:f,bank:false,desc:"מזומן מהבית"}); if(ok){ window.__cxGo=true; $("cxSave").click(); } else yes.disabled=false; };
+  const no=document.createElement("button"); no.type="button"; no.className="btn small"; no.textContent="להמשיך במינוס";
+  no.onclick=()=>{ window.__cxGo=true; $("cxSave").click(); };
+  r.append(yes,no); box.appendChild(r); buzz([8,30,8]);
+}
 function cxLossOf(a,f,b,t){ return Math.max(0,conv(a,f,t)-b); }
 function cxLossShow(){ const a=num("cxAmt"), b=num("cxGot"); const f=cur.cxF||S.localCur, t=cur.cxT||(S.localCur==="USD"?"ILS":"USD"); const L=$("cxLoss");
   if(!(a>0&&b>0)||f===t){ L.hidden=true; return; }
@@ -1560,7 +1574,7 @@ function cxLossShow(){ const a=num("cxAmt"), b=num("cxGot"); const f=cur.cxF||S.
   if(loss>0.004){ L.append("📉 לפי השער היום היית אמור לקבל "+fmt(fair,t)+". ", Object.assign(document.createElement("b"),{textContent:"הפרשי שער: "+fmt(loss,t)+" ("+pct.toFixed(1)+"%)"}), " · נרשם כהוצאה"+(t!=="ILS"?" (≈ "+fmt(conv(loss,t,"ILS"),"ILS")+")":"")); }
   else L.append("🎉 קיבלת שער טוב מהשער היום. אין הפרשי שער."); }
 function cxFill(){ const a=num("cxAmt"); const f=cur.cxF||S.localCur, t=cur.cxT||(S.localCur==="USD"?"ILS":"USD"); if(a>0&&!$("cxTo").dataset.touched) $("cxGot").value=group(String(Math.round(conv(a,f,t)*100)/100)); }
-$("cxAmt").addEventListener("input",()=>{ delete $("cxTo").dataset.touched; cxFill(); cxLossShow(); });
+$("cxAmt").addEventListener("input",()=>{ delete $("cxTo").dataset.touched; cxFill(); cxLossShow(); $("cxShort").hidden=true; });
 $("cxGot").addEventListener("input",()=>{ $("cxTo").dataset.touched="1"; cxLossShow(); });
 $("cwSave").onclick=async()=>{
   showErr("cwErr"); const amt=num("cwAmt"), fee=num("cwFee")||0;
@@ -1580,6 +1594,9 @@ $("cxSave").onclick=async()=>{
   showErr("cxErr"); const a=num("cxAmt"), b=num("cxGot"); const f=cur.cxF||S.localCur, t=cur.cxT||(S.localCur==="USD"?"ILS":"USD");
   if(!(a>0)||!(b>0)) return showErr("cxErr","צריך למלא כמה נתת וכמה קיבלת");
   if(f===t) return showErr("cxErr","בוחרים שני מטבעות שונים");
+  const have=(cashBalances()[f]||0), shortBy=Math.round((a-Math.max(0,have))*100)/100;
+  if(shortBy>0.004&&!window.__cxGo){ cxAsk(shortBy,f); return; }
+  window.__cxGo=false; $("cxShort").hidden=true;
   const loss=cxLossOf(a,f,b,t);
   const ok=await cashSave({sub:"exchange",amount:a,cur:f,toAmount:b,toCur:t,desc:"החלפת מטבע",...(loss>0.004?{fee:Math.round(loss*100)/100,feeCur:t,rate:S.fx.live?"live":"saved"}:{})});
   if(ok){ $("cxAmt").value=""; $("cxGot").value=""; delete $("cxTo").dataset.touched; $("cxLoss").hidden=true; cashForm=null;
