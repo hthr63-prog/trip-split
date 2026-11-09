@@ -546,6 +546,11 @@ async function refreshPersonal(){
     P=[...mine.filter(x=>x.type!=="cash"&&x.type!=="budget"),...fees]; pLoaded=true; if(!$("acctSheet").hidden) fillAcct(); if(view==="personal") renderAll();
   }catch(e){ console.error(e); pLoaded=true; }
 }
+/* too easy to guess offline: only digits, or built from the person's name or username */
+function weakPw(pw){ const p=pw.toLowerCase(), q=person(me)||{};
+  if(/^\d+$/.test(p)||/^(.)\1+$/.test(p)) return true;
+  const ids=[q.name,q.u,(q.u||"").split(/[._]/)[0],me].filter(Boolean).map(x=>String(x).toLowerCase()).filter(x=>x.length>=2);
+  return ids.some(x=>p.includes(x)); }
 async function setPassword(pw){
   /* create or replace the account password; moves existing personal items to the new key */
   const raw=await deriveRaw(me,pw); const nc=await ctxFromRaw(raw);
@@ -568,13 +573,15 @@ function renderLock(){
   const p=person(me); const has=!!p?.vk;
   $("lockTitle").textContent= has? "שלום "+nm(me)+" 🔐" : "בוא/י ניצור לך חשבון אישי";
   $("lockText").textContent= has? "מכניסים את הסיסמה של החשבון האישי. צריך לעשות את זה פעם אחת בכל מכשיר." :
-    "בוחרים סיסמה (לפחות 4 תווים). איתה ההוצאות האישיות שלך יופיעו בכל טלפון ובכל דפדפן, ואף אחד אחר לא יוכל לקרוא אותן. חשוב לזכור אותה: אי אפשר לשחזר סיסמה שנשכחה.";
+    "בוחרים סיסמה (לפחות 8 תווים, שלא דומה לשם). איתה ההוצאות האישיות שלך יופיעו בכל טלפון ובכל דפדפן, ואף אחד אחר לא יוכל לקרוא אותן. חשוב לזכור אותה: אי אפשר לשחזר סיסמה שנשכחה.";
   $("lockPw2Wrap").hidden=has; $("lockBtn").textContent= has? "כניסה" : "יצירת חשבון";
   $("lockPw").setAttribute("autocomplete",has?"current-password":"new-password");
 }
 $("lockBtn").onclick=async()=>{
   showErr("lockErr"); const pw=$("lockPw").value; const p=person(me);
   if(pw.length<4) return showErr("lockErr","הסיסמה צריכה להיות לפחות 4 תווים");
+  if(!person(me)?.vk&&pw.length<8) return showErr("lockErr","סיסמה חדשה צריכה להיות לפחות 8 תווים");
+  if(!person(me)?.vk&&weakPw(pw)) return showErr("lockErr","הסיסמה קלה לניחוש. בחרו משהו שלא דומה לשם ולא רק מספרים");
   $("lockBtn").disabled=true; $("lockBtn").textContent="רגע…";
   try{
     if(p?.vk){ const ok=await unlock(pw); if(!ok){ showErr("lockErr","הסיסמה לא נכונה. נסו שוב."); return; } }
@@ -1906,7 +1913,8 @@ $("acctLogout").onclick=()=>{ store("trip-ak-"+me,""); acct=null; acctFor=null; 
 $("acctChange").onclick=()=>{ $("pwChange").hidden=!$("pwChange").hidden; };
 $("pwSave").onclick=async()=>{
   showErr("pwErr"); const a=$("newPw").value, b=$("newPw2").value;
-  if(a.length<4) return showErr("pwErr","הסיסמה צריכה להיות לפחות 4 תווים");
+  if(a.length<8) return showErr("pwErr","סיסמה חדשה צריכה להיות לפחות 8 תווים");
+  if(weakPw(a)) return showErr("pwErr","הסיסמה קלה לניחוש. בחרו משהו שלא דומה לשם ולא רק מספרים");
   if(a!==b) return showErr("pwErr","שתי הסיסמאות לא זהות");
   $("pwSave").disabled=true;
   try{ await setPassword(a); $("newPw").value=""; $("newPw2").value=""; $("pwChange").hidden=true; $("status").textContent="הסיסמה עודכנה ✓"; await refreshPersonal(); renderSettings(); }
