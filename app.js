@@ -1040,6 +1040,7 @@ function renderSofar(){
   }
   { const bb=$("sfBud"), r= personal ? budgetCalc() : null; bb.hidden=!r;
     if(r){ bb.querySelector(".t").textContent= r.left<0 ? "עברת את התקציב ב-"+fmt(-r.left,r.cur) : "נשארו "+fmt(r.left,r.cur)+" מהתקציב";
+      { const W=worthCalc(r); bb.querySelector(".w").textContent= W.cash.length ? "· עם המזומן "+fmt(W.total,W.cur) : ""; }
       bb.querySelector("i").style.width=Math.round((1-r.pct)*100)+"%"; bb.classList.toggle("warn",r.left>=0&&r.left<r.amount*0.15); bb.classList.toggle("over",r.left<0); } }
   /* the personal screen has no other card with the currency switch now */
   const sh=$("sfShow"); sh.hidden=!personal; if(personal) showinRow(sh);
@@ -1471,6 +1472,9 @@ function renderCash(){
     const s=document.createElement("small"); s.className="hint num"; s.textContent= c!=="ILS" ? "≈ "+fmt(conv(bal[c],c,"ILS"),"ILS") : "";
     d.append(n,s); B.appendChild(d);
   }
+  if(curs.length>1){ const tc=BUDGET?.cur||"ILS", tot=curs.reduce((a,c)=>a+conv(bal[c],c,tc),0);
+    const d=document.createElement("div"); d.className="cash-total"; const l=document.createElement("span"); l.textContent="סה״כ מזומן בארנק";
+    const v=document.createElement("b"); v.className="num"; v.textContent="≈ "+fmt(tot,tc); d.append(l,v); B.appendChild(d); }
   $("cashFees").textContent= fees>0 ? "עמלות והפרשי שער: "+fmt(fees,"ILS") : "";
   /* history: every change shows as + / − */
   const L=$("cashList"); L.innerHTML="";
@@ -1832,6 +1836,14 @@ function renderAcct(){
 /* ---- personal trip budget: what is left in the bank ----
    Money leaves the bank on ATM withdrawals (with the fee) and on card payments, personal or shared ones I paid.
    Cash payments are not counted again: that money already left with the withdrawal. Settle-up transfers count both ways. */
+/* bank + every note in the wallet, valued at today's rate, in the budget currency */
+function worthCalc(r){
+  const cur=r?r.cur:"ILS", bal=cashBalances(), cash=[];
+  for(const c of Object.keys(bal)) if(Math.abs(bal[c])>0.004) cash.push({c,v:bal[c],w:conv(bal[c],c,cur)});
+  cash.sort((a,b)=>b.w-a.w);
+  const cashW=cash.reduce((a,x)=>a+x.w,0), bank=r?r.left:0;
+  return {cur,bank,cash,cashW,total:bank+cashW};
+}
 function budgetCalc(){
   const B=BUDGET; if(!B||!(+B.amount>0)) return null;
   const cur=B.cur||"ILS", st=tripStart(), td=todayStr();
@@ -1865,6 +1877,17 @@ function renderBudget(){
   const box=$("budgetBox"); box.classList.toggle("warn",r.left>=0&&r.left<r.amount*0.15); box.classList.toggle("over",r.left<0);
   $("budPct").textContent=Math.round((1-r.pct)*100)+"%";
   money($("budLeft"),r.left,r.cur,"budLeft");
+  { const W=worthCalc(r), box=$("budWorth"); box.hidden=!W.cash.length; 
+    if(W.cash.length){ money($("wTotal"),W.total,W.cur,"wTotal");
+      const COL=["#14B8A6","#F59E0B","#EC4899","#3B82F6","#8B5CF6"], pos=[["🏦 בבנק",Math.max(0,W.bank),"#6C4BFF"],...W.cash.filter(x=>x.w>0).map((x,i)=>["💵 "+CUR[x.c].name,x.w,COL[i%COL.length]])];
+      const sum=pos.reduce((a,x)=>a+x[1],0)||1, bar=$("wBar"); bar.innerHTML="";
+      for(const [,v,col] of pos){ const i=document.createElement("i"); i.style.width=(v/sum*100)+"%"; i.style.background=col; bar.appendChild(i); }
+      const P=$("wParts"); P.innerHTML="";
+      const line=(label,col,val,sub)=>{ const d=document.createElement("div"); const a=document.createElement("span"); const sw=document.createElement("i"); sw.className="sw"; sw.style.background=col; a.append(sw,label);
+        const b=document.createElement("b"); b.className="num"; b.textContent=val; if(sub){ const sm=document.createElement("small"); sm.textContent=sub; b.appendChild(sm); } d.append(a,b); P.appendChild(d); };
+      line("🏦 בבנק","#6C4BFF",fmt(W.bank,W.cur));
+      W.cash.forEach((x,i)=>line("💵 מזומן · "+CUR[x.c].name,x.w>0?COL[i%COL.length]:"var(--bad)",fmt(x.v,x.c), x.c!==W.cur?"≈ "+fmt(x.w,W.cur):""));
+      $("wNote").textContent="המזומן לפי הארנק, בשער של היום"+(S.fx.at?" ("+new Date(S.fx.at).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})+")":"")+". השווי משתנה עם השער."; } }
   $("budOf").textContent="מתוך "+fmt(r.amount,r.cur)+(r.gifts>0.004?" + "+fmt(r.gifts,r.cur)+" שנכנסו":"")+" · ירדו "+fmt(r.used,r.cur);
   const IL=$("budInList"); IL.innerHTML="";
   for(const x of [...INCOME].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))){
