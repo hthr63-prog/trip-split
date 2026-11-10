@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261110092750"></script>
+<script src="theme.js?v=20261110112536"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -739,6 +739,11 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .worth-parts .sw{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .worth-parts b{font-weight:700;text-align:left}
 .worth-parts small{color:var(--muted);font-weight:500;margin-inline-start:6px}
+.worth-net{display:flex;justify-content:space-between;gap:8px;font-size:.86rem;color:var(--muted);border-top:1px dashed var(--line);padding-top:7px}
+.worth-net b{color:var(--ink);font-weight:700}
+.bud-fold{align-self:flex-start;color:var(--brand);opacity:1;text-decoration:none;font-weight:700}
+.backup-state{font-size:.88rem;padding:8px 11px;border-radius:12px;background:var(--surface-2)}
+.backup-state.due{background:color-mix(in srgb,#F59E0B 14%,var(--surface));color:#8a5300}
 .worth-note{color:var(--muted);font-size:.76rem}
 .sf-budget .w{color:var(--muted);font-size:.8rem;white-space:nowrap}
 .bud-note{color:var(--muted);font-size:.78rem;line-height:1.45}
@@ -1215,6 +1220,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
       <div class="acct-row"><span>🧳 הטיול</span><b id="acctTrip"></b></div>
       <div class="acct-row"><span>🔐 ההוצאות האישיות</span><b id="acctLock"></b></div>
       <div class="acct-row"><span>📶 חיבור</span><b id="acctConn"></b></div>
+      <div class="acct-row"><span>💾 גיבוי אחרון</span><span class="acct-u"><b id="acctBackup"></b><button class="btn small" id="acctBackupBtn" type="button">גיבוי</button></span></div>
     </div>
     <div class="stack">
       <button class="btn block" id="acctMine" type="button">👤 להוצאות האישיות שלי</button>
@@ -1231,12 +1237,14 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
           <div class="bud-nums"><small>נשארו בבנק</small><b class="num" id="budLeft">—</b><span id="budOf"></span></div>
         </div>
         <div class="worth" id="budWorth" hidden>
-          <div class="worth-top"><span>💎 השווי שלך עכשיו</span><b class="num" id="wTotal"></b></div>
+          <div class="worth-top"><span>💎 כמה יש לך בסך הכול</span><b class="num" id="wTotal"></b></div>
           <div class="worth-bar" id="wBar"></div>
           <div class="worth-parts" id="wParts"></div>
+          <div class="worth-net" id="wNet" hidden></div>
           <small class="worth-note" id="wNote"></small>
         </div>
-        <div class="bud-rows" id="budRows"></div>
+        <button class="bd-toggle bud-fold" id="budFold" type="button" aria-expanded="false" aria-controls="budRows"></button>
+        <div class="bud-rows" id="budRows" hidden></div>
         <div class="bud-pace" id="budPace"></div>
         <div class="bud-in" id="budInList"></div>
         <div class="actions bud-acts"><button class="btn" id="budInBtn" type="button">🎁 כסף שנכנס</button><button class="btn" id="budSyncBtn" type="button">🏦 עדכון לפי הבנק</button></div>
@@ -1380,6 +1388,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
     <div class="sec">
       <h3>💾 גיבוי</h3>
       <div class="hint">כל ההוצאות המשותפות, וההוצאות האישיות שלך אם נכנסת לחשבון, בקובץ שנפתח באקסל או ב-Google Sheets.</div>
+      <div class="backup-state" id="backupState"></div>
       <div class="actions"><button class="btn small" id="exportBtn" type="button">ייצוא לאקסל</button></div>
     </div>
 
@@ -1392,9 +1401,9 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261110092750">
-<script src="config.js?v=20261110092750"></script>
-<script src="fx.js?v=20261110092750"></script>
-<script src="app.js?v=20261110092750"></script>
+<meta name="app-v" content="20261110112536">
+<script src="config.js?v=20261110112536"></script>
+<script src="fx.js?v=20261110112536"></script>
+<script src="app.js?v=20261110112536"></script>
 </body>
 </html>
