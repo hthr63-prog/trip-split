@@ -1897,8 +1897,6 @@ function renderBudget(){
         const b=document.createElement("b"); b.className="num"; b.textContent=val; if(sub){ const sm=document.createElement("small"); sm.textContent=sub; b.appendChild(sm); } d.append(a,b); P.appendChild(d); };
       line("🏦 בבנק","#6C4BFF",fmt(W.bank,W.cur));
       W.cash.forEach((x,i)=>line("💵 מזומן · "+CUR[x.c].name,x.w>0?COL[i%COL.length]:"var(--bad)",fmt(x.v,x.c), x.c!==W.cur?"≈ "+fmt(x.w,W.cur):""));
-      { const foreign=W.cash.filter(x=>x.c!==W.cur&&x.w>0).reduce((a,x)=>a+x.w,0), n=$("wNet"); n.hidden=!(foreign>0.5);
-        if(foreign>0.5){ n.textContent=""; const a=document.createElement("span"); a.textContent="≈ אחרי צ׳יינג׳ (בערך 2.5% פחות על המטבע הזר)"; const b=document.createElement("b"); b.className="num"; b.textContent=fmt(W.total-foreign*0.025,W.cur); n.append(a,b); } }
       $("wNote").textContent="המזומן לפי הארנק, בשער של היום"+(S.fx.at?" ("+new Date(S.fx.at).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})+")":"")+". השווי משתנה עם השער."; } }
   $("budOf").textContent="מתוך "+fmt(r.amount,r.cur)+(r.gifts>0.004?" + "+fmt(r.gifts,r.cur)+" שנכנסו":"")+" · ירדו "+fmt(r.used,r.cur);
   const IL=$("budInList"); IL.innerHTML="";
