@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261110113600"></script>
+<script src="theme.js?v=20261112190240"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -724,6 +724,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .cash-more button{flex:1}
 .cx-short{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;border:1.5px solid color-mix(in srgb,#F59E0B 55%,var(--line));background:color-mix(in srgb,#F59E0B 10%,var(--surface))}
 .cx-short .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chk-sub{display:block;color:var(--muted);font-size:.78rem;font-weight:400}
 .cash-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;padding-top:8px;border-top:1px dashed var(--line);font-size:.92rem}
 .cash-total span{color:var(--muted)}
 .cash-total b{font-family:var(--display);font-weight:800;font-size:1.1rem}
@@ -758,6 +759,21 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .bd-toggle,#catMore,.card-head .link,.quick .link,.bud-head .link{position:relative}
 .bd-toggle::after,#catMore::after,.card-head .link::after,.quick .link::after,.bud-head .link::after{content:"";position:absolute;inset:-8px -3px}
 .sf-top{padding-block:6px;margin-block:-6px}
+
+/* simpler account sheet: long sections fold */
+details.fold{border:1.5px solid var(--line);border-radius:18px;background:var(--surface);flex-shrink:0;overflow:hidden}
+details.fold>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;cursor:pointer;font-family:var(--display);font-weight:700;font-size:1.02rem;min-height:52px}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:"▾";color:var(--muted);transition:transform .2s ease}
+details.fold[open]>summary::after{transform:rotate(180deg)}
+details.fold>summary em{font-style:normal;color:var(--muted);font-weight:600;font-size:.88rem;margin-inline-start:auto;margin-inline-end:6px}
+details.fold>.quick,details.fold>.stack{margin:0 12px 12px}
+details.fold>.quick{background:none;padding:0}
+details.fold-note>summary{list-style:none;cursor:pointer;color:var(--muted);font-size:.84rem;text-decoration:underline;text-underline-offset:3px;padding:4px 0}
+details.fold-note>summary::-webkit-details-marker{display:none}
+.sf-budget{flex-wrap:wrap;row-gap:7px}
+.sf-budget .bar{order:3;flex-basis:100%}
+.sf-budget .w{margin-inline-start:auto}
 </style>
 </head>
 <body>
@@ -1076,7 +1092,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
           <div class="hint">המזומן שאתם לוקחים איתכם, בכל המטבעות. כל מטבע מנוהל בנפרד, וכל הוצאה במזומן יורדת מהמטבע שלה.</div>
           <div id="cbRows" class="stack" style="gap:8px"></div>
           <button class="link" id="cbAdd" type="button">➕ עוד מטבע</button>
-          <label class="chk"><input type="checkbox" id="cbBank" checked><span>נקנה מהחשבון בבנק (יורד מהתקציב)</span></label>
+          <label class="chk"><input type="checkbox" id="cbBank" checked><span>נקנה מהחשבון בבנק (יורד מהתקציב)<small class="chk-sub">מזומן שקניתם לפני שהגדרתם תקציב לא יורד ממנו</small></span></label>
           <div class="err" id="cbErr" hidden></div>
           <button class="btn primary" id="cbSave" type="button">הוספה לארנק</button>
         </div>
@@ -1108,7 +1124,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
           <div class="hint" id="cashRText"></div>
           <button class="btn danger" id="cashRSave" type="button">כן, לאפס את הארנק</button>
         </div>
-        <div class="hint">כל מטבע בארנק מנוהל בנפרד, וכל הוצאה במזומן יורדת מהמטבע שלה. משיכה והחלפה הן לא הוצאות. היתרה יורדת לבד כשרושמים הוצאה ששולמה במזומן: הוצאה אישית, או הוצאה משותפת ש<b>את/ה</b> שילמת.</div>
+        <div class="hint">כל מטבע בנפרד. הוצאה במזומן יורדת לבד מהמטבע שלה.</div>
         <div id="cashList" class="stack" style="gap:7px"></div>
       </section>
 
@@ -1270,10 +1286,9 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
         <div class="actions"><button class="btn primary" id="budSave" type="button">שמירה</button><button class="btn" id="budCancel" type="button">ביטול</button></div>
         <div class="err" id="budErr" hidden></div>
       </div>
-      <small class="bud-note">יורד מהיתרה: משיכות מכספומט עם העמלה, תשלומים בכרטיס (אישיים, ומשותפים ששילמת), והתחשבנות בהעברה לחשבון. התחשבנות במזומן עוברת לארנק. תשלום במזומן לא יורד שוב, כי הכסף כבר ירד במשיכה. רק את/ה רואה את התקציב.</small>
+      <details class="fold-note"><summary>איך זה מחושב?</summary><small class="bud-note">יורד מהיתרה: משיכות מכספומט עם העמלה, תשלומים בכרטיס (אישיים, ומשותפים ששילמת), והתחשבנות בהעברה לחשבון. התחשבנות במזומן עוברת לארנק. תשלום במזומן לא יורד שוב, כי הכסף כבר ירד במשיכה. רק את/ה רואה את התקציב.</small></details>
     </section>
-    <div class="quick" id="acctQuickBox">
-      <div class="quick-top"><span class="quick-ico" aria-hidden="true">⚡</span><div><b>הוספה מהירה ממסך הבית</b><small>שני אייקונים: אחד למשותף, אחד לאישי</small></div></div>
+    <details class="fold" id="acctQuickBox"><summary><span>⚡ הוספה מהירה ממסך הבית</span></summary><div class="quick">
       <div class="quick-pair">
         <button class="qbtn" id="acctQuick" type="button"><img src="icon-add-180.png" alt=""><span><b>➕ משותפת</b><small>📋 העתקת הקישור</small></span></button>
         <button class="qbtn" id="acctQuickMe" type="button"><img src="icon-me-180.png" alt=""><span><b>➕ אישית</b><small>📋 העתקת הקישור</small></span></button>
@@ -1287,8 +1302,8 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
         <b>🤖 אנדרואיד</b>
         <ol><li>לחיצה ארוכה על אייקון האפליקציה ← "הוצאה חדשה". אפשר לגרור אותו למסך הבית.</li></ol>
       </div>
-    </div>
-    <h3 class="acct-h">👥 האנשים בטיול</h3>
+    </div></details>
+    <details class="fold" id="acctPeopleFold"><summary><span>👥 האנשים בטיול</span><em id="acctCount"></em></summary><div class="stack" style="gap:12px">
     <div class="acct-rows" id="acctList"></div>
     <button class="btn primary block" id="acctNew" type="button">➕ פתיחת משתמש חדש</button>
     <div class="fieldset" id="acctNewF" hidden>
@@ -1301,6 +1316,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
       <div class="actions"><button class="btn primary" id="anSave" type="button">פתיחת המשתמש</button><button class="btn" id="anCancel" type="button">ביטול</button></div>
       <div class="err" id="anErr" hidden></div>
     </div>
+    </div></details>
   </div>
 </div>
 <div class="sheet-bg" id="setSheet" hidden>
@@ -1400,9 +1416,9 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261110113600">
-<script src="config.js?v=20261110113600"></script>
-<script src="fx.js?v=20261110113600"></script>
-<script src="app.js?v=20261110113600"></script>
+<meta name="app-v" content="20261112190240">
+<script src="config.js?v=20261112190240"></script>
+<script src="fx.js?v=20261112190240"></script>
+<script src="app.js?v=20261112190240"></script>
 </body>
 </html>

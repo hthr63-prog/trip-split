@@ -1694,7 +1694,8 @@ function sinceLastVisit(){
     toast("🔔 "+by+" "+(fresh.length===1?"הוסיף/ה הוצאה אחת":"הוסיפו "+fresh.length+" הוצאות")+" מאז הפעם הקודמת (מסומנות ברשימה)"); renderAll(); }
 }
 function renderNotif(){
-  if(!me){ $("notifSec").hidden=true; return; } $("notifSec").hidden=false;
+  /* phone notifications are shown only to someone who already turned them on, so they can turn them off */
+  if(!me||!person(me)?.ntfy){ $("notifSec").hidden=true; return; } $("notifSec").hidden=false;
   const t=person(me)?.ntfy; $("ntfyOff").hidden=!!t; $("ntfyOn").hidden=!t;
   if(t) $("ntfyTopic").textContent=t;
 }
@@ -1863,7 +1864,9 @@ function budgetCalc(){
   const parts={atm:0,home:0,cardP:0,cardS:0,tr:0,gift:0}; let usedTrip=0;
   const add=(k,v,it)=>{ parts[k]+=v; if(onTrip(it)) usedTrip+=v; };
   for(const x of CASH) if(x.sub==="withdraw"&&inc(x)) add("atm",C(x.amount,x.cur)+C(x.fee||0,x.feeCur||x.cur),x);
-  for(const x of CASH) if(x.sub==="bring"&&x.bank) add("home",C(x.amount,x.cur),x);
+  /* cash bought from the bank counts only if bought after the budget was set: a budget is "what is in the bank now" */
+  const since=+B.since||+B.createdAt||0;
+  for(const x of CASH) if(x.sub==="bring"&&x.bank&&(x.createdAt||0)>since) add("home",C(x.amount,x.cur),x);
   for(const x of INCOME) add("gift",-C(x.amount,x.cur),x);
   for(const it of P) if(!it._fee&&it.pm==="card"&&inc(it)) add("cardP",C(it.amount,it.cur),it);
   for(const it of S.items){ if(!inc(it)) continue;
@@ -1963,14 +1966,14 @@ $("budSClear").onclick=async()=>{ const {id,adj,adjAt,adjTo,...rest}=BUDGET; con
 $("budSave").onclick=async()=>{
   const amount=parseFloat(String($("budAmt").value).replace(/,/g,"")); if(!(amount>0)) return showErr("budErr","צריך סכום גדול מאפס");
   const c=await loadAcct(); if(!c) return showErr("budErr","פותחים קודם את האישי עם הסיסמה");
-  const data={type:"budget",amount,cur:cur.bud||"ILS",prep:$("budPrep").checked,createdAt:Date.now(),trip:curTrip};
+  const data={type:"budget",amount,cur:cur.bud||"ILS",prep:$("budPrep").checked,createdAt:Date.now(),since:+BUDGET?.since||+BUDGET?.createdAt||Date.now(),trip:curTrip};
   if(BUDGET&&BUDGET.adj&&(BUDGET.cur||"ILS")===data.cur){ data.adj=BUDGET.adj; data.adjAt=BUDGET.adjAt; data.adjTo=BUDGET.adjTo; }
   const id=BUDGET?.id||uid("b"); const ok=await run(async()=>EXP().doc(id).set(await encFor(c,data)));
   if(!ok) return showErr("budErr","לא נשמר. נסו שוב.");
   BUDGET={...data,id}; budEditing=false; renderBudget(); renderSofar(); buzz(10); toast("💰 התקציב נשמר");
 };
 function backupAge(){ const t=+load("trip-backup")||0; return t? Math.floor((Date.now()-t)/864e5) : null; }
-function backupText(){ const d=backupAge(); return d===null ? "עוד לא נעשה גיבוי בטלפון הזה" : d===0 ? "היום ✓" : d===1 ? "אתמול" : "לפני "+d+" ימים"; }
+function backupText(){ const d=backupAge(); return d===null ? "עוד לא נעשה" : d===0 ? "היום ✓" : d===1 ? "אתמול" : "לפני "+d+" ימים"; }
 function renderBackup(){ const d=backupAge(), due= d===null||d>=7, el=$("backupState");
   if(el){ el.textContent=(due?"⚠️ ":"✓ ")+"גיבוי אחרון: "+backupText()+(due?". מומלץ פעם בשבוע.":""); el.classList.toggle("due",due); }
   if($("acctBackup")){ $("acctBackup").textContent=backupText(); $("acctBackup").style.color= due?"#b45309":""; } }
@@ -1999,7 +2002,7 @@ function fillAcct(){
     else { const sh=document.createElement("button"); sh.type="button"; sh.className="btn small"; sh.textContent="📤 קישור"; sh.setAttribute("aria-label","שליחת הקישור של "+p.name); sh.onclick=()=>shareUrl(sh,personalUrl(p.id),"הקישור של "+p.name+" ל"+(S.trip||"טיול")); r.append(sh); }
     L.append(r);
   }
-  $("acctNew").hidden=!canWrite; $("acctQuickBox").hidden=!canWrite;
+  $("acctNew").hidden=!canWrite; $("acctQuickBox").hidden=!canWrite; $("acctCount").textContent=active().length+" משתתפים";
   $("acctLockBtn").hidden=!open;
   renderBudget(); renderBackup();
   $("acctMine").textContent= view==="personal" ? "🤝 לחשבון המשותף" : "👤 להוצאות האישיות שלי";
