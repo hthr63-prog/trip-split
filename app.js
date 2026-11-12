@@ -1904,7 +1904,7 @@ function renderBudget(){
   $("budOf").textContent="מתוך "+fmt(r.amount,r.cur)+(r.gifts>0.004?" + "+fmt(r.gifts,r.cur)+" שנכנסו":"")+" · ירדו "+fmt(r.used,r.cur);
   const IL=$("budInList"); IL.innerHTML="";
   for(const x of [...INCOME].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))){
-    const d=document.createElement("div"); d.className="bud-row"; const a=document.createElement("span"); a.textContent="🎁 "+(x.note||"כסף שנכנס")+" · "+dayLabel(x.date);
+    const d=document.createElement("div"); d.className="bud-row"; const a=document.createElement("span"); const nt=x.note||"כסף שנכנס"; a.textContent=(/^\p{Extended_Pictographic}/u.test(nt)?"":"🎁 ")+nt+" · "+dayLabel(x.date);
     const b=document.createElement("b"); b.className="num"; b.textContent="+"+fmt(+x.amount,x.cur);
     const del=document.createElement("button"); del.type="button"; del.className="x"; del.textContent="✕"; del.setAttribute("aria-label","מחיקה");
     del.onclick=async()=>{ if(!del.dataset.sure){ del.dataset.sure="1"; del.textContent="למחוק?"; setTimeout(()=>{ if(del.isConnected){ delete del.dataset.sure; del.textContent="✕"; } },3000); return; }
@@ -1936,7 +1936,13 @@ async function saveBudget(data){
   return ok;
 }
 let budInTo="bank";
-function renderBudIn(){ seg($("budInTo"),[["bank","🏦 נכנס לחשבון"],["cash","💵 קיבלתי במזומן"]],v=>v===budInTo,v=>{ budInTo=v; renderBudIn(); }); setCurBtn("budInCur",cur.bin||BUDGET?.cur||"ILS"); }
+/* one-tap notes: common reasons, then the ones you used before */
+function renderBudInChips(){ const box=$("budInChips"); box.innerHTML="";
+  const base=["🎁 מתנה מההורים","🎁 מתנה מסבתא","💸 החזר חוב","💼 משכורת","↩️ החזר כספי"];
+  const past=[...new Set(INCOME.map(x=>x.note).filter(Boolean).reverse())].filter(n=>!base.includes(n)).slice(0,4);
+  for(const n of [...past,...base]){ const b=document.createElement("button"); b.type="button"; b.textContent=n;
+    b.onclick=()=>{ const inp=$("budInNote"); inp.value= n==="💸 החזר חוב" ? "💸 החזר חוב מ" : n; inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); buzz(5); }; box.appendChild(b); } }
+function renderBudIn(){ renderBudInChips(); seg($("budInTo"),[["bank","🏦 נכנס לחשבון"],["cash","💵 קיבלתי במזומן"]],v=>v===budInTo,v=>{ budInTo=v; renderBudIn(); }); setCurBtn("budInCur",cur.bin||BUDGET?.cur||"ILS"); }
 $("budInBtn").onclick=()=>{ const f=$("budInF"); f.hidden=!f.hidden; showErr("budInErr"); renderBudIn(); if(!f.hidden) setTimeout(()=>$("budInAmt").focus(),60); };
 $("budInCancel").onclick=()=>{ $("budInF").hidden=true; };
 $("budInCur").onclick=()=>openCurPicker("באיזה מטבע?",cur.bin||BUDGET?.cur||"ILS",c=>{ cur.bin=c; renderBudIn(); });

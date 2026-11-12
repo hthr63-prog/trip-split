@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261112190240"></script>
+<script src="theme.js?v=20261112191345"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -724,6 +724,9 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .cash-more button{flex:1}
 .cx-short{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;border:1.5px solid color-mix(in srgb,#F59E0B 55%,var(--line));background:color-mix(in srgb,#F59E0B 10%,var(--surface))}
 .cx-short .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bud-sync .note-in,.bud-sync input:not([type=checkbox]){background:var(--surface);border-color:var(--line)}
+.bud-sync .note-in:focus{border-color:var(--brand)}
+.note-chips{gap:6px}.note-chips button{font-size:.85rem;padding:6px 11px}
 .chk-sub{display:block;color:var(--muted);font-size:.78rem;font-weight:400}
 .cash-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;padding-top:8px;border-top:1px dashed var(--line);font-size:.92rem}
 .cash-total span{color:var(--muted)}
@@ -1266,7 +1269,9 @@ details.fold-note>summary::-webkit-details-marker{display:none}
         <div class="bud-sync" id="budInF" hidden>
           <label for="budInAmt">כמה נכנס?</label>
           <div class="amount"><input id="budInAmt" class="num" inputmode="decimal" placeholder="1,000"><button class="curbtn" id="budInCur" type="button" aria-label="מטבע"></button></div>
-          <input id="budInNote" maxlength="40" placeholder="ממי או על מה? למשל: מתנה מסבתא">
+          <label for="budInNote">ממי או על מה?</label>
+          <div class="seg note-chips" id="budInChips"></div>
+          <input id="budInNote" class="note-in" maxlength="40" placeholder="למשל: מתנה מסבתא, אריאל החזיר חוב" autocomplete="off">
           <div class="seg" id="budInTo"></div>
           <div class="actions"><button class="btn primary" id="budInSave" type="button">הוספה</button><button class="btn" id="budInCancel" type="button">ביטול</button></div>
           <div class="err" id="budInErr" hidden></div>
@@ -1416,9 +1421,9 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261112190240">
-<script src="config.js?v=20261112190240"></script>
-<script src="fx.js?v=20261112190240"></script>
-<script src="app.js?v=20261112190240"></script>
+<meta name="app-v" content="20261112191345">
+<script src="config.js?v=20261112191345"></script>
+<script src="fx.js?v=20261112191345"></script>
+<script src="app.js?v=20261112191345"></script>
 </body>
 </html>
