@@ -913,10 +913,13 @@ function streak(){
 }
 const SCENES={home:["ILS"],beach:["PHP","IDR","MYR","MVR","FJD","LKR","BND"],karst:["VND","LAK"],fuji:["JPY"],city:["SGD","HKD","KRW","CNY","TWD","MOP","AED","USD","EUR","GBP","CAD","AUD","NZD","QAR","OMR"],peaks:["NPR","BTN","KGS","UZS","KZT","MNT","GEL","AMD","CHF","ISK","NOK"],taj:["INR","PKR","BDT"]};
 function sceneFor(c){ for(const k in SCENES) if(SCENES[k].includes(c)) return k; return "temple"; }
+const PLACE={ILS:[32.08,34.78],THB:[13.75,100.5],VND:[21.03,105.85],LAK:[17.97,102.6],KHR:[11.56,104.92],MMK:[16.8,96.15],MYR:[3.14,101.69],SGD:[1.35,103.82],IDR:[-8.65,115.22],PHP:[14.6,120.98],JPY:[35.68,139.69],KRW:[37.57,126.98],CNY:[39.9,116.4],HKD:[22.3,114.17],TWD:[25.03,121.56],INR:[28.61,77.21],NPR:[27.7,85.32],LKR:[6.93,79.86],MVR:[4.18,73.51],BTN:[27.47,89.64],MNT:[47.92,106.92],USD:[40.71,-74.0],EUR:[48.86,2.35],GBP:[51.5,-0.12],AUD:[-33.87,151.21],AED:[25.2,55.27]};
 function renderHero(){
   const H=$("hero"); H.hidden= !loaded || view==="stats";
   if(H.hidden) return;
   H.dataset.scene=sceneFor(S.localCur);
+  /* where the sky is: the capital (or main hub) of the country whose currency is in use; Israel before the flight */
+  { const L=PLACE[S.localCur]||PLACE.ILS; H.dataset.lat=L[0]; H.dataset.lng=L[1]; }
   const k=S.localCur; const name=(CTRY[k]||CUR[k]?.name||k); const flag=name.split(" ")[0]; const country=CTRY[k]?name.slice(flag.length+1):name;
   $("heroFlag").textContent=CTRY[k]?flag:"🌏"; $("heroCountry").textContent=CTRY[k]?country:name;
   const st=tripStart(); const diff= st? daysBetween(st,todayStr()) : 0;
