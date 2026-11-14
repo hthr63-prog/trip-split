@@ -151,14 +151,52 @@ const KW={THB:"תאילנד thailand bangkok בנגקוק",VND:"וייטנאם v
 const norm=s=>String(s||"").toLowerCase().replace(/[׳'"`]/g,"").replace(/\s+/g," ").trim();
 
 /* ---- sheets ---- */
-function openSheet(id){ const s=$(id); s.classList.remove("closing"); s.hidden=false; document.body.style.overflow="hidden"; }
+/* sheets move on springs (motion.js): up on open, follow the finger down, settle back or close */
+const M=window.Motion;
+function sheetEl(s){ return s.querySelector(".sheet"); }
+function openSheet(id){ const s=$(id); s.classList.remove("closing"); const wasHidden=s.hidden; s.hidden=false; document.body.style.overflow="hidden";
+  const sh=sheetEl(s); if(sh&&!sh.querySelector(".grab")){ const g=document.createElement("div"); g.className="grab"; g.setAttribute("aria-hidden","true"); sh.prepend(g); }
+  if(!M||calm()||!wasHidden) return;
+  s.classList.add("msp"); const wide=innerWidth>=640;
+  M.animate(s,[{opacity:0},{opacity:1}],{spring:"snappy"});
+  M.animate(sh,wide?[{opacity:0,transform:"scale(.94)"},{opacity:1,transform:"none"}]:[{transform:"translateY(100%)"},{transform:"none"}],{spring:"smooth"});
+  if(id==="addSheet"){ const f=$("addSlot").firstElementChild; if(f) M.enter([...f.children].filter(c=>!c.hidden),{delay:90,stagger:26,max:8}); }
+}
 function closeSheet(id){
   const s=$(id); if(s.hidden) return;
+  if(M&&!calm()&&s.classList.contains("msp")){ const sh=sheetEl(s); if(s.dataset.closing) return; s.dataset.closing="1";
+    const fin=()=>{ delete s.dataset.closing; if(sh){ sh.style.transform=""; sh.getAnimations().forEach(a=>a.cancel()); } s.getAnimations().forEach(a=>a.cancel()); s.hidden=true; s.classList.remove("msp"); if(id==="addSheet") restoreAdd(); if($("curSheet").hidden&&$("setSheet").hidden&&$("addSheet").hidden&&$("acctSheet").hidden) document.body.style.overflow=""; };
+    const from=sh&&sh.style.transform||"none";
+    Promise.all([M.animate(s,[{opacity:1},{opacity:0}],{spring:"snappy",keep:true}), sh?M.animate(sh,innerWidth>=640?[{opacity:1,transform:"none"},{opacity:0,transform:"scale(.96)"}]:[{transform:from},{transform:"translateY(100%)"}],{spring:"snappy",keep:true}):null]).then(fin);
+    return; }
   const finish=()=>{ s.hidden=true; s.classList.remove("closing"); if(id==="addSheet") restoreAdd(); if($("curSheet").hidden&&$("setSheet").hidden&&$("addSheet").hidden&&$("acctSheet").hidden) document.body.style.overflow=""; };
   if(calm()) return finish();
   s.classList.add("closing"); setTimeout(finish,190);
 }
 for(const id of ["curSheet","setSheet","addSheet","acctSheet"]) $(id).addEventListener("click",e=>{ if(e.target.id===id) closeSheet(id); });
+/* drag a sheet down to close it (from the top, or anywhere while it is scrolled to the top) */
+for(const id of ["curSheet","setSheet","addSheet","acctSheet"]){ const s=$(id), sh=sheetEl(s); if(!sh) continue;
+  let y0=0,t0=0,dy=0,on=false,pid=null;
+  sh.addEventListener("pointerdown",e=>{ if(innerWidth>=640||e.pointerType==="mouse"&&e.button!==0) return; if(e.target.closest("input,textarea,select,button,.seg,.curlist,.recent")) return; if(sh.scrollTop>0&&!e.target.closest(".sheet-head,.grab")) return; y0=e.clientY; t0=performance.now(); dy=0; on=true; pid=e.pointerId; },{passive:true});
+  sh.addEventListener("pointermove",e=>{ if(!on||e.pointerId!==pid) return; dy=Math.max(0,e.clientY-y0); if(dy>4){ sh.style.transform="translateY("+dy+"px)"; s.style.opacity=String(Math.max(.35,1-dy/600)); } },{passive:true});
+  const end=()=>{ if(!on) return; on=false; const v=dy/Math.max(1,performance.now()-t0);
+    if(dy>110||(dy>30&&v>.55)){ s.classList.add("msp"); s.style.opacity=""; buzz(6); closeSheet(id); }
+    else if(dy>0){ const from=sh.style.transform; sh.style.transform=""; s.style.opacity=""; if(M) M.animate(sh,[{transform:from},{transform:"none"}],{spring:"bouncy"}); } };
+  sh.addEventListener("pointerup",end); sh.addEventListener("pointercancel",end);
+}
+/* after saving: a little chip with the expense flies from the button into the total, which pops */
+function flyToTotal(from,label){
+  if(!M||calm()||!from) return;
+  const a=from.getBoundingClientRect(); if(!a.width) return;
+  const chip=document.createElement("div"); chip.className="fly-chip"; chip.textContent=label; document.body.appendChild(chip);
+  const cw=chip.offsetWidth, ch=chip.offsetHeight; chip.style.left=(a.left+a.width/2-cw/2)+"px"; chip.style.top=(a.top+a.height/2-ch/2)+"px";
+  setTimeout(()=>{ const t=$("sfBig"), r=t&&!$("sofar").hidden?t.getBoundingClientRect():null;
+    const ok=r&&r.bottom>0&&r.top<innerHeight;
+    const dx=ok?(r.left+r.width/2)-(a.left+a.width/2):0, dy=ok?(r.top+r.height/2)-(a.top+a.height/2):-120;
+    M.animate(chip,[{transform:"translate(0,0) scale(1)",opacity:1},{transform:`translate(${dx}px,${dy}px) scale(${ok?.55:.8})`,opacity:ok?.9:0}],{spring:"smooth",keep:true})
+      .then(()=>{ chip.remove(); if(ok) M.pop(t); });
+  },260);
+}
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(!$("curSheet").hidden) closeSheet("curSheet"); else { closeSheet("setSheet"); closeSheet("addSheet"); } } });
 
 /* ---- currency picker ---- */
@@ -1156,9 +1194,14 @@ async function save(){
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
   const data={kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr()};
   const id=editingId||uid("e");
-  const ok=await run(()=> editingId ? EXP().doc(id).update(data) : EXP().doc(id).set({...data,createdAt:Date.now(),tz:hereTz(),by:me||null,trip:curTrip}));
+  const job=run(()=> editingId ? EXP().doc(id).update(data) : EXP().doc(id).set({...data,createdAt:Date.now(),tz:hereTz(),by:me||null,trip:curTrip}));
+  /* optimistic: the sheet goes away at once; if saving fails it comes back with everything still filled in */
+  const fromBtn=$("saveBtn").getBoundingClientRect().width?$("saveBtn"):null, label=catEmoji(data)+" "+fmt(amount,data.cur);
+  if(!$("addSheet").hidden){ buzz(10); flyToTotal(fromBtn,label); closeSheet("addSheet"); }
+  const ok=await job;
+  if(!ok&&canWrite){ setTimeout(()=>{ openAdd(); showErr("fErr","לא נשמר. בדקו את החיבור ונסו שוב."); },400); return; }
   if(ok&&!editingId) notifyOthers("🧾 "+nm(me||form.payer)+" "+(fem(me||form.payer)?"הוסיפה":"הוסיף")+": "+data.desc+" "+fmt(amount,data.cur));
-  if(ok){ done($("saveBtn")); burst($("saveBtn"),catEmoji(data)); setTimeout(checkStreak,400); }
+  if(ok){ done($("saveBtn")); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
 async function addTransfer(from,to,amt,pm,tc){
@@ -1201,8 +1244,11 @@ async function pSave(){
   const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat,catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||defLoc(),pm:pform.pm||"cash",date:$("pDate").value||todayStr(),trip:curTrip};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
   const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz()});
-  const ok=await run(()=>EXP().doc(id).set(doc));
-  if(ok){ done($("pSave")); burst($("pSave"),catEmoji(data)); setTimeout(checkStreak,400); }
+  const job=run(()=>EXP().doc(id).set(doc));
+  if(!$("addSheet").hidden){ buzz(10); flyToTotal($("pSave"),catEmoji(data)+" "+fmt(amount,data.cur)); closeSheet("addSheet"); }
+  const ok=await job;
+  if(!ok&&canWrite){ setTimeout(()=>{ openAdd(); showErr("pErr","לא נשמר. בדקו את החיבור ונסו שוב."); },400); return; }
+  if(ok){ done($("pSave")); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
 $("fLoc").onclick=()=>openLocPicker(form.loc||defLoc(),k=>{ form.loc=k; renderForm(); });

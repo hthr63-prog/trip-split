@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261114080405"></script>
+<script src="theme.js?v=20261114080826"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -777,6 +777,13 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 .sf-budget{flex-wrap:wrap;row-gap:7px}
 .sf-budget .bar{order:3;flex-basis:100%}
 .sf-budget .w{margin-inline-start:auto}
+
+/* motion: sheets on springs, grabber, flying chip */
+.sheet-bg.msp,.sheet-bg.msp .sheet{animation:none!important}
+.sheet{touch-action:pan-y}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:-8px auto -4px;flex-shrink:0}
+@media (min-width:640px){.grab{display:none}}
+.fly-chip{position:fixed;z-index:80;pointer-events:none;padding:7px 13px;border-radius:999px;background:var(--grad);color:#fff;font-family:var(--display);font-weight:800;font-size:.95rem;white-space:nowrap;box-shadow:var(--shadow)}
 </style>
 </head>
 <body>
@@ -1421,10 +1428,10 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261114080405">
-<script src="config.js?v=20261114080405"></script>
-<script src="motion.js?v=20261114080405"></script>
-<script src="fx.js?v=20261114080405"></script>
-<script src="app.js?v=20261114080405"></script>
+<meta name="app-v" content="20261114080826">
+<script src="config.js?v=20261114080826"></script>
+<script src="motion.js?v=20261114080826"></script>
+<script src="fx.js?v=20261114080826"></script>
+<script src="app.js?v=20261114080826"></script>
 </body>
 </html>
