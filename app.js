@@ -685,6 +685,7 @@ async function refreshPersonal(){
     CASH=mine.filter(x=>x.type==="cash");
     const fees=CASH.filter(x=>(x.sub==="withdraw"||x.sub==="exchange")&&+x.fee>0).map(x=>{ const st=tripStart(), early= x.sub==="exchange"&&st&&(x.date||"")<st;   /* rate loss on money changed before the flight counts as trip spending */
       return {id:"fee-"+x.id,_wid:x.id,_fee:true,desc:x.sub==="exchange"?"הפרשי שער בצ׳יינג׳":"עמלת משיכה",amount:+x.fee,cur:x.feeCur||x.cur,cat:"other",catLabel:x.sub==="exchange"?"הפרשי שער":"עמלות משיכה",pm:"fee",date:early?st:x.date,createdAt:x.createdAt,tz:x.tz,loc:early?(S.dest||x.loc):x.loc}; });
+    for(const x of CASH){ const v=cardFee(x); if(v>0) fees.push({id:"cfee-"+x.id,_wid:x.id,_fee:true,desc:"עמלת כרטיס 1% על משיכה",amount:v,cur:x.cur,cat:"other",catLabel:"עמלות משיכה",pm:"fee",date:x.date,createdAt:(x.createdAt||0)+1,tz:x.tz,loc:x.loc}); }
     INCOME=mine.filter(x=>x.type==="budget-in");
     BUDGET=mine.filter(x=>x.type==="budget").sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||null;
     P=[...mine.filter(x=>x.type!=="cash"&&x.type!=="budget"&&x.type!=="budget-in"),...fees]; pLoaded=true; if(!$("acctSheet").hidden) fillAcct(); if(view==="personal") renderAll();
@@ -1670,6 +1671,10 @@ function cashPaidByMe(){
 }
 /* settle-ups paid in cash between me and someone else */
 function cashTransfers(){ return me ? S.items.filter(it=>it.kind==="transfer"&&it.pm==="cash"&&(it.payer===me||it.to===me)&&tripOf(it)===curTrip) : []; }
+/* the travel card (Max "Backpacker") takes 1% of every cash withdrawal, on top of what the ATM takes.
+   It is worked out from each withdrawal, so it also covers withdrawals recorded before this rule. */
+const CARD_FEE=0.01;
+function cardFee(x){ return x&&x.sub==="withdraw" ? Math.round((+x.amount||0)*CARD_FEE*100)/100 : 0; }
 function cashBalances(){
   const since=Math.min(...CASH.map(x=>x.createdAt||Infinity));
   const bal={};
@@ -1687,7 +1692,7 @@ function cashBalances(){
 function renderCash(){ return flipList($("cashList"),renderCash_); }
 function renderCash_(){
   const bal=cashBalances(); CASHBAL=bal;
-  const fees=CASH.filter(x=>(x.sub==="withdraw"||x.sub==="exchange")&&+x.fee>0).reduce((s,x)=>s+conv(+x.fee,x.feeCur||x.cur,"ILS"),0);
+  const fees=CASH.filter(x=>(x.sub==="withdraw"||x.sub==="exchange")&&+x.fee>0).reduce((s,x)=>s+conv(+x.fee,x.feeCur||x.cur,"ILS"),0)+CASH.reduce((s,x)=>s+conv(cardFee(x),x.cur,"ILS"),0);
   const B=$("cashBal"); B.innerHTML="";
   const curs=Object.keys(bal).filter(c=>Math.abs(bal[c])>0.004);
   if(!CASH.length&&!cashTransfers().length){ B.innerHTML='<div class="hint">עוד לא נרשמו משיכות. כשמושכים מזומן מכספומט, לוחצים "משיכה מכספומט", ומאז היתרה מתעדכנת לבד בכל תשלום במזומן.</div>'; }
@@ -1717,7 +1722,7 @@ function renderCash_(){
     const dot=document.createElement("div"); dot.className="dot c2"; dot.textContent=(label[x.sub]||"·").split(" ")[0];
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; t.textContent=(label[x.sub]||"").replace(/^\S+ /,"")+(x.note?" · "+x.note:"");
-    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(x,dayLabel(x.date)+(+x.fee>0?" · עמלה "+fmt(+x.fee,x.feeCur||x.cur)+" (נרשמה כהוצאה)":""));
+    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(x,dayLabel(x.date)+(x.sub==="withdraw" ? " · עמלות "+(+x.fee>0?fmt(+x.fee,x.feeCur||x.cur)+" כספומט + ":"")+fmt(cardFee(x),x.cur)+" כרטיס (1%)" : (+x.fee>0?" · עמלה "+fmt(+x.fee,x.feeCur||x.cur)+" (נרשמה כהוצאה)":"")));
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const sign=v=>(v>0?"+":v<0?"−":"")+fmt(Math.abs(v),"X").replace(/ X$/,"");
@@ -1734,7 +1739,7 @@ function renderCash_(){
   for(const [k,id] of [["b","cashB"],["w","cashW"],["a","cashA"],["x","cashX"],["r","cashR"]]) if(!$("addSlot").contains($(id))) $(id).hidden=cashForm!==k;
   for(const [k,id] of [["b","cashBBtn"],["w","cashWBtn"],["a","cashABtn"],["x","cashXBtn"],["r","cashRBtn"]]) $(id).setAttribute("aria-pressed",String(cashForm===k));
   if(cashForm==="a"||cashForm==="r") $("cashMoreBox").hidden=false;
-  setCurBtn("cwCur",cur.cw||S.localCur); setCurBtn("cwFeeCur",cur.cwFee||S.localCur); setCurBtn("caCur",cur.ca||S.localCur);
+  setCurBtn("cwCur",cur.cw||S.localCur); cwCardHint(); setCurBtn("cwFeeCur",cur.cwFee||S.localCur); setCurBtn("caCur",cur.ca||S.localCur);
   setCurBtn("cxFrom",cur.cxF||S.localCur); setCurBtn("cxTo",cur.cxT||(S.localCur==="USD"?"ILS":"USD"));
   seg($("caMode"),[["count","🔢 יש לי בארנק"],["minus","➖ הורדה"],["plus","➕ הוספה"]],v=>v===caMode,v=>{ caMode=v; renderCash(); });
   const c=cur.ca||S.localCur;
@@ -1780,6 +1785,10 @@ $("cashABtn").onclick=()=>openCash("a","caAmt");
 $("cashXBtn").onclick=()=>{ openCash("x","cxAmt"); cxFill(); };
 $("cashRBtn").onclick=()=>openCash("r");
 $("cwCur").onclick=()=>openCurPicker("באיזה מטבע משכת?",cur.cw||S.localCur,c=>{ cur.cw=c; renderCash(); });
+/* live: what the card adds on top */
+function cwCardHint(){ const a=num("cwAmt"), el=$("cwCard"); if(!el) return; const c=cur.cw||S.localCur;
+  el.textContent= a>0 ? "💳 עמלת כרטיס 1%: "+fmt(cardFee({sub:"withdraw",amount:a}),c)+" · יורד מהבנק בסך הכול "+fmt(a+cardFee({sub:"withdraw",amount:a}),c)+(num("cwFee")>0&&(cur.cwFee||S.localCur)===c?" + עמלת הכספומט":"") : "💳 על כל משיכה הכרטיס לוקח עוד 1%, והוא נרשם לבד כהוצאה"; }
+for(const id of ["cwAmt","cwFee"]) $(id).addEventListener("input",cwCardHint);
 $("cwFeeCur").onclick=()=>openCurPicker("באיזה מטבע העמלה?",cur.cwFee||S.localCur,c=>{ cur.cwFee=c; renderCash(); });
 $("caCur").onclick=()=>openCurPicker("איזה מטבע?",cur.ca||S.localCur,c=>{ cur.ca=c; renderCash(); });
 $("cxFrom").onclick=()=>openCurPicker("נתתי…",cur.cxF||S.localCur,c=>{ cur.cxF=c; renderCash(); cxFill(); cxLossShow(); });
@@ -1810,7 +1819,7 @@ $("cwSave").onclick=async()=>{
   showErr("cwErr"); const amt=num("cwAmt"), fee=num("cwFee")||0;
   if(!(amt>0)) return showErr("cwErr","כמה משכת?");
   const ok=await cashSave({sub:"withdraw",amount:amt,cur:cur.cw||S.localCur,fee,feeCur:cur.cwFee||S.localCur,desc:"משיכה מכספומט"});
-  if(ok){ $("cwAmt").value=""; $("cwFee").value=""; cashForm=null; toast("🏧 נרשמה משיכה של "+fmt(amt,cur.cw||S.localCur)+(fee>0?" (העמלה נרשמה כהוצאה)":"")); }
+  if(ok){ $("cwAmt").value=""; $("cwFee").value=""; cashForm=null; toast("🏧 נרשמה משיכה של "+fmt(amt,cur.cw||S.localCur)+" · עמלות "+(fee>0?fmt(fee,cur.cwFee||S.localCur)+" + ":"")+fmt(cardFee({sub:"withdraw",amount:amt}),cur.cw||S.localCur)+" (1% כרטיס) נרשמו כהוצאה"); }
 };
 $("caSave").onclick=async()=>{
   showErr("caErr"); const v=num("caAmt"); const c=cur.ca||S.localCur;
@@ -2096,7 +2105,7 @@ function budgetCalc(){
   const C=(a,c)=>conv(+a||0,c||cur,cur);
   const parts={atm:0,home:0,cardP:0,cardS:0,tr:0,gift:0}; let usedTrip=0;
   const add=(k,v,it)=>{ parts[k]+=v; if(onTrip(it)) usedTrip+=v; };
-  for(const x of CASH) if(x.sub==="withdraw"&&inc(x)) add("atm",C(x.amount,x.cur)+C(x.fee||0,x.feeCur||x.cur),x);
+  for(const x of CASH) if(x.sub==="withdraw"&&inc(x)) add("atm",C(x.amount,x.cur)+C(x.fee||0,x.feeCur||x.cur)+C(cardFee(x),x.cur),x);
   /* cash bought from the bank counts only if bought after the budget was set: a budget is "what is in the bank now" */
   const since=+B.since||+B.createdAt||0;
   for(const x of CASH) if(x.sub==="bring"&&x.bank&&(x.createdAt||0)>since) add("home",C(x.amount,x.cur),x);
