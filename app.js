@@ -491,7 +491,23 @@ function delBtn(onConfirm){
   d.onclick=()=>{ if(d.dataset.sure){ onConfirm(); } else { d.dataset.sure="1"; d.textContent="בטוח?"; setTimeout(()=>{ if(d.isConnected){ delete d.dataset.sure; d.textContent=d.dataset.label||"מחיקה"; } },3000); } };
   return d;
 }
-function renderLedger(){
+/* lists keep their place: rows that stay slide to their new spot, new rows drop in, all on springs */
+function flipKeys(box){ const m=new Map(); if(!box) return m;
+  box.querySelectorAll(".row[data-id]").forEach(r=>m.set("r:"+r.dataset.id,r.closest(".swipe")||r));
+  box.querySelectorAll(".day > h3").forEach(h=>m.set("h:"+h.textContent.slice(0,24),h)); return m; }
+function flipList(box,render){
+  const live= M&&!calm()&&box&&box.offsetParent!==null&&seenReady;
+  const vis=r=>r.bottom>-80&&r.top<innerHeight+80;
+  const before=new Map(); if(live) for(const [k,el] of flipKeys(box)){ const r=el.getBoundingClientRect(); if(vis(r)) before.set(k,r); }
+  const out=render(); if(!live) return out;
+  const fresh=[];
+  for(const [k,el] of flipKeys(box)){ const b=el.getBoundingClientRect(); if(!vis(b)) continue; const a=before.get(k);
+    if(a){ const dx=a.left-b.left, dy=a.top-b.top; if(Math.abs(dx)>.5||Math.abs(dy)>.5) M.animate(el,[{transform:`translate(${dx}px,${dy}px)`},{transform:"none"}],{spring:"smooth"}); }
+    else if(k.startsWith("r:")&&before.size) fresh.push(el); }
+  if(fresh.length&&fresh.length<8) M.enter(fresh,{spring:"bouncy",stagger:45});
+  return out; }
+function renderLedger(){ return flipList($("ledger"),renderLedger_); }
+function renderLedger_(){
   seg($("filter"),[["all","הכול"],...active().map(p=>[p.id,p.name]),["transfers","💸 העברות"]],v=>v===filter,v=>{filter=v;renderLedger();});
   const L=$("ledger"); L.innerHTML="";
   const q=norm($("lSearch").value);
@@ -640,7 +656,8 @@ function myShareItems(){
   for(const it of S.items){ if(it.kind==="transfer") continue; const sh=sharesOf(it)[me]||0; if(sh>0) out.push({...it,amount:(+it.amount||0)*sh}); }
   return out;
 }
-function renderPersonal(){
+function renderPersonal(){ return flipList($("pLedger"),renderPersonal_); }
+function renderPersonal_(){
   if(view!=="personal"||!me) return;
   const locked=!(acct&&acctFor===me);
   $("lockCard").hidden=!locked; $("pBody").hidden=locked;
@@ -708,7 +725,7 @@ function tapRow(r){
   r.classList.add("tappable"); r.tabIndex=0; r.setAttribute("aria-expanded","false");
   const toggle=e=>{ if(e.target.closest(".acts")) return; const open=!r.classList.contains("open");
     document.querySelectorAll(".row.open").forEach(x=>{ x.classList.remove("open"); x.setAttribute("aria-expanded","false"); });
-    if(open){ r.classList.add("open"); r.setAttribute("aria-expanded","true"); buzz(5); } };
+    if(open){ r.classList.add("open"); r.setAttribute("aria-expanded","true"); buzz(5); if(M) M.enter(r.querySelectorAll(".acts > *"),{spring:"snappy",stagger:35}); } };
   r.addEventListener("click",toggle);
   r.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(e); } });
 }
@@ -734,7 +751,12 @@ function swipeWrap(r,it,personal,o){
     const now= Math.abs(dx)>TH ? Math.sign(dx) : 0; if(now!==armed){ armed=now; w.classList.toggle("armed",!!now); if(now) buzz(10); }
   });
   const end=()=>{ if(!drag) return; drag=false; w.classList.remove("dragging");
-    const act=armed; r.style.transform=""; w.classList.remove("armed","to-again","to-del");
+    const act=armed, from=r.style.transform||"none"; r.style.transform="";
+    if(M&&!calm()&&from!=="none"){
+      if(act<0){ M.animate(r,[{transform:from},{transform:"translateX(-105%)"}],{spring:"snappy",keep:true}).then(()=>{ w.classList.remove("armed","to-again","to-del"); doDel(); }); return; }
+      M.animate(r,[{transform:from},{transform:"none"}],{spring:"bouncy"}).then(()=>w.classList.remove("armed","to-again","to-del"));
+      if(act>0&&canAgain){ M.pop(r); doAgain(); } return; }
+    w.classList.remove("armed","to-again","to-del");
     if(act>0&&canAgain) doAgain(); else if(act<0) doDel(); };
   r.addEventListener("pointerup",end); r.addEventListener("pointercancel",end);
   return w;
@@ -1508,7 +1530,8 @@ function cashBalances(){
   for(const c in bal) bal[c]=Math.round(bal[c]*100)/100;
   return bal;
 }
-function renderCash(){
+function renderCash(){ return flipList($("cashList"),renderCash_); }
+function renderCash_(){
   const bal=cashBalances(); CASHBAL=bal;
   const fees=CASH.filter(x=>(x.sub==="withdraw"||x.sub==="exchange")&&+x.fee>0).reduce((s,x)=>s+conv(+x.fee,x.feeCur||x.cur,"ILS"),0);
   const B=$("cashBal"); B.innerHTML="";
@@ -1677,7 +1700,11 @@ async function again(it,personal){
 const BIN_DAYS=30;
 async function delItem(it,personal){
   const r0=document.querySelector('.row[data-id="'+CSS.escape(it.id)+'"]'); const row=r0&&r0.closest(".swipe")||r0;
-  if(row&&!calm()){ row.classList.add("leave"); buzz(12); await new Promise(r=>setTimeout(r,240)); }
+  if(row&&!calm()){ buzz(12);
+    if(M){ const h=row.offsetHeight, inner=row.querySelector(".row")||row, slid=/translateX\(-1/.test(getComputedStyle(inner).transform)||inner.getAnimations().some(a=>a.playState!=="finished");
+      if(!slid) await M.animate(row,[{opacity:1,transform:"none"},{opacity:0,transform:"translateX(-24px) scale(.97)"}],{spring:"snappy",keep:true});
+      row.style.overflow="hidden"; await M.animate(row,[{height:h+"px",opacity:0},{height:"0px",opacity:0,marginTop:"-7px"}],{spring:"smooth",keep:true}); }
+    else { row.classList.add("leave"); await new Promise(r=>setTimeout(r,240)); } }
   SEEN.delete(it.id);
   const ok=await run(()=>EXP().doc(it.id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null}));
   if(ok) toast("🗑 הועבר לסל המחזור: "+(it.kind==="transfer"?"העברה":(it.desc||"הוצאה")),"ביטול",()=>restoreItem(it.id));
