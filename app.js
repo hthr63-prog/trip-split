@@ -118,6 +118,9 @@ function perUsd(c){ return +S.fx.rates[c]||NaN; }
 /* every shared expense and transfer keeps the rate of the moment it was entered (rIls: 1 unit = rIls shekels).
    Balances add up those frozen shekel values, so a later move in rates never changes who owes what. */
 function rateNow(c){ return c==="ILS" ? 1 : conv(1,c,"ILS"); }
+/* a shared expense paid by card in a foreign currency costs the payer 1% more (card fee, Max "Backpacker").
+   That 1% is part of the expense, so it is split like the expense: nobody pays a fee for the other. */
+function feeRate(it){ return it&&it.kind!=="transfer"&&it.pm==="card"&&!it._fee&&it.cur&&it.cur!=="ILS" ? 0.01 : 0; }
 function ils(it){ const v=+it.amount||0; return it.rIls>0 ? v*it.rIls : conv(v,it.cur||"ILS","ILS"); }
 function conv(v,from,to){ if(from===to) return v; return v/perUsd(from)*perUsd(to); }
 function fmt(v,cur){
@@ -163,9 +166,9 @@ function compute(){
   for(const it of S.items){
     /* older settle-ups (before rates were frozen) recorded what they closed per currency */
     if(it.kind==="transfer"&&!(it.rIls>0)&&it.vec&&typeof it.vec==="object"){ for(const c in it.vec){ const v=+it.vec[c]||0, b=conv(v,c,"ILS"); add(it.payer,c,v,b); add(it.to,c,-v,-b); } continue; }
-    const c=it.cur||"ILS", v=+it.amount||0, vb=ils(it), sh=sharesOf(it);
-    add(it.payer,c,v,vb);
-    for(const k in sh) add(k,c,-v*sh[k],-vb*sh[k]);
+    const c=it.cur||"ILS", vb=ils(it), sh=sharesOf(it), f=1+feeRate(it), v=(+it.amount||0)*f, vf=vb*f;
+    add(it.payer,c,v,vf);
+    for(const k in sh) add(k,c,-v*sh[k],-vf*sh[k]);
     if(it.kind==="transfer") continue;
     const sv=conv(vb,"ILS",showCur); total+=sv;
     paid[it.payer]=(paid[it.payer]||0)+sv;
@@ -612,12 +615,12 @@ function renderLedger_(){
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; const m=document.createElement("div"); m.className="m";
     if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent=withTime(it,"סגירת חשבון"+(it.pm==="cash"?" · 💵 מזומן":it.pm==="bank"?" · 🏦 העברה לחשבון":"")); }
-    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
+    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+(feeRate(it)?" בכרטיס (+1% עמלה, מתחלקת)":"")+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
     if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(ils(it),"ILS"); right.appendChild(s); }
-    if(me&&it.kind!=="transfer"){ const sh=sharesOf(it); const d=(it.payer===me?+it.amount:0)-(+it.amount)*(sh[me]||0); if(Math.abs(d)>0.0001){ const s=document.createElement("span"); s.className="mine num "+(d>0?"plus":"minus"); s.textContent=(d>0?"מגיע לך ":"עליך ")+fmt(Math.abs(d),it.cur); right.appendChild(s); } }
+    if(me&&it.kind!=="transfer"){ const sh=sharesOf(it); const fa=(+it.amount)*(1+feeRate(it)); const d=(it.payer===me?fa:0)-fa*(sh[me]||0); if(Math.abs(d)>0.0001){ const s=document.createElement("span"); s.className="mine num "+(d>0?"plus":"minus"); s.textContent=(d>0?"מגיע לך ":"עליך ")+fmt(Math.abs(d),it.cur); right.appendChild(s); } }
     if(canWrite){
       const acts=document.createElement("div"); acts.className="acts";
       if(it.kind!=="transfer"){ const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>startEdit(it); acts.appendChild(e); }
@@ -1685,7 +1688,8 @@ function syncCardFees(){
   if(!pLoaded||!me) return; const days=new Map();
   const add=(it,v)=>{ if(!(v>0)||!it.date) return; const k=it.date+"|"+it.cur; const o=days.get(k)||{date:it.date,cur:it.cur,v:0,n:0,loc:it.loc,tz:it.tz,createdAt:0}; o.v+=v; o.n++; o.createdAt=Math.max(o.createdAt,(it.createdAt||0)+1); days.set(k,o); };
   for(const it of P) if(!it._pfx) add(it,payFee(it));
-  for(const it of S.items) if(it.payer===me&&!it.deleted) add(it,payFee(it));
+  /* shared: my share of the 1%, whoever paid (the fee is split with the expense) */
+  for(const it of S.items) if(!it.deleted){ const sh=sharesOf(it)[me]||0; if(sh>0) add(it,payFee(it)*sh); }
   const out=[...days.values()].map(o=>({id:"pfee-"+o.date+"-"+o.cur,_fee:true,_pfx:true,desc:"עמלת כרטיס 1% על "+(o.n===1?"תשלום בכרטיס":o.n+" תשלומים בכרטיס"),amount:r2(o.v),cur:o.cur,cat:"other",catLabel:"עמלות כרטיס",pm:"fee",date:o.date,createdAt:o.createdAt,tz:o.tz,loc:o.loc}));
   P=[...P.filter(x=>!x._pfx),...out];
 }
