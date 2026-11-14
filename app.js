@@ -104,10 +104,22 @@ function sharesOf(it){
   const among=(it.among&&it.among.length)?it.among:active().map(p=>p.id);
   for(const k of among) out[k]=1/among.length; return out;
 }
+/* what a settle-up of amt (in cur) from→to closes, per original currency: the payer's whole position
+   (what they owe and what is owed to them, in every currency), scaled to the part being paid, at today's rates */
+function settleOf(from,to,amt,cur){
+  const n=compute().net[from]||{}, pos=Object.entries(n).filter(([,x])=>Math.abs(x)>0.004);
+  const total=-pos.reduce((a,[c,x])=>a+conv(x,c,cur),0); if(!(total>0)||!(amt>0)) return null;
+  let k=amt/total; if(Math.abs(k-1)<0.005) k=1; if(k>1) return null;      /* paying more than owed: keep it a plain transfer */
+  const v={}; for(const [c,x] of pos) v[c]=Math.round(-x*k*1e6)/1e6; return v;
+}
 function compute(){
   const net={}; let total=0; const paid={}, share={}, cats={};
   for(const p of S.people){ net[p.id]={}; paid[p.id]=0; share[p.id]=0; }
   for(const it of S.items){
+    /* a settle-up records which debts it closed, currency by currency, so a later change in rates cannot reopen them */
+    if(it.kind==="transfer"&&it.vec&&typeof it.vec==="object"){ for(const c in it.vec){ const v=+it.vec[c]||0;
+      if(!net[it.payer]) net[it.payer]={}; if(!net[it.to]) net[it.to]={};
+      net[it.payer][c]=(net[it.payer][c]||0)+v; net[it.to][c]=(net[it.to][c]||0)-v; } continue; }
     const c=it.cur||"ILS", v=+it.amount||0, sh=sharesOf(it);
     if(!net[it.payer]) net[it.payer]={};
     net[it.payer][c]=(net[it.payer][c]||0)+v;
@@ -1236,7 +1248,8 @@ async function save(){
 async function addTransfer(from,to,amt,pm,tc){
   const showCur_=showCur; const showCur2=tc||showCur_;
   const id=uid("t");
-  const ok=await run(()=>EXP().doc(id).set({kind:"transfer",amount:amt,cur:showCur2,payer:from,to,pm:pm==="cash"?"cash":"bank",date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),by:me||null,trip:curTrip}));
+  const vec=settleOf(from,to,amt,showCur2);
+  const ok=await run(()=>EXP().doc(id).set({kind:"transfer",amount:amt,cur:showCur2,payer:from,to,...(vec?{vec}:{}),pm:pm==="cash"?"cash":"bank",date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),by:me||null,trip:curTrip}));
   if(ok){ setTimeout(()=>{ const c=compute(); if(!c.debts.length) confetti(); flash($("ticket"),"glow",900); },60); buzz([12,60,12]); }
   if(ok) notifyOthers("💸 "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur2));
   if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur2)+(pm==="cash"?" במזומן · עודכן בארנק":" בהעברה · עודכן בתקציב"),"ביטול",()=>run(()=>EXP().doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
