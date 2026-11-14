@@ -36,7 +36,7 @@ jobs:
       - name: הכנת קבצי האתר
         run: |
           mkdir _site
-          for f in $(ls -A); do case "$f" in .git|.github|_site|.gitleaks.toml|SECURITY.md|firestore.rules|publish.sh|CLAUDE.md) ;; *) cp -r "$f" _site/ ;; esac; done
+          for f in $(ls -A); do case "$f" in .git|.github|_site|.gitleaks.toml|SECURITY.md|firestore.rules|publish.sh|CLAUDE.md|PROJECT_STATUS.md) ;; *) cp -r "$f" _site/ ;; esac; done
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:

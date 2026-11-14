@@ -6,7 +6,7 @@
    used offline is always the newest one that was downloaded. (Keeping one copy per version let
    an old app.js be served with a new index.html, which showed an old, half-working screen.) */
 const CACHE = "trip-split-v2";
-const CORE = ["./", "app.js", "fx.js", "theme.js", "config.js", "manifest.json", "icon-192.png", "apple-touch-icon.png"];
+const CORE = ["./", "app.js", "fx.js", "motion.js", "theme.js", "config.js", "manifest.json", "icon-192.png", "apple-touch-icon.png"];
 
 const keyOf = req => {
   const url = new URL(req.url);
