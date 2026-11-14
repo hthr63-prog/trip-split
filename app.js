@@ -1202,7 +1202,7 @@ function renderSofar(){
   { const bb=$("sfBud"), r= personal ? budgetCalc() : null; bb.hidden=!r;
     if(r){ bb.querySelector(".t").textContent= r.left<0 ? "עברת את התקציב ב-"+fmt(-r.left,r.cur) : "נשארו "+fmt(r.left,r.cur)+" מהתקציב";
       { const W=worthCalc(r); bb.querySelector(".w").textContent= W.cash.length ? "· עם המזומן "+fmt(W.total,W.cur) : ""; }
-      { const rw=runwayCalc(r), el=bb.querySelector(".rw"); el.hidden=!(rw&&rw.days!=null); if(rw&&rw.days!=null) el.textContent= rw.days>365 ? "⏳ בקצב הזה הכסף מספיק ליותר משנה" : "⏳ בקצב הזה הכסף מספיק לעוד כ-"+rw.days+" ימים · עד "+rw.until; }
+      { const rw=runwayCalc(r), el=bb.querySelector(".rw"); el.hidden=!(rw&&rw.days!=null); if(rw&&rw.days!=null) el.textContent="⏳ בקצב הזה הכסף מספיק לעוד כ-"+rw.days.toLocaleString("en-US")+" ימים"+runwayLong(rw.days)+" · עד "+rw.until; }
       bb.querySelector("i").style.width=Math.round((1-r.pct)*100)+"%"; bb.classList.toggle("warn",r.left>=0&&r.left<r.amount*0.15); bb.classList.toggle("over",r.left<0); } }
   /* the personal screen has no other card with the currency switch now */
   const sh=$("sfShow"); sh.hidden=!personal; if(personal) showinRow(sh);
@@ -2122,7 +2122,11 @@ function runwayCalc(r){
   const left=Math.floor(W.total/perDay), end=new Date(Date.now()+left*864e5);
   return {total:W.total,perDay,days:left,cur:r.cur,until:end.getDate()+"."+(end.getMonth()+1)+(end.getFullYear()!==new Date().getFullYear()?"."+String(end.getFullYear()).slice(2):"")};
 }
-function runwayText(rw){ if(!rw||rw.days==null) return ""; return "⏳ בקצב של "+fmt(rw.perDay,rw.cur)+" ליום, כל הכסף ("+fmt(rw.total,rw.cur)+", בבנק ובמזומן) מספיק "+(rw.days>365?"ליותר משנה":"לעוד כ-"+rw.days+" ימים · עד "+rw.until); }
+function runwayText(rw){ if(!rw||rw.days==null) return ""; return "⏳ בקצב של "+fmt(rw.perDay,rw.cur)+" ליום, כל הכסף ("+fmt(rw.total,rw.cur)+", בבנק ובמזומן) מספיק לעוד כ-"+rw.days.toLocaleString("en-US")+" ימים"+runwayLong(rw.days)+" · עד "+rw.until; }
+/* a long stretch also in months and years, so 632 days reads as "about a year and 9 months" */
+function runwayLong(d){ if(d<60) return ""; const m=Math.round(d/30.44), y=Math.floor(m/12), r=m%12;
+  const ms=r===0?"":r===1?"חודש":r===2?"חודשיים":r+" חודשים", ys=y===0?"":y===1?"שנה":y===2?"שנתיים":y+" שנים";
+  return " (בערך "+(ys&&ms?ys+(/^\d/.test(ms)?" ו-":" ו")+ms:ys||ms)+")"; }
 let budEditing=false, budSyncing=false;
 function renderBudget(){
   const open=!!(acct&&acctFor===me);
