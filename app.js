@@ -129,7 +129,7 @@ function compute(){
 
 /* ---- extra state ---- */
 let view="shared";
-let PENDING=new Set(), FRESH=new Set(), BIN=[], BINRAW=[], purged=false, CASH=[], dayCur="ILS", cashForm=null;                 // "shared" | "personal"
+let editOrig=null, PENDING=new Set(), FRESH=new Set(), BIN=[], BINRAW=[], purged=false, CASH=[], dayCur="ILS", cashForm=null;                 // "shared" | "personal"
 let P=[], pLoaded=false, pEditingId=null, pform={cat:"food"}, BUDGET=null, INCOME=[];
 let cur={fCur:null,pCur:null,cFrom:null,cTo:"ILS"};
 let cLast="A";                     // which converter field the person typed in
@@ -1137,7 +1137,8 @@ async function run(fn){
     const r=await Promise.race([job.then(()=>"ok"),new Promise(res=>setTimeout(()=>res("slow"),2500))]);
     if(r==="slow"){ $("status").textContent="⏳ נשמר בטלפון, יעלה כשתחזור קליטה"; job.then(done).catch(e=>{ console.error(e); $("status").textContent="השמירה נכשלה. נסו שוב."; }); return true; }
     done(); return true; }
-  catch(e){ console.error(e); $("status").textContent= e&&e.code==="permission-denied" ? "אין הרשאה לשמור." : "השמירה נכשלה. בדקו את החיבור ונסו שוב."; return false; }
+  catch(e){ if(e&&e.code==="needs-network"){ $("status").textContent="📶 בשביל זה צריך קליטה. נסו שוב כשתחזור."; toast("📶 בשביל זה צריך קליטה. ההוצאות עצמן נשמרות גם בלי."); return false; }
+    console.error(e); $("status").textContent= e&&e.code==="permission-denied" ? "אין הרשאה לשמור." : "השמירה נכשלה. בדקו את החיבור ונסו שוב."; return false; }
   finally{ busy=false; document.querySelectorAll("#saveBtn,#nuSave,#pSave").forEach(b=>{ b.disabled=false; b.classList.remove("busy"); }); }
 }
 /* ---- private space: the trip lives under a long random key that only the shared links carry (after #k=).
@@ -1197,7 +1198,7 @@ $("cFrom").onclick=()=>openCurPicker("יש לי…",cur.cFrom,c=>{ cur.cFrom=c; 
 $("cTo").onclick=()=>openCurPicker("מקבלים…",cur.cTo,c=>{ cur.cTo=c; window.__cPicked=true; renderConv(); });
 function startEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
-  editingId=it.id; form.payer=it.payer; form.cat=it.cat||"other"; form.loc=locOf(it); form.pm=it.pm||"cash";
+  editingId=it.id; editOrig=JSON.parse(JSON.stringify(it)); form.payer=it.payer; form.cat=it.cat||"other"; form.loc=locOf(it); form.pm=it.pm||"cash";
   form.among=it.pcts?Object.keys(it.pcts):((it.among&&it.among.length)?[...it.among]:S.people.map(p=>p.id));
   form.mode=it.pcts?"pct":"equal"; form.pcts=it.pcts?{...it.pcts}:{};
   $("fDesc").value=it.desc||""; $("fCatLabel").value=it.catLabel||""; $("fAmt").value=group(String(it.amount)); $("fDate").value=it.date||todayStr(); cur.fCur=it.cur;
@@ -1219,7 +1220,10 @@ async function save(){
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
   const data={kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr()};
   const id=editingId||uid("e");
-  const job=run(()=> editingId ? EXP().doc(id).update(data) : EXP().doc(id).set({...data,createdAt:Date.now(),tz:hereTz(),by:me||null,trip:curTrip}));
+  let patch=data;
+  if(editingId&&editOrig){ patch={}; for(const k of Object.keys(data)){ if(JSON.stringify(data[k]??null)!==JSON.stringify(editOrig[k]??null)) patch[k]=data[k]; } }
+  if(editingId&&!Object.keys(patch).length){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; closeSheet("addSheet"); toast("לא שונה כלום"); return; }
+  const job=run(()=> editingId ? EXP().doc(id).update(patch) : EXP().doc(id).set({...data,createdAt:Date.now(),tz:hereTz(),by:me||null,trip:curTrip}));
   /* optimistic: the sheet goes away at once; if saving fails it comes back with everything still filled in */
   const fromBtn=$("saveBtn").getBoundingClientRect().width?$("saveBtn"):null, label=catEmoji(data)+" "+fmt(amount,data.cur);
   if(!$("addSheet").hidden){ buzz(10); flyToTotal(fromBtn,label); closeSheet("addSheet"); }
@@ -2249,6 +2253,8 @@ if(!cfg||!window.firebase){
   return;
 }
 firebase.initializeApp(cfg); db=firebase.firestore(); canWrite=true;
+/* transactions (people, trips, usernames, passwords) cannot wait offline the way plain saves can */
+{ const rt=db.runTransaction.bind(db); db.runTransaction=f=> navigator.onLine===false ? Promise.reject(Object.assign(new Error("offline"),{code:"needs-network"})) : rt(f); }
 if(!SPACE){ noSpace(); return; }
 try{ const pr=db.enablePersistence&&db.enablePersistence({synchronizeTabs:true}); if(pr&&pr.catch) pr.catch(()=>{}); }catch(e){}
 if("serviceWorker" in navigator&&location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
