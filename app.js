@@ -1098,12 +1098,27 @@ function streak(){
 const SCENES={home:["ILS"],beach:["PHP","IDR","MYR","MVR","FJD","LKR","BND"],karst:["VND","LAK"],fuji:["JPY"],city:["SGD","HKD","KRW","CNY","TWD","MOP","AED","USD","EUR","GBP","CAD","AUD","NZD","QAR","OMR"],peaks:["NPR","BTN","KGS","UZS","KZT","MNT","GEL","AMD","CHF","ISK","NOK"],taj:["INR","PKR","BDT"]};
 function sceneFor(c){ for(const k in SCENES) if(SCENES[k].includes(c)) return k; return "temple"; }
 const PLACE={ILS:[32.08,34.78],THB:[13.75,100.5],VND:[21.03,105.85],LAK:[17.97,102.6],KHR:[11.56,104.92],MMK:[16.8,96.15],MYR:[3.14,101.69],SGD:[1.35,103.82],IDR:[-8.65,115.22],PHP:[14.6,120.98],JPY:[35.68,139.69],KRW:[37.57,126.98],CNY:[39.9,116.4],HKD:[22.3,114.17],TWD:[25.03,121.56],INR:[28.61,77.21],NPR:[27.7,85.32],LKR:[6.93,79.86],MVR:[4.18,73.51],BTN:[27.47,89.64],MNT:[47.92,106.92],USD:[40.71,-74.0],EUR:[48.86,2.35],GBP:[51.5,-0.12],AUD:[-33.87,151.21],AED:[25.2,55.27]};
+/* the phone's own location, rounded to ~1 km and kept only on this phone (never uploaded); refreshed when the app opens */
+let HERE=(()=>{ try{ const v=JSON.parse(load("trip-here")||"null"); return v&&isFinite(v.lat)&&isFinite(v.lng)?v:null; }catch(e){ return null; } })();
+function hereNow(){ return HERE&&Date.now()-(HERE.at||0)<3*864e5 ? HERE : null; }
+let hereAsked=0;
+function askHere(){
+  if(!navigator.geolocation||Date.now()-hereAsked<20*60e3) return; hereAsked=Date.now();
+  try{ navigator.geolocation.getCurrentPosition(p=>{
+      const lat=Math.round(p.coords.latitude*100)/100, lng=Math.round(p.coords.longitude*100)/100;
+      const moved=!HERE||Math.abs(HERE.lat-lat)>0.01||Math.abs(HERE.lng-lng)>0.01;
+      HERE={lat,lng,at:Date.now()}; store("trip-here",JSON.stringify(HERE)); if(moved&&loaded) renderHero();
+    },()=>{},{enableHighAccuracy:false,maximumAge:30*60e3,timeout:20000}); }catch(e){}
+}
+setTimeout(askHere,1500);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") askHere(); });
 function renderHero(){
   const H=$("hero"); H.hidden= !loaded || view==="stats";
   if(H.hidden) return;
   H.dataset.scene=sceneFor(S.localCur);
-  /* where the sky is: the capital (or main hub) of the country whose currency is in use; Israel before the flight */
-  { const L=PLACE[S.localCur]||PLACE.ILS; H.dataset.lat=L[0]; H.dataset.lng=L[1]; }
+  /* where the sky is: where the phone is (sunrise/sunset of the real place). Without location permission,
+     the capital (or main hub) of the country whose currency is in use; Israel before the flight */
+  { const h=hereNow(), L=h?[h.lat,h.lng]:(PLACE[S.localCur]||PLACE.ILS); H.dataset.lat=L[0]; H.dataset.lng=L[1]; H.dataset.where=h?"here":"capital"; }
   const k=S.localCur; const name=(CTRY[k]||CUR[k]?.name||k); const flag=name.split(" ")[0]; const country=CTRY[k]?name.slice(flag.length+1):name;
   $("heroFlag").textContent=CTRY[k]?flag:"🌏"; $("heroCountry").textContent=CTRY[k]?country:name;
   const st=tripStart(); const diff= st? daysBetween(st,todayStr()) : 0;
