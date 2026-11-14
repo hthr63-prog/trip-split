@@ -40,6 +40,34 @@ const CATS=[["food","🍜 אוכל"],["stay","🛏️ לינה"],["transport","�
 /* names for categories that were offered briefly, so older entries still read well */
 const OLD_CATS={scooter:"🛵 קטנוע ודלק",flights:"✈️ טיסות",tours:"🥾 טרקים וסיורים",massage:"💆 עיסויים",sim:"📶 סים ואינטרנט",visa:"🛂 ויזה",health:"💊 בריאות"};
 const CATNAME=Object.fromEntries(CATS);
+/* guess the category from the name: first from what you called things before, then from common words */
+const CAT_WORDS={
+  transport:["מונית","טקסי","taxi","טוקטוק","טוק טוק","tuk","גרב","גראב","grab","bolt","בולט","אובר","uber","אוטובוס","bus","רכבת","train","סליפר","sleeper","מעבורת","ferry","סירה","לונגטייל","longtail","boat","טיסה","טיסות","flight","שדה תעופה","airport","דלק","fuel","קטנוע","אופנוע","scooter","bike","טרנספר","transfer","הסעה","ואן","מיניבוס","מיניוואן","van","סונגתאו","songthaew","bts","mrt","מטרו","metro","חניה","parking","הובלה"],
+  stay:["מלון","hotel","הוסטל","hostel","לינה","צימר","באנגלו","bungalow","airbnb","איירביאנבי","אירביאנבי","גסטהאוס","guesthouse","guest house","resort","ריזורט","לילה","לילות","night","חדר","room","וילה","villa"],
+  food:["ארוחה","ארוחת","בוקר","breakfast","צהריים","lunch","ערב","dinner","אוכל","food","קפה","coffee","אספרסו","קפוצ","לאטה","תה","שייק","shake","מיץ","juice","פאד תאי","pad thai","מסעדה","restaurant","פיצה","pizza","המבורגר","burger","ברגר","גלידה","ice cream","מאפה","מאפייה","bakery","סושי","sushi","ראמן","ramen","נודלס","noodle","אורז","rice","פו","pho","סלט","salad","פירות","fruit","מנגו","mango","קוקוס","coconut","דוכן","street food","סנדוויץ","טוסט","קרואסון","שוק לילה","night market","סבן","7-11","711","seven","סופר","supermarket","מכולת","חטיף","snack","מים","water","שתייה","בננה","פנקייק","pancake","קארי","curry","ברביקיו","bbq","דים סאם"],
+  party:["בירה","beer","קוקטייל","cocktail","משקה","drink","בר","bar","פאב","pub","מועדון","club","מסיבה","party","פול מון","full moon","וודקה","וויסקי","יין","wine","שוט","shot","באקט","bucket"],
+  fun:["כניסה","entrance","ticket","כרטיס כניסה","מקדש","temple","פארק","park","טרק","trek","סיור","tour","שנורקל","snorkel","צלילה","dive","diving","קורס","course","שיעור","class","עיסוי","מסאז","massage","ספא","spa","מוזיאון","museum","אטרקציה","קייאק","kayak","רפטינג","rafting","זיפליין","zipline","פילים","elephant","מופע","show","הופעה","מואי","muay","קולנוע","cinema","איים","island","שייט","cruise","מפל","waterfall"],
+  laundry:["כביסה","laundry","מכבסה","ייבוש","גיהוץ"],
+  shop:["קניות","shopping","מזכרת","מזכרות","souvenir","מגנט","magnet","בגד","בגדים","חולצה","shirt","מכנסיים","pants","שמלה","dress","נעליים","shoes","כפכפים","גרביים","socks","תיק","bag","כובע","hat","משקפי","קרם","sunscreen","סים","sim","esim","מטען","charger","כבל","cable","קניון","mall","מתנה","gift","תכשיט","שעון","פארם","pharmacy","תרופה","תרופות"],
+  other:["ויזה","visa","ביטוח","insurance","עמלה","fee","טיפ","tip","קנס","fine"]
+};
+function catNorm(t){ return " "+String(t||"").toLowerCase().replace(/[׳'"`’.,!?()\-–_/]+/g," ").replace(/\s+/g," ").trim()+" "; }
+function guessCat(desc,pool){
+  const q=catNorm(desc).trim(); if(q.length<2) return null;
+  /* 1. you already named something like this: use what you chose then */
+  let hist=null;
+  for(const it of [...(pool||[])].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))){ if(!it.cat||it.kind==="transfer"||it._fee) continue; const d=catNorm(it.desc).trim(); if(d&&(d===q||(q.length>=3&&d.startsWith(q))||(d.length>=4&&q.startsWith(d)))){ hist=it.cat; break; } }
+  /* 2. common words, also with a Hebrew prefix (במונית, לקפה, והמלון) */
+  /* the earliest word in the name wins ("מונית למלון" is a taxi); a longer word breaks ties */
+  const t=catNorm(desc); let best=null, len=0, pos=1e9;
+  for(const [cat,words] of Object.entries(CAT_WORDS)) for(const w of words){ const k=catNorm(w).trim();
+    const at=t.indexOf(k); if(at<0) continue; const before=t.slice(0,at), sp=before.lastIndexOf(" "), pre=before.slice(sp+1);
+    if(pre.length>2||!/^[והבלמשכ]*$/.test(pre)) continue;
+    if(sp<pos||(sp===pos&&k.length>len)){ best=cat; len=k.length; pos=sp; } }
+  /* "food" was the old default, so an old food entry does not beat a clear word */
+  if(hist&&!(hist==="food"&&best&&best!=="food")) return hist;
+  return best;
+}
 
 /* rates snapshot (units per 1 USD), used only until live rates load */
 const SNAPSHOT={"ILS":3.171842,"USD":1,"EUR":0.890365,"THB":33.719076,"VND":25729.735232,"LAK":22505.1838,"KHR":4065.593788,"MMK":2098.794175,"MYR":4.072794,"SGD":1.279887,"IDR":18143.678069,"PHP":63.478823,"BND":1.279887,"JPY":157.949155,"KRW":1340.784427,"CNY":6.684037,"HKD":7.845861,"MOP":8.081237,"TWD":32.830657,"MNT":3601.958391,"INR":94.779591,"NPR":151.71843,"LKR":331.826006,"BTN":94.779591,"MVR":15.459298,"BDT":124.174282,"PKR":275.809125,"KZT":452.607877,"UZS":11885.050986,"KGS":87.457295,"AED":3.6725,"GBP":0.743257,"CHF":0.817104,"AUD":1.432863,"NZD":1.785676,"CAD":1.397182,"TRY":50.017333,"GEL":2.593158,"JOD":0.709,"EGP":55.339922,"QAR":3.64,"OMR":0.384886,"ZAR":16.566684,"MXN":18.801918,"BRL":5.488807,"ARS":1550.805724,"CLP":981.86821,"PEN":3.452304,"COP":3245.471352,"CZK":21.682276,"HUF":324.682409,"PLN":3.930636,"RON":4.756031,"BGN":1.741402,"SEK":9.759447,"NOK":9.26785,"DKK":6.654908,"ISK":121.298704,"MAD":9.795078,"KES":129.924573,"TZS":2643.325335,"FJD":2.248705,"RSD":104.76815,"AMD":359.039516,"AZN":1.7};
@@ -52,7 +80,7 @@ const SEED_ITEMS=[
 
 let S={trip:"",localCur:"THB",people:[],items:[],fx:{rates:{...SNAPSHOT},at:null,live:false}};
 let db=null, canWrite=false, busy=false, editingId=null, filter="all", loaded=false;
-let form={payer:null,among:null,mode:"equal",pcts:{},cat:"food"};
+let form={payer:null,among:null,mode:"equal",pcts:{},cat:null,catSet:false};
 let me=null, showCur=load("trip-show")||"ILS"; if(!CUR[showCur]) showCur="ILS";
 let nuG="m";
 
@@ -155,7 +183,7 @@ function compute(){
 /* ---- extra state ---- */
 let view="shared";
 let editOrig=null, PENDING=new Set(), FRESH=new Set(), BIN=[], BINRAW=[], purged=false, CASH=[], dayCur="ILS", cashForm=null;                 // "shared" | "personal"
-let P=[], pLoaded=false, pEditingId=null, pform={cat:"food"}, BUDGET=null, INCOME=[];
+let P=[], pLoaded=false, pEditingId=null, pform={cat:null,catSet:false}, BUDGET=null, INCOME=[];
 let cur={fCur:null,pCur:null,cFrom:null,cTo:"ILS"};
 let cLast="A";                     // which converter field the person typed in
 
@@ -439,7 +467,8 @@ function renderForm(){
     }
   }
   $("fLoc").textContent=locName(form.loc||defLoc());
-  seg($("fCat"),CATS,v=>v===form.cat,v=>{form.cat=v;renderForm(); if(v==="other") $("fCatLabel").focus();});
+  seg($("fCat"),CATS,v=>v===form.cat,v=>{form.cat=v;form.catSet=true;renderForm(); if(v==="other") $("fCatLabel").focus();});
+  $("fCatAuto").hidden=!(form.cat&&!form.catSet);
   $("fCatLabel").hidden=form.cat!=="other";
   convHint("fAmt",cur.fCur,"fConv");
 }
@@ -693,7 +722,8 @@ function renderPForm(){
   if(!cur.pCur) cur.pCur=S.localCur; setCurBtn("pCur",cur.pCur);
   $("pLoc").textContent=locName(pform.loc||defLoc());
   seg($("pPm"),[["cash","💵 מזומן"],["card","💳 כרטיס"]],v=>v===(pform.pm||"cash"),v=>{pform.pm=v;renderPForm();});
-  seg($("pCat"),CATS,v=>v===pform.cat,v=>{pform.cat=v;renderPForm(); if(v==="other") $("pCatLabel").focus();});
+  seg($("pCat"),CATS,v=>v===pform.cat,v=>{pform.cat=v;pform.catSet=true;renderPForm(); if(v==="other") $("pCatLabel").focus();});
+  $("pCatAuto").hidden=!(pform.cat&&!pform.catSet);
   $("pCatLabel").hidden=pform.cat!=="other";
   convHint("pAmt",cur.pCur,"pConv"); saveLabel();
 }
@@ -1232,7 +1262,7 @@ $("cFrom").onclick=()=>openCurPicker("יש לי…",cur.cFrom,c=>{ cur.cFrom=c; 
 $("cTo").onclick=()=>openCurPicker("מקבלים…",cur.cTo,c=>{ cur.cTo=c; window.__cPicked=true; renderConv(); });
 function startEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
-  editingId=it.id; editOrig=JSON.parse(JSON.stringify(it)); form.payer=it.payer; form.cat=it.cat||"other"; form.loc=locOf(it); form.pm=it.pm||"cash";
+  editingId=it.id; editOrig=JSON.parse(JSON.stringify(it)); form.payer=it.payer; form.cat=it.cat||"other"; form.catSet=true; form.loc=locOf(it); form.pm=it.pm||"cash";
   form.among=it.pcts?Object.keys(it.pcts):((it.among&&it.among.length)?[...it.among]:S.people.map(p=>p.id));
   form.mode=it.pcts?"pct":"equal"; form.pcts=it.pcts?{...it.pcts}:{};
   $("fDesc").value=it.desc||""; $("fCatLabel").value=it.catLabel||""; $("fAmt").value=group(String(it.amount)); $("fDate").value=it.date||todayStr(); cur.fCur=it.cur;
@@ -1241,7 +1271,7 @@ function startEdit(it){
   if(!$("addSlot").contains($("form"))) openAdd(); else $("form").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function resetForm(){ setTimeout(()=>fDateChips(),0);
-  editingId=null; $("fDesc").value=""; $("fCatLabel").value=""; $("fAmt").value=""; form.mode="equal"; form.pcts={}; form.among=null; if(me) form.payer=me; cur.fCur=S.localCur; form.loc=null;
+  editingId=null; form.cat=null; form.catSet=false; $("fDesc").value=""; $("fCatLabel").value=""; $("fAmt").value=""; form.mode="equal"; form.pcts={}; form.among=null; if(me) form.payer=me; cur.fCur=S.localCur; form.loc=null;
   $("formTitle").textContent="➕ הוצאה משותפת"; $("saveBtn").textContent="הוספה"; $("cancelEdit").hidden=true; renderForm(); saveLabel();
 }
 async function save(){
@@ -1252,7 +1282,7 @@ async function save(){
   if(!form.among.length) return showErr("fErr","צריך לבחור לפחות אדם אחד שמתחלק בהוצאה");
   let pcts=null;
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
-  const data={rIls:(editingId&&editOrig&&editOrig.cur===cur.fCur&&editOrig.rIls>0)?editOrig.rIls:rateNow(cur.fCur),kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr()};
+  const data={rIls:(editingId&&editOrig&&editOrig.cur===cur.fCur&&editOrig.rIls>0)?editOrig.rIls:rateNow(cur.fCur),kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat||"other",catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr()};
   const id=editingId||uid("e");
   let patch=data;
   if(editingId&&editOrig){ patch={}; for(const k of Object.keys(data)){ if(JSON.stringify(data[k]??null)!==JSON.stringify(editOrig[k]??null)) patch[k]=data[k]; } }
@@ -1289,13 +1319,13 @@ function toast(msg,actLabel,act){
 $("pCur").onclick=()=>openCurPicker("באיזה מטבע שילמת?",cur.pCur,c=>{ cur.pCur=c; renderPersonal(); });
 function pStartEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
-  pEditingId=it.id; pform.cat=it.cat||"other"; pform.loc=locOf(it); pform.pm=it.pm||"cash"; cur.pCur=it.cur;
+  pEditingId=it.id; pform.cat=it.cat||"other"; pform.catSet=true; pform.loc=locOf(it); pform.pm=it.pm||"cash"; cur.pCur=it.cur;
   $("pDesc").value=it.desc||""; $("pCatLabel").value=it.catLabel||""; $("pAmt").value=group(String(it.amount)); $("pDate").value=it.date||todayStr();
   $("pFormTitle").textContent="✏️ עריכת הוצאה אישית"; $("pSave").textContent="שמירת שינויים"; $("pCancel").hidden=false; saveLabel(); renderPersonal();
   if(!$("addSlot").contains($("pForm"))) openAdd(); else $("pForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function pReset(){
-  pEditingId=null; $("pDesc").value=""; $("pCatLabel").value=""; $("pAmt").value=""; cur.pCur=S.localCur; pform.loc=null;
+  pEditingId=null; pform.cat=null; pform.catSet=false; $("pDesc").value=""; $("pCatLabel").value=""; $("pAmt").value=""; cur.pCur=S.localCur; pform.loc=null;
   $("pFormTitle").textContent="➕ הוצאה אישית"; $("pSave").textContent="הוספה"; $("pCancel").hidden=true; renderPersonal(); saveLabel();
 }
 async function pSave(){
@@ -1304,7 +1334,7 @@ async function pSave(){
   if(!(amount>0)) return showErr("pErr","צריך להזין סכום גדול מאפס");
   if(!$("pDesc").value.trim()){ $("pDesc").focus(); return showErr("pErr","צריך לתת שם להוצאה, למשל: קפה"); }
   const c=await loadAcct(); if(!c) return showErr("pErr","צריך להיכנס לחשבון האישי קודם.");
-  const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat,catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||defLoc(),pm:pform.pm||"cash",date:$("pDate").value||todayStr(),trip:curTrip};
+  const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat||"other",catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||defLoc(),pm:pform.pm||"cash",date:$("pDate").value||todayStr(),trip:curTrip};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
   const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz()});
   const job=run(()=>EXP().doc(id).set(doc));
@@ -1474,8 +1504,8 @@ function switchAddKind(kind){
   if(toMe&&!(acct&&acctFor===me)){ toast("🔒 קודם פותחים את האישי עם הסיסמה","לאישי",()=>{ closeSheet("addSheet"); goView("personal"); }); renderAddKind("shared"); return; }
   const [a,b]= toMe ? [["fAmt","fDesc","fDate"],["pAmt","pDesc","pDate"]] : [["pAmt","pDesc","pDate"],["fAmt","fDesc","fDate"]];
   a.forEach((id,i)=>{ if($(id).value) $(b[i]).value=$(id).value; });
-  if(toMe){ cur.pCur=cur.fCur||cur.pCur; pform.cat=form.cat||pform.cat; pform.pm=form.pm||pform.pm; }
-  else { cur.fCur=cur.pCur||cur.fCur; form.cat=pform.cat||form.cat; form.pm=pform.pm||form.pm; }
+  if(toMe){ cur.pCur=cur.fCur||cur.pCur; pform.cat=form.cat||pform.cat; pform.catSet=form.catSet; pform.pm=form.pm||pform.pm; }
+  else { cur.fCur=cur.pCur||cur.fCur; form.cat=pform.cat||form.cat; form.catSet=pform.catSet; form.pm=pform.pm||form.pm; }
   restoreAdd(); openAdd(toMe?"me":"shared"); buzz(6);
 }
 /* the save button says what it will add, so it can be checked without scrolling */
@@ -1517,10 +1547,10 @@ function chipsFor(box,list,pick){
 function renderRecent(){
   if(view!=="personal") chipsFor($("recentChips"),S.items,it=>{
     if(editingId) resetForm();
-    $("fDesc").value=it.desc||""; $("fAmt").value=group(String(it.amount)); cur.fCur=it.cur||cur.fCur; form.cat=it.cat||"other"; $("fCatLabel").value=it.catLabel||""; form.pm=it.pm||form.pm;
+    $("fDesc").value=it.desc||""; $("fAmt").value=group(String(it.amount)); cur.fCur=it.cur||cur.fCur; form.cat=it.cat||"other"; form.catSet=true; $("fCatLabel").value=it.catLabel||""; form.pm=it.pm||form.pm;
     $("fDate").value=todayStr(); renderForm(); openAdd(); setTimeout(()=>{ try{ $("fAmt").select(); }catch(e){} },120); });
   if(view==="personal"&&acct&&acctFor===me) chipsFor($("pRecentChips"),P,it=>{
-    $("pDesc").value=it.desc||""; $("pAmt").value=group(String(it.amount)); cur.pCur=it.cur||cur.pCur; pform.cat=it.cat||"other"; $("pCatLabel").value=it.catLabel||""; pform.pm=it.pm||pform.pm;
+    $("pDesc").value=it.desc||""; $("pAmt").value=group(String(it.amount)); cur.pCur=it.cur||cur.pCur; pform.cat=it.cat||"other"; pform.catSet=true; $("pCatLabel").value=it.catLabel||""; pform.pm=it.pm||pform.pm;
     $("pDate").value=todayStr(); renderPersonal(); openAdd(); setTimeout(()=>{ try{ $("pAmt").select(); }catch(e){} },120); });
   else $("pRecentChips").hidden=true;
 }
@@ -1827,12 +1857,14 @@ function suggest(inputId,boxId,pool,apply){
   for(const it of out){ const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=it.desc+" · "+fmt(+it.amount,it.cur);
     b.onclick=()=>{ apply(it); box.hidden=true; }; box.appendChild(b); }
 }
+$("fDesc").addEventListener("input",()=>{ if(form.catSet) return; const g=guessCat($("fDesc").value,S.items); if(g!==form.cat){ form.cat=g; renderForm(); } });
+$("pDesc").addEventListener("input",()=>{ if(pform.catSet) return; const g=guessCat($("pDesc").value,[...P,...S.items]); if(g!==pform.cat){ pform.cat=g; renderPForm(); } });
 $("fDesc").addEventListener("input",()=>suggest("fDesc","fSuggest",S.items.filter(x=>x.kind!=="transfer"),it=>{
-  $("fDesc").value=it.desc; form.cat=it.cat||"other"; $("fCatLabel").value=it.catLabel||"";
+  $("fDesc").value=it.desc; form.cat=it.cat||"other"; form.catSet=true; $("fCatLabel").value=it.catLabel||"";
   if(!$("fAmt").value){ $("fAmt").value=group(String(it.amount)); cur.fCur=it.cur||cur.fCur; }
   renderForm(); }));
 $("pDesc").addEventListener("input",()=>suggest("pDesc","pSuggest",P,it=>{
-  $("pDesc").value=it.desc; pform.cat=it.cat||"other"; $("pCatLabel").value=it.catLabel||"";
+  $("pDesc").value=it.desc; pform.cat=it.cat||"other"; pform.catSet=true; $("pCatLabel").value=it.catLabel||"";
   if(!$("pAmt").value){ $("pAmt").value=group(String(it.amount)); cur.pCur=it.cur||cur.pCur; }
   renderPersonal(); }));
 

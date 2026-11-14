@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261114093034"></script>
+<script src="theme.js?v=20261114093851"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -729,6 +729,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .note-chips{gap:6px}.note-chips button{font-size:.85rem;padding:6px 11px}
 .chk-sub{display:block;color:var(--muted);font-size:.78rem;font-weight:400}
 .more-rows{margin-top:6px;color:var(--brand);font-weight:700}
+.cat-auto{color:var(--brand);font-weight:600;font-size:.8rem;margin-inline-start:6px}
 .cash-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;padding-top:8px;border-top:1px dashed var(--line);font-size:.92rem}
 .cash-total span{color:var(--muted)}
 .cash-total b{font-family:var(--display);font-weight:800;font-size:1.1rem}
@@ -1016,7 +1017,7 @@ details.fold-note>summary::-webkit-details-marker{display:none}
         <div class="seg" id="fMode"></div>
         <div class="pcts" id="fPcts" hidden></div>
       </div>
-      <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="fCat"></div><input id="fCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
+      <div class="fieldset"><span class="hint">קטגוריה <span class="cat-auto" id="fCatAuto" hidden>🪄 לפי השם · אפשר לשנות</span></span><div class="seg" id="fCat"></div><input id="fCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
       <div class="err" id="fErr" hidden></div>
       <div class="actions">
         <button class="btn primary big" id="saveBtn" type="button">הוספה</button>
@@ -1091,7 +1092,7 @@ details.fold-note>summary::-webkit-details-marker{display:none}
         </div>
         <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="pLoc" type="button"></button></div>
         <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="pPm"></div></div>
-        <div class="fieldset"><span class="hint">קטגוריה</span><div class="seg" id="pCat"></div><input id="pCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
+        <div class="fieldset"><span class="hint">קטגוריה <span class="cat-auto" id="pCatAuto" hidden>🪄 לפי השם · אפשר לשנות</span></span><div class="seg" id="pCat"></div><input id="pCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
         <div class="err" id="pErr" hidden></div>
         <div class="actions">
           <button class="btn primary big" id="pSave" type="button">הוספה</button>
@@ -1451,10 +1452,10 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261114093034">
-<script src="config.js?v=20261114093034"></script>
-<script src="motion.js?v=20261114093034"></script>
-<script src="fx.js?v=20261114093034"></script>
-<script src="app.js?v=20261114093034"></script>
+<meta name="app-v" content="20261114093851">
+<script src="config.js?v=20261114093851"></script>
+<script src="motion.js?v=20261114093851"></script>
+<script src="fx.js?v=20261114093851"></script>
+<script src="app.js?v=20261114093851"></script>
 </body>
 </html>
