@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261114144103"></script>
+<script src="theme.js?v=20261114195356"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -844,6 +844,15 @@ input.bad-f{border-color:var(--bad)!important}
 .day.fold.shut + .day.fold.shut{margin-top:-6px}
 .sf-budget .rw{order:4;flex-basis:100%;font-size:.82rem;font-weight:600;color:var(--ink);opacity:.85}
 .cw-card{font-weight:600;color:var(--ink)}
+
+.monthfold{font:inherit;display:flex;align-items:center;gap:10px;width:100%;min-height:60px;padding:10px 16px;border:0;border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--brand) 14%,var(--surface)),var(--surface));color:var(--ink);cursor:pointer;text-align:right;box-shadow:0 6px 18px -12px rgba(76,52,200,.5);margin-top:6px}
+.monthfold .df-tx{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.monthfold .df-tx b{font-weight:800;font-size:1.02rem}
+.monthfold .df-tx small{color:var(--muted);font-size:.84rem}
+.monthfold .df-go{font-weight:700;font-size:.98rem;white-space:nowrap}
+.monthfold .df-ch{font-style:normal;color:var(--brand);transition:transform .25s ease}
+.monthfold.on .df-ch{transform:rotate(180deg)}
+.monthfold.on + .day{margin-top:4px}
 </style>
 </head>
 <body>
@@ -1493,10 +1502,10 @@ input.bad-f{border-color:var(--bad)!important}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261114144103">
-<script src="config.js?v=20261114144103"></script>
-<script src="motion.js?v=20261114144103"></script>
-<script src="fx.js?v=20261114144103"></script>
-<script src="app.js?v=20261114144103"></script>
+<meta name="app-v" content="20261114195356">
+<script src="config.js?v=20261114195356"></script>
+<script src="motion.js?v=20261114195356"></script>
+<script src="fx.js?v=20261114195356"></script>
+<script src="app.js?v=20261114195356"></script>
 </body>
 </html>

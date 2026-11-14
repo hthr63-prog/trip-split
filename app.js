@@ -507,7 +507,7 @@ function timeOf(it){
 }
 function withTime(it,txt){ const t=timeOf(it); return t? "🕒 "+t+" · "+txt : txt; }
 /* how it was paid, on every expense row; old entries without a mark count as cash, so they say so */
-function pmText(it){ if(!it||it.kind==="transfer"||it._fee) return ""; return it.pm==="card" ? "💳 כרטיס"+(feeRate(it)?" · עמלה 1%":"") : "💵 מזומן"; }
+function pmText(it){ if(!it||it.kind==="transfer"||it._fee) return ""; return it.pm==="card" ? "💳 כרטיס"+(feeRate(it)?" · עמלה\u00a01%":"") : "💵 מזומן"; }
 function matches(it,q){
   if(!q) return true;
   const hay=norm([it.desc,pmText(it),catName(catKey(it)),nm(it.payer),it.to?nm(it.to):"",it.cur,CUR[it.cur]?.name,String(it.amount),dayLabel(it.date)].join(" "));
@@ -571,10 +571,24 @@ function flipList(box,render){
   return out; }
 const LIST_STEP=40, listLim={shared:LIST_STEP,mine:LIST_STEP};
 /* folded days: which past days were opened by hand (per list), kept while the app is open */
-const DAY_OPEN={shared:new Set(),mine:new Set()};
+/* folded list: months → days → expenses. What you opened or closed by hand is kept while the app is open. */
+const FOLD={shared:new Map(),mine:new Map()};
 function groupDays(list){ const m=new Map(); for(const it of list){ const a=m.get(it.date)||[]; a.push(it); m.set(it.date,a); } return m; }
-/* today is always open; on a day with nothing yet, the latest day stays open so the screen is not empty */
-function foldOpen(list,k){ const o=new Set(DAY_OPEN[k]), t=todayStr(); o.add(t); if(list.length&&!list.some(it=>it.date===t)) o.add(list[0].date); return o; }
+/* the day open by default: today, or on a day with nothing yet the latest day (so the screen is not empty) */
+function autoDay(list){ const t=todayStr(); return list.some(it=>it.date===t)||!list.length ? t : list[0].date; }
+function isOpen(k,key,def){ const v=FOLD[k].get(key); return v===undefined?def:v; }
+function foldState(list,k){ const a=autoDay(list), tm=todayStr().slice(0,7);
+  return { day:d=>d===todayStr()||isOpen(k,"d"+d,d===a), month:m=>isOpen(k,"m"+m,m===tm||m===a.slice(0,7)) }; }
+/* one line for a whole past month: name, how many days and expenses, the total; tap to see its days */
+function monthFold(L,ym,items,open,k,redraw,sum){
+  const b=document.createElement("button"); b.type="button"; b.className="monthfold"+(open?" on":""); b.setAttribute("aria-expanded",String(open));
+  const n=items.filter(it=>it.kind!=="transfer").length, days=new Set(items.map(it=>it.date)).size;
+  const tx=document.createElement("span"); tx.className="df-tx"; const t=document.createElement("b"); t.textContent="🗓️ "+monthName(ym,true);
+  const sub=document.createElement("small"); sub.textContent=(days===1?"יום אחד":days+" ימים")+" · "+(n===1?"הוצאה אחת":n+" הוצאות"); tx.append(t,sub);
+  const c=document.createElement("span"); c.className="df-go num"; c.textContent=sum>0?fmt(sum,showCur):"";
+  const ch=document.createElement("i"); ch.className="df-ch"; ch.setAttribute("aria-hidden","true"); ch.textContent="▾";
+  b.append(tx,c,ch); b.onclick=()=>{ buzz(5); FOLD[k].set("m"+ym,!open); redraw(); }; L.appendChild(b);
+}
 function dayFold(box,h,date,items,open,k,redraw){
   box.classList.add("fold"); box.classList.toggle("shut",!open);
   if(date===todayStr()) return;
@@ -588,7 +602,7 @@ function dayFold(box,h,date,items,open,k,redraw){
   const c=document.createElement("span"); c.className="df-go num"; c.textContent=((h.querySelector(".daysum")||{}).textContent||"").replace(/^סה״כ /,"");
   const ch=document.createElement("i"); ch.className="df-ch"; ch.setAttribute("aria-hidden","true"); ch.textContent="▾";
   sum.append(tx,c,ch); h.hidden=true;
-  sum.onclick=()=>{ buzz(5); if(open) DAY_OPEN[k].delete(date); else DAY_OPEN[k].add(date); redraw(); };
+  sum.onclick=()=>{ buzz(5); FOLD[k].set("d"+date,!open); redraw(); };
   h.after(sum);
 }
 function moreBtn(L,left,fn){ if(left<=0) return; const b=document.createElement("button"); b.type="button"; b.className="btn block more-rows"; b.textContent="עוד "+Math.min(left,LIST_STEP)+" הוצאות · נשארו "+left; b.onclick=()=>{ buzz(5); fn(); }; L.appendChild(b); }
@@ -603,21 +617,25 @@ function renderLedger_(){
     if(loaded&&!q&&!S.items.length){ richEmpty(e,"🧳","עוד אין הוצאות בטיול","הקפה הראשון, המונית מהשדה, הכול מתחיל כאן.","➕ הוצאה ראשונה",openAdd); }
     else { e.className="empty"; e.textContent=!loaded?"":q?"לא נמצאה הוצאה שמתאימה לחיפוש":"אין הוצאות בסינון הזה"; }
     L.appendChild(e); return; }
-  let curDay=null, box=null, skip=false;
-  /* today in full; earlier days fold into one line each (tap to open). Searching or filtering opens everything. */
-  const fold=!q&&filter==="all", openDays=foldOpen(list,"shared"), byDay=fold?groupDays(list):null;
+  let curDay=null, box=null, skip=false, curMon=null, skipMon=false;
+  /* today in full; earlier days fold into one line each, past months into one line each (tap to open). Searching or filtering opens everything. */
+  const fold=!q&&filter==="all", st=foldState(list,"shared"), byDay=fold?groupDays(list):null, tm=todayStr().slice(0,7);
   /* a long trip has hundreds of rows: draw the newest ones, more on request */
   const shown=fold?list:list.slice(0,listLim.shared);
   for(const it of shown){
+    const ym=(it.date||"").slice(0,7);
+    if(fold&&ym!==curMon){ curMon=ym; skipMon=false; if(ym!==tm){ const mi=list.filter(x=>(x.date||"").slice(0,7)===ym); skipMon=!st.month(ym);
+        monthFold(L,ym,mi,!skipMon,"shared",renderLedger,mi.filter(x=>x.kind!=="transfer").reduce((a,x)=>a+conv(+x.amount||0,x.cur,showCur),0)); } }
+    if(skipMon) continue;
     if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,sharedDay(it.date)); box.appendChild(h); L.appendChild(box);
-      skip=fold&&!openDays.has(it.date); if(fold) dayFold(box,h,it.date,byDay.get(it.date),!skip,"shared",renderLedger); }
+      skip=fold&&!st.day(it.date); if(fold) dayFold(box,h,it.date,byDay.get(it.date),!skip,"shared",renderLedger); }
     if(skip) continue;
     const r=document.createElement("div"); r.className="row"+(it.kind==="transfer"?" transfer":"")+(FRESH.has(it.id)?" fresh":"")+(PENDING.has(it.id)?" pending":"")+(isNew(it.id)?" enter":""); r.dataset.id=it.id;
     const dot=catTile(it, it.kind==="transfer"?null:it.payer);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; const m=document.createElement("div"); m.className="m";
     if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent=withTime(it,"סגירת חשבון"+(it.pm==="cash"?" · 💵 מזומן":it.pm==="bank"?" · 🏦 העברה לחשבון":"")); }
-    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+pmText(it)+(feeRate(it)?" מתחלקת":"")+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
+    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+pmText(it)+(feeRate(it)?"\u00a0מתחלקת":"")+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
@@ -784,12 +802,16 @@ function renderPersonal_(){
     if(pLoaded&&!pq) richEmpty(e,"🔐","עוד אין הוצאות אישיות","מזכרות, קפה, עיסוי. "+(fem(me)?"רק את רואה אותן.":"רק אתה רואה אותן."),"➕ הוצאה אישית",openAdd);
     else { e.className="empty"; e.textContent=!pLoaded?"טוען…":"לא נמצאה הוצאה שמתאימה לחיפוש"; }
     L.appendChild(e); }
-  let curDay=null, box=null, skip=false;
-  const fold=!pq, openDays=foldOpen(list,"mine"), byDay=fold?groupDays(list):null;
+  let curDay=null, box=null, skip=false, curMon=null, skipMon=false;
+  const fold=!pq, st=foldState(list,"mine"), byDay=fold?groupDays(list):null, tm=todayStr().slice(0,7);
   const shown=fold?list:list.slice(0,listLim.mine);
   for(const it of shown){
-    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,""); box.appendChild(h); L.appendChild(box);
-      skip=fold&&!openDays.has(it.date); if(fold) dayFold(box,h,it.date,byDay.get(it.date),!skip,"mine",renderPersonal); }
+    const ym=(it.date||"").slice(0,7);
+    if(fold&&ym!==curMon){ curMon=ym; skipMon=false; if(ym!==tm){ const mi=list.filter(x=>(x.date||"").slice(0,7)===ym); skipMon=!st.month(ym);
+        monthFold(L,ym,mi,!skipMon,"mine",renderPersonal,mi.reduce((a,x)=>a+conv(+x.amount||0,x.cur,showCur),0)); } }
+    if(skipMon) continue;
+    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,(()=>{ const v=list.filter(x=>x.date===it.date).reduce((a,x)=>a+conv(+x.amount||0,x.cur,showCur),0); return v>0?"סה״כ "+fmt(v,showCur):""; })()); box.appendChild(h); L.appendChild(box);
+      skip=fold&&!st.day(it.date); if(fold) dayFold(box,h,it.date,byDay.get(it.date),!skip,"mine",renderPersonal); }
     if(skip) continue;
     const r=document.createElement("div"); r.className="row"+(isNew(it.id)?" enter":""); r.dataset.id=it.id;
     const dot=catTile(it,null);
@@ -1692,7 +1714,7 @@ function syncCardFees(){
   for(const it of P) if(!it._pfx) add(it,payFee(it));
   /* shared: my share of the 1%, whoever paid (the fee is split with the expense) */
   for(const it of S.items) if(!it.deleted){ const sh=sharesOf(it)[me]||0; if(sh>0) add(it,payFee(it)*sh); }
-  const out=[...days.values()].map(o=>({id:"pfee-"+o.date+"-"+o.cur,_fee:true,_pfx:true,desc:"עמלת כרטיס 1% על "+(o.n===1?"תשלום בכרטיס":o.n+" תשלומים בכרטיס"),amount:r2(o.v),cur:o.cur,cat:"other",catLabel:"עמלות כרטיס",pm:"fee",date:o.date,createdAt:o.createdAt,tz:o.tz,loc:o.loc}));
+  const out=[...days.values()].map(o=>({id:"pfee-"+o.date+"-"+o.cur,_fee:true,_pfx:true,desc:"עמלת כרטיס 1%"+(o.n>1?" · "+o.n+" תשלומים":""),amount:r2(o.v),cur:o.cur,cat:"other",catLabel:"עמלות כרטיס",pm:"fee",date:o.date,createdAt:o.createdAt,tz:o.tz,loc:o.loc}));
   P=[...P.filter(x=>!x._pfx),...out];
 }
 function cashBalances(){
