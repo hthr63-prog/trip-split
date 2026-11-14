@@ -534,9 +534,11 @@ function flipList(box,render){
     else if(k.startsWith("r:")&&before.size) fresh.push(el); }
   if(fresh.length&&fresh.length<8) M.enter(fresh,{spring:"bouncy",stagger:45});
   return out; }
+const LIST_STEP=40, listLim={shared:LIST_STEP,mine:LIST_STEP};
+function moreBtn(L,left,fn){ if(left<=0) return; const b=document.createElement("button"); b.type="button"; b.className="btn block more-rows"; b.textContent="עוד "+Math.min(left,LIST_STEP)+" הוצאות · נשארו "+left; b.onclick=()=>{ buzz(5); fn(); }; L.appendChild(b); }
 function renderLedger(){ return flipList($("ledger"),renderLedger_); }
 function renderLedger_(){
-  seg($("filter"),[["all","הכול"],...active().map(p=>[p.id,p.name]),["transfers","💸 העברות"]],v=>v===filter,v=>{filter=v;renderLedger();});
+  seg($("filter"),[["all","הכול"],...active().map(p=>[p.id,p.name]),["transfers","💸 העברות"]],v=>v===filter,v=>{filter=v;listLim.shared=LIST_STEP;renderLedger();});
   const L=$("ledger"); L.innerHTML="";
   const q=norm($("lSearch").value);
   const list=S.items.filter(it=>(filter==="all"||(filter==="transfers"?it.kind==="transfer":it.payer===filter))&&matches(it,q)).sort((x,y)=>(y.date||"").localeCompare(x.date||"")||(y.createdAt||0)-(x.createdAt||0));
@@ -546,7 +548,9 @@ function renderLedger_(){
     else { e.className="empty"; e.textContent=!loaded?"":q?"לא נמצאה הוצאה שמתאימה לחיפוש":"אין הוצאות בסינון הזה"; }
     L.appendChild(e); return; }
   let curDay=null, box=null;
-  for(const it of list){
+  /* a long trip has hundreds of rows: draw the newest ones, more on request */
+  const shown=list.slice(0,listLim.shared);
+  for(const it of shown){
     if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,sharedDay(it.date)); box.appendChild(h); L.appendChild(box); }
     const r=document.createElement("div"); r.className="row"+(it.kind==="transfer"?" transfer":"")+(FRESH.has(it.id)?" fresh":"")+(PENDING.has(it.id)?" pending":"")+(isNew(it.id)?" enter":""); r.dataset.id=it.id;
     const dot=catTile(it, it.kind==="transfer"?null:it.payer);
@@ -569,6 +573,7 @@ function renderLedger_(){
     }
     r.append(dot,main,right); tapRow(r); box.appendChild(swipeWrap(r,it,false));
   }
+  moreBtn(L,list.length-shown.length,()=>{ listLim.shared+=LIST_STEP; renderLedger(); });
 }
 
 /* ---- personal account: password-protected, works on any device ----
@@ -716,7 +721,8 @@ function renderPersonal_(){
     else { e.className="empty"; e.textContent=!pLoaded?"טוען…":"לא נמצאה הוצאה שמתאימה לחיפוש"; }
     L.appendChild(e); }
   let curDay=null, box=null;
-  for(const it of list){
+  const shown=list.slice(0,listLim.mine);
+  for(const it of shown){
     if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,""); box.appendChild(h); L.appendChild(box); }
     const r=document.createElement("div"); r.className="row"+(isNew(it.id)?" enter":""); r.dataset.id=it.id;
     const dot=catTile(it,null);
@@ -738,6 +744,7 @@ function renderPersonal_(){
     right.appendChild(acts);
     r.append(dot,main,right); tapRow(r); box.appendChild(swipeWrap(r,it,true));
   }
+  moreBtn(L,list.length-shown.length,()=>{ listLim.mine+=LIST_STEP; renderPersonal(); });
 }
 
 /* ================= playful layer ================= */
@@ -1530,8 +1537,9 @@ $("tabbar").addEventListener("click",e=>{ const b=e.target.closest("button"); if
 $("addClose").onclick=()=>closeSheet("addSheet");
 $("fabUp").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
 window.addEventListener("scroll",()=>{ $("fabUp").hidden= window.scrollY<400; },{passive:true});
-$("lSearch").addEventListener("input",renderLedger);
-$("pSearch").addEventListener("input",renderPersonal);
+{ let tl=0, tp=0;
+  $("lSearch").addEventListener("input",()=>{ clearTimeout(tl); tl=setTimeout(()=>{ listLim.shared=LIST_STEP; renderLedger(); },140); });
+  $("pSearch").addEventListener("input",()=>{ clearTimeout(tp); tp=setTimeout(()=>{ listLim.mine=LIST_STEP; renderPersonal(); },140); }); }
 
 /* ---- daily summary in the personal view: alone / together / combined, in shekels unless chosen otherwise ---- */
 function renderDaily(){
