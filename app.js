@@ -80,12 +80,16 @@ async function refreshRates(){
     for(const c in CUR){ const v=d.usd&&d.usd[c.toLowerCase()]; if(v>0) next[c]=v; } got=true; stamp=d.date?new Date(d.date+"T00:00:00Z"):new Date(); }catch(e){}
   try{ const d=await fetchJson("https://api.coinbase.com/v2/exchange-rates?currency=USD");
     const r=d.data&&d.data.rates; if(r){ for(const c in CUR){ const v=parseFloat(r[c]); if(v>0) next[c]=v; } got=true; stamp=new Date(); } }catch(e){}
-  if(got){ S.fx={rates:next,at:stamp,live:true}; store("trip-fx",JSON.stringify({rates:next,at:stamp.toISOString()})); renderAll(); }
+  if(got){ S.fx={rates:next,at:stamp,live:true}; store("trip-fx",JSON.stringify({rates:next,at:stamp.toISOString()})); renderAll(); setTimeout(freezeOld,1500); }
 }
 try{ const c=JSON.parse(load("trip-fx")||"null"); if(c&&c.rates){ S.fx={rates:{...SNAPSHOT,...c.rates},at:new Date(c.at),live:false}; } }catch(e){}
 
 /* ---- money ---- */
 function perUsd(c){ return +S.fx.rates[c]||NaN; }
+/* every shared expense and transfer keeps the rate of the moment it was entered (rIls: 1 unit = rIls shekels).
+   Balances add up those frozen shekel values, so a later move in rates never changes who owes what. */
+function rateNow(c){ return c==="ILS" ? 1 : conv(1,c,"ILS"); }
+function ils(it){ const v=+it.amount||0; return it.rIls>0 ? v*it.rIls : conv(v,it.cur||"ILS","ILS"); }
 function conv(v,from,to){ if(from===to) return v; return v/perUsd(from)*perUsd(to); }
 function fmt(v,cur){
   const info=CUR[cur]||{sym:""}; const a=Math.abs(v);
@@ -112,31 +116,40 @@ function settleOf(from,to,amt,cur){
   let k=amt/total; if(Math.abs(k-1)<0.005) k=1; if(k>1) return null;      /* paying more than owed: keep it a plain transfer */
   const v={}; for(const [c,x] of pos) v[c]=Math.round(-x*k*1e6)/1e6; return v;
 }
+let froze=false;
+function freezeOld(){
+  if(froze||!canWrite||navigator.onLine===false||!S.fx.live) return;
+  const old=ALL.filter(x=>!x.deleted&&x.kind!=="private"&&(x.kind==="expense"||x.kind==="transfer")&&!(x.rIls>0)&&x.cur&&x.cur!=="ILS");
+  froze=true; if(!old.length) return;
+  const batch=db.batch(); let n=0;
+  for(const x of old){ const r=rateNow(x.cur); if(r>0){ batch.update(EXP().doc(x.id),{rIls:r}); n++; } }
+  if(n) batch.commit().catch(e=>{ console.error(e); froze=false; });
+}
 function compute(){
-  const net={}; let total=0; const paid={}, share={}, cats={};
-  for(const p of S.people){ net[p.id]={}; paid[p.id]=0; share[p.id]=0; }
+  /* net: what each person paid minus their share, per original currency (for the per-currency breakdown);
+     base: the same in shekels at each expense's own rate (for the balance itself) */
+  const net={}, base={}; let total=0; const paid={}, share={}, cats={};
+  const add=(id,c,v,b)=>{ if(!net[id]) net[id]={}; net[id][c]=(net[id][c]||0)+v; base[id]=(base[id]||0)+b; };
+  for(const p of S.people){ net[p.id]={}; base[p.id]=0; paid[p.id]=0; share[p.id]=0; }
   for(const it of S.items){
-    /* a settle-up records which debts it closed, currency by currency, so a later change in rates cannot reopen them */
-    if(it.kind==="transfer"&&it.vec&&typeof it.vec==="object"){ for(const c in it.vec){ const v=+it.vec[c]||0;
-      if(!net[it.payer]) net[it.payer]={}; if(!net[it.to]) net[it.to]={};
-      net[it.payer][c]=(net[it.payer][c]||0)+v; net[it.to][c]=(net[it.to][c]||0)-v; } continue; }
-    const c=it.cur||"ILS", v=+it.amount||0, sh=sharesOf(it);
-    if(!net[it.payer]) net[it.payer]={};
-    net[it.payer][c]=(net[it.payer][c]||0)+v;
-    for(const k in sh){ if(!net[k]) net[k]={}; net[k][c]=(net[k][c]||0)-v*sh[k]; }
+    /* older settle-ups (before rates were frozen) recorded what they closed per currency */
+    if(it.kind==="transfer"&&!(it.rIls>0)&&it.vec&&typeof it.vec==="object"){ for(const c in it.vec){ const v=+it.vec[c]||0, b=conv(v,c,"ILS"); add(it.payer,c,v,b); add(it.to,c,-v,-b); } continue; }
+    const c=it.cur||"ILS", v=+it.amount||0, vb=ils(it), sh=sharesOf(it);
+    add(it.payer,c,v,vb);
+    for(const k in sh) add(k,c,-v*sh[k],-vb*sh[k]);
     if(it.kind==="transfer") continue;
-    const sv=conv(v,c,showCur); total+=sv;
+    const sv=conv(vb,"ILS",showCur); total+=sv;
     paid[it.payer]=(paid[it.payer]||0)+sv;
     for(const k in sh) share[k]=(share[k]||0)+sv*sh[k];
     const ck=it.cat||"other"; cats[ck]=(cats[ck]||0)+sv;
   }
-  const bal={}; for(const id in net){ let b=0; for(const c in net[id]) b+=conv(net[id][c],c,showCur); bal[id]=b; }
+  const bal={}; for(const id in base) bal[id]=conv(base[id],"ILS",showCur);
   const eps=conv(0.5,"ILS",showCur);
   const cr=Object.entries(bal).filter(([,b])=>b>eps).map(([id,b])=>({id,b})).sort((x,y)=>y.b-x.b);
   const dr=Object.entries(bal).filter(([,b])=>b<-eps).map(([id,b])=>({id,b:-b})).sort((x,y)=>y.b-x.b);
   const debts=[]; let i=0,j=0;
   while(i<dr.length&&j<cr.length){ const x=Math.min(dr[i].b,cr[j].b); if(x>eps) debts.push({from:dr[i].id,to:cr[j].id,amt:x}); dr[i].b-=x; cr[j].b-=x; if(dr[i].b<=eps) i++; if(cr[j].b<=eps) j++; }
-  return {net,bal,total,paid,share,cats,debts};
+  return {net,base,bal,total,paid,share,cats,debts};
 }
 
 /* ---- extra state ---- */
@@ -544,7 +557,7 @@ function renderLedger_(){
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
-    if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(conv(+it.amount,it.cur,"ILS"),"ILS"); right.appendChild(s); }
+    if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(ils(it),"ILS"); right.appendChild(s); }
     if(me&&it.kind!=="transfer"){ const sh=sharesOf(it); const d=(it.payer===me?+it.amount:0)-(+it.amount)*(sh[me]||0); if(Math.abs(d)>0.0001){ const s=document.createElement("span"); s.className="mine num "+(d>0?"plus":"minus"); s.textContent=(d>0?"מגיע לך ":"עליך ")+fmt(Math.abs(d),it.cur); right.appendChild(s); } }
     if(canWrite){
       const acts=document.createElement("div"); acts.className="acts";
@@ -1230,7 +1243,7 @@ async function save(){
   if(!form.among.length) return showErr("fErr","צריך לבחור לפחות אדם אחד שמתחלק בהוצאה");
   let pcts=null;
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
-  const data={kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr()};
+  const data={rIls:(editingId&&editOrig&&editOrig.cur===cur.fCur&&editOrig.rIls>0)?editOrig.rIls:rateNow(cur.fCur),kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat,catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr()};
   const id=editingId||uid("e");
   let patch=data;
   if(editingId&&editOrig){ patch={}; for(const k of Object.keys(data)){ if(JSON.stringify(data[k]??null)!==JSON.stringify(editOrig[k]??null)) patch[k]=data[k]; } }
@@ -1248,8 +1261,7 @@ async function save(){
 async function addTransfer(from,to,amt,pm,tc){
   const showCur_=showCur; const showCur2=tc||showCur_;
   const id=uid("t");
-  const vec=settleOf(from,to,amt,showCur2);
-  const ok=await run(()=>EXP().doc(id).set({kind:"transfer",amount:amt,cur:showCur2,payer:from,to,...(vec?{vec}:{}),pm:pm==="cash"?"cash":"bank",date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),by:me||null,trip:curTrip}));
+  const ok=await run(()=>EXP().doc(id).set({kind:"transfer",amount:amt,cur:showCur2,rIls:rateNow(showCur2),payer:from,to,pm:pm==="cash"?"cash":"bank",date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),by:me||null,trip:curTrip}));
   if(ok){ setTimeout(()=>{ const c=compute(); if(!c.debts.length) confetti(); flash($("ticket"),"glow",900); },60); buzz([12,60,12]); }
   if(ok) notifyOthers("💸 "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur2));
   if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur2)+(pm==="cash"?" במזומן · עודכן בארנק":" בהעברה · עודכן בתקציב"),"ביטול",()=>run(()=>EXP().doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
@@ -1730,6 +1742,7 @@ $("dMore").onclick=()=>{ dayLimit+=30; renderDaily(); };
 async function again(it,personal){
   const id=uid(personal?"m":"e"); const base={...it}; delete base.id;
   Object.assign(base,{date:todayStr(),createdAt:Date.now(),tz:hereTz(),loc:defLoc(),trip:curTrip});
+  if(!personal) base.rIls=rateNow(base.cur||"ILS"); else delete base.rIls;
   let ok;
   if(personal){ const c=await loadAcct(); if(!c) return; const doc=await encFor(c,base); ok=await run(()=>EXP().doc(id).set(doc)); }
   else { base.by=me||null; delete base.source; ok=await run(()=>EXP().doc(id).set(base)); if(ok) notifyOthers("🧾 "+nm(me||it.payer)+" "+(fem(me||it.payer)?"הוסיפה":"הוסיף")+": "+(base.desc||"הוצאה")+" "+fmt(+base.amount,base.cur)); }
@@ -2300,6 +2313,7 @@ metaRef().onSnapshot(async s=>{
     return;
   }
   const d=s.data(); const prevLocal=S.localCur;
+  setTimeout(freezeOld,4000);
   const was=curTrip; META=d; S.people=d.people||[]; applyTrip(); if(ALL.length&&was!==curTrip){ splitItems(); }
   if(firstMeta||prevLocal!==S.localCur){ if(!editingId) cur.fCur=S.localCur; if(!pEditingId) cur.pCur=S.localCur; cur.cFrom=S.localCur; }
   firstMeta=false;
