@@ -154,7 +154,7 @@ const norm=s=>String(s||"").toLowerCase().replace(/[׳'"`]/g,"").replace(/\s+/g,
 /* sheets move on springs (motion.js): up on open, follow the finger down, settle back or close */
 const M=window.Motion;
 function sheetEl(s){ return s.querySelector(".sheet"); }
-function openSheet(id){ const s=$(id); s.classList.remove("closing"); const wasHidden=s.hidden; s.hidden=false; document.body.style.overflow="hidden";
+function openSheet(id){ const s=$(id); s.classList.remove("closing"); const wasHidden=s.hidden; s.hidden=false; document.body.style.overflow="hidden"; if(id==="acctSheet") renderTabs();
   const sh=sheetEl(s); if(sh&&!sh.querySelector(".grab")){ const g=document.createElement("div"); g.className="grab"; g.setAttribute("aria-hidden","true"); sh.prepend(g); }
   if(!M||calm()||!wasHidden) return;
   s.classList.add("msp"); const wide=innerWidth>=640;
@@ -165,7 +165,7 @@ function openSheet(id){ const s=$(id); s.classList.remove("closing"); const wasH
 function closeSheet(id){
   const s=$(id); if(s.hidden) return;
   if(M&&!calm()&&s.classList.contains("msp")){ const sh=sheetEl(s); if(s.dataset.closing) return; s.dataset.closing="1";
-    const fin=()=>{ delete s.dataset.closing; if(sh){ sh.style.transform=""; sh.getAnimations().forEach(a=>a.cancel()); } s.getAnimations().forEach(a=>a.cancel()); s.hidden=true; s.classList.remove("msp"); if(id==="addSheet") restoreAdd(); if($("curSheet").hidden&&$("setSheet").hidden&&$("addSheet").hidden&&$("acctSheet").hidden) document.body.style.overflow=""; };
+    const fin=()=>{ delete s.dataset.closing; if(sh){ sh.style.transform=""; sh.getAnimations().forEach(a=>a.cancel()); } s.getAnimations().forEach(a=>a.cancel()); s.hidden=true; s.classList.remove("msp"); if(id==="addSheet") restoreAdd(); if($("curSheet").hidden&&$("setSheet").hidden&&$("addSheet").hidden&&$("acctSheet").hidden) document.body.style.overflow=""; if(id==="acctSheet") renderTabs(); };
     const from=sh&&sh.style.transform||"none";
     Promise.all([M.animate(s,[{opacity:1},{opacity:0}],{spring:"snappy",keep:true}), sh?M.animate(sh,innerWidth>=640?[{opacity:1,transform:"none"},{opacity:0,transform:"scale(.96)"}]:[{transform:from},{transform:"translateY(100%)"}],{spring:"snappy",keep:true}):null]).then(fin);
     return; }
@@ -1286,7 +1286,13 @@ $("pDesc").addEventListener("keydown",e=>{ if(e.key==="Enter") $("pAmt").focus()
 
 /* ---- stats page: spending per month and by category ---- */
 let stScope="trip", stMonth=null, locScope="couple";
-function goView(v){ viewSwap(()=>{ view=v; syncUrl(); renderAll(); window.scrollTo({top:0}); }); }
+function goView(v){
+  /* with motion.js: the new screen's blocks rise in one after another instead of a whole-page cross-fade */
+  if(M&&!calm()){ view=v; syncUrl(); renderAll(); window.scrollTo({top:0});
+    const box=$(v==="stats"?"viewStats":v==="personal"?"viewPersonal":"viewShared");
+    const parts=[$("hero"),$("sofar"),...(box?box.querySelectorAll(":scope > *, :scope > #pBody > *"):[])].filter(el=>el&&!el.hidden&&el.offsetParent!==null&&el.id!=="pBody"&&el.getBoundingClientRect().top<innerHeight);
+    M.enter(parts.slice(0,6),{stagger:45}); return; }
+  viewSwap(()=>{ view=v; syncUrl(); renderAll(); window.scrollTo({top:0}); }); }
 $("statsBtn").onclick=()=>goView(view==="stats"?"shared":"stats");
 $("statsBack").onclick=()=>goView("shared");
 $("catMore").onclick=()=>{ stScope="trip"; stMonth=thisMonth(); goView("stats"); };
@@ -1472,7 +1478,20 @@ const pDateChips=$("pDate")&&$("pDateChips")?dateChips($("pDate"),$("pDateChips"
 /* bottom tab bar */
 function renderTabs(){
   const on=loaded&&!!me&&!!person(me)&&canWrite; $("tabbar").hidden=!on; document.body.classList.toggle("has-tabs",on);
-  for(const b of $("tabbar").querySelectorAll("[data-v]")){ const v=b.dataset.v; const act= v==="acct" ? !$("acctSheet").hidden : v===view; b.classList.toggle("on",act); b.setAttribute("aria-current",act?"page":"false"); }
+  let onBtn=null;
+  const acctOpen=!$("acctSheet").hidden;
+  for(const b of $("tabbar").querySelectorAll("[data-v]")){ const v=b.dataset.v; const act= v==="acct" ? acctOpen : (!acctOpen&&v===view); b.classList.toggle("on",act); b.setAttribute("aria-current",act?"page":"false"); if(act) onBtn=b; }
+  tabInd(onBtn);
+}
+/* a soft pill behind the active tab that glides to the next one (motion.js) */
+function tabInd(btn){
+  const bar=$("tabbar"); let i=bar.querySelector(".tab-ind");
+  if(!btn||bar.hidden){ if(i) i.style.opacity="0"; return; }
+  if(!i){ i=document.createElement("i"); i.className="tab-ind"; i.setAttribute("aria-hidden","true"); bar.prepend(i); }
+  const R=bar.getBoundingClientRect(), b=btn.getBoundingClientRect(), w=Math.min(64,b.width-8), x=b.left-R.left+(b.width-w)/2;
+  const prev=i.dataset.x!==undefined&&i.style.opacity!=="0" ? +i.dataset.x : null; if(prev===x) return;
+  i.dataset.x=x; i.style.opacity="1"; i.style.width=w+"px"; i.style.transform="translateX("+x+"px)";
+  if(M&&prev!==null&&!calm()) M.animate(i,[{transform:"translateX("+prev+"px) scaleX(1)"},{transform:"translateX("+((prev+x)/2)+"px) scaleX(1.35)",offset:.45},{transform:"translateX("+x+"px) scaleX(1)"}],{spring:"smooth"});
 }
 $("tabbar").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; buzz(6);
   if(b.id==="tabAdd") return openAdd();
