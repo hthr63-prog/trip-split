@@ -14,7 +14,8 @@ const buzz=ms=>{ try{
 const MONEY=new Map();   /* last shown value per number, to count from it */
 function money(el,v,cur,key){
   if(!el) return; key=key||el.id||""; const prev=MONEY.get(key); MONEY.set(key,{v,cur});
-  if(calm()||!prev||prev.cur!==cur||!isFinite(prev.v)||Math.abs(prev.v-v)<0.005){ el.textContent=fmt(v,cur); return; }
+  /* a new display currency rolls too: from the number shown a moment ago to the new one, in the new currency */
+  if(calm()||!prev||!isFinite(prev.v)||!isFinite(v)||Math.abs(prev.v-v)<0.005){ el.textContent=fmt(v,cur); return; }
   /* the number rolls to its new value on a spring (motion.js), like a meter settling */
   el.classList.add("ticking");
   if(window.Motion){ Motion.count(el,prev.v,v,x=>{ el.textContent=fmt(x,cur); if(x===v) el.classList.remove("ticking"); },"smooth"); return; }
@@ -1106,7 +1107,9 @@ function renderSofar(){
   const V=it=>conv(+it.amount||0,it.cur,showCur);
   const days=sfDays(sfScope);
   const R=$("sfRow"); R.innerHTML="";
-  const cell=(val,label,sw)=>{ const d=document.createElement("div"); const b=document.createElement("b"); b.className="num"; b.textContent=val; const l=document.createElement("span");
+  /* money cells roll to their new value like the big number (also on a currency switch); counts are plain text */
+  const cell=(val,label,sw)=>{ const d=document.createElement("div"); const b=document.createElement("b"); b.className="num"; const key="sfc"+R.children.length;
+    if(typeof val==="number") money(b,val,showCur,key); else { b.textContent=val; MONEY.delete(key); } const l=document.createElement("span");
     if(sw){ const i=document.createElement("i"); i.className="sw"; i.style.background=sw; l.appendChild(i); } l.appendChild(document.createTextNode(label)); d.append(b,l); R.appendChild(d); };
   const st=tripStart();
   const daysCell=()=>{ if(st&&st>td){ cell(String(Math.round((new Date(st+"T12:00")-new Date(td+"T12:00"))/864e5)),"ימים לטיסה"); }
@@ -1136,7 +1139,7 @@ function renderSofar(){
       const pct=Math.round((total-daily)/daily*100);
       badge= total===0 ? ["","היום עוד כלום"] : [pct>0?"up":"down", pct===0?"היום בדיוק כמו הממוצע":"היום "+(pct>0?"▲ ":"▼ ")+Math.abs(pct)+"%"];
     }
-    const d=document.createElement("div"); const bb=document.createElement("b"); bb.className="num"; bb.textContent=fmt(val,showCur);
+    const d=document.createElement("div"); const bb=document.createElement("b"); bb.className="num"; money(bb,val,showCur,"sfc"+R.children.length);
     const l=document.createElement("span"); l.textContent=label; d.append(bb,l);
     if(badge){ const t=document.createElement("em"); t.className="sf-delta "+badge[0]; t.textContent=badge[1]; d.appendChild(t); }
     R.appendChild(d);
@@ -1153,7 +1156,7 @@ function renderSofar(){
     const all2=S.items.filter(it=>it.kind!=="transfer");
     $("sfSub").textContent=( its.length ? its.length+" הוצאות"+(sfScope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (sfScope==="day"?"עוד לא נרשמו הוצאות היום":"עוד לא נרשמו הוצאות") )+flightNote;
     $("sfBar").hidden=true;
-    if(me){ cell(fmt(mine,showCur),"החלק שלך"); cell(fmt(paid,showCur),"שילמת"); avgCell(total,f=>all2.filter(f).reduce((a,it)=>a+V(it),0)); }
+    if(me){ cell(mine,"החלק שלך"); cell(paid,"שילמת"); avgCell(total,f=>all2.filter(f).reduce((a,it)=>a+V(it),0)); }
     else { cell(String(its.length),"הוצאות"); daysCell(); avgCell(total,f=>all2.filter(f).reduce((a,it)=>a+V(it),0)); }
     R.hidden=false;
   } else {
@@ -1165,7 +1168,7 @@ function renderSofar(){
     $("sfSub").textContent=( all>0 ? "לבד + החלק שלך במשותף"+(sfScope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (sfScope==="day"?"עוד אין הוצאות היום":"עוד אין הוצאות") )+flightNote;
     const bar=$("sfBar"); bar.hidden=!(all>0);
     if(all>0){ $("sfBarA").style.width=(own/all*100)+"%"; $("sfBarB").style.width=(tog/all*100)+"%"; }
-    cell(fmt(own,showCur),"לבד","#14B8A6"); cell(fmt(tog,showCur),"ביחד","linear-gradient(135deg,#6C4BFF,#FF4D8D)");
+    cell(own,"לבד","#14B8A6"); cell(tog,"ביחד","linear-gradient(135deg,#6C4BFF,#FF4D8D)");
     avgCell(all,f=>P.filter(f).reduce((a,it)=>a+V(it),0)+myShareItems().filter(f).reduce((a,it)=>a+V(it),0));
   }
   { const bb=$("sfBud"), r= personal ? budgetCalc() : null; bb.hidden=!r;
