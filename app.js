@@ -689,7 +689,15 @@ function myShareItems(){
   for(const it of S.items){ if(it.kind==="transfer") continue; const sh=sharesOf(it)[me]||0; if(sh>0) out.push({...it,amount:(+it.amount||0)*sh}); }
   return out;
 }
-function renderPersonal(){ return flipList($("pLedger"),renderPersonal_); }
+function renderPForm(){
+  if(!cur.pCur) cur.pCur=S.localCur; setCurBtn("pCur",cur.pCur);
+  $("pLoc").textContent=locName(pform.loc||defLoc());
+  seg($("pPm"),[["cash","💵 מזומן"],["card","💳 כרטיס"]],v=>v===(pform.pm||"cash"),v=>{pform.pm=v;renderPForm();});
+  seg($("pCat"),CATS,v=>v===pform.cat,v=>{pform.cat=v;renderPForm(); if(v==="other") $("pCatLabel").focus();});
+  $("pCatLabel").hidden=pform.cat!=="other";
+  convHint("pAmt",cur.pCur,"pConv"); saveLabel();
+}
+function renderPersonal(){ renderPForm(); return flipList($("pLedger"),renderPersonal_); }
 function renderPersonal_(){
   if(view!=="personal"||!me) return;
   const locked=!(acct&&acctFor===me);
@@ -707,12 +715,6 @@ function renderPersonal_(){
   showinRow($("pShowin"));
   renderDaily(); renderCash();
   catBars("pCats","pCatPanel",cats);
-  if(!cur.pCur) cur.pCur=S.localCur; setCurBtn("pCur",cur.pCur);
-  $("pLoc").textContent=locName(pform.loc||defLoc());
-  seg($("pPm"),[["cash","💵 מזומן"],["card","💳 כרטיס"]],v=>v===(pform.pm||"cash"),v=>{pform.pm=v;renderPersonal();});
-  seg($("pCat"),CATS,v=>v===pform.cat,v=>{pform.cat=v;renderPersonal(); if(v==="other") $("pCatLabel").focus();});
-  $("pCatLabel").hidden=pform.cat!=="other";
-  convHint("pAmt",cur.pCur,"pConv");
   const L=$("pLedger"); L.innerHTML="";
   const pq=norm($("pSearch").value);
   const list=P.filter(it=>matches(it,pq)).sort((x,y)=>(y.date||"").localeCompare(x.date||"")||(y.createdAt||0)-(x.createdAt||0));
@@ -1235,12 +1237,12 @@ function startEdit(it){
   form.mode=it.pcts?"pct":"equal"; form.pcts=it.pcts?{...it.pcts}:{};
   $("fDesc").value=it.desc||""; $("fCatLabel").value=it.catLabel||""; $("fAmt").value=group(String(it.amount)); $("fDate").value=it.date||todayStr(); cur.fCur=it.cur;
   renderForm();
-  $("formTitle").textContent="✏️ עריכת הוצאה"; $("saveBtn").textContent="שמירת שינויים"; $("cancelEdit").hidden=false;
+  $("formTitle").textContent="✏️ עריכת הוצאה"; $("saveBtn").textContent="שמירת שינויים"; $("cancelEdit").hidden=false; saveLabel();
   if(!$("addSlot").contains($("form"))) openAdd(); else $("form").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function resetForm(){ setTimeout(()=>fDateChips(),0);
   editingId=null; $("fDesc").value=""; $("fCatLabel").value=""; $("fAmt").value=""; form.mode="equal"; form.pcts={}; form.among=null; if(me) form.payer=me; cur.fCur=S.localCur; form.loc=null;
-  $("formTitle").textContent="➕ הוצאה משותפת"; $("saveBtn").textContent="הוספה"; $("cancelEdit").hidden=true; renderForm();
+  $("formTitle").textContent="➕ הוצאה משותפת"; $("saveBtn").textContent="הוספה"; $("cancelEdit").hidden=true; renderForm(); saveLabel();
 }
 async function save(){
   showErr("fErr");
@@ -1289,12 +1291,12 @@ function pStartEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
   pEditingId=it.id; pform.cat=it.cat||"other"; pform.loc=locOf(it); pform.pm=it.pm||"cash"; cur.pCur=it.cur;
   $("pDesc").value=it.desc||""; $("pCatLabel").value=it.catLabel||""; $("pAmt").value=group(String(it.amount)); $("pDate").value=it.date||todayStr();
-  $("pFormTitle").textContent="✏️ עריכת הוצאה אישית"; $("pSave").textContent="שמירת שינויים"; $("pCancel").hidden=false; renderPersonal();
+  $("pFormTitle").textContent="✏️ עריכת הוצאה אישית"; $("pSave").textContent="שמירת שינויים"; $("pCancel").hidden=false; saveLabel(); renderPersonal();
   if(!$("addSlot").contains($("pForm"))) openAdd(); else $("pForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function pReset(){
   pEditingId=null; $("pDesc").value=""; $("pCatLabel").value=""; $("pAmt").value=""; cur.pCur=S.localCur; pform.loc=null;
-  $("pFormTitle").textContent="➕ הוצאה אישית"; $("pSave").textContent="הוספה"; $("pCancel").hidden=true; renderPersonal();
+  $("pFormTitle").textContent="➕ הוצאה אישית"; $("pSave").textContent="הוספה"; $("pCancel").hidden=true; renderPersonal(); saveLabel();
 }
 async function pSave(){
   showErr("pErr");
@@ -1453,15 +1455,35 @@ for(const id of ["fAmt","pAmt","cA","cB","cwAmt","cwFee","caAmt","cxAmt","cxGot"
 
 /* ---- floating buttons: back to top, quick add ---- */
 let addHome=null;
-function openAdd(){
-  if(view==="stats") goView("shared");
-  const id= view==="personal"&&me ? "pForm" : "form";
+function openAdd(kind){
+  if(view==="stats"&&!kind) goView("shared");
+  const id= kind==="me"||(!kind&&view==="personal"&&me) ? "pForm" : "form";
   if(id==="pForm"&&!(acct&&acctFor===me)){ window.scrollTo({top:0,behavior:"smooth"}); $("lockPw").focus(); return; }
   const f=$(id); addHome={f,parent:f.parentNode,next:f.nextSibling};
   $("addSlot").appendChild(f); f.hidden=false; openSheet("addSheet");
+  if(id==="pForm") renderPForm(); else renderForm();
+  renderAddKind(id==="pForm"?"me":"shared");
   try{ fDateChips(); pDateChips(); }catch(e){}
   setTimeout(()=>{ try{ $(id==="pForm"?"pAmt":"fAmt").focus(); }catch(e){} },80);
 }
+/* shared / personal switch at the top of the add sheet: what was typed comes along */
+function renderAddKind(k){ const el=$("addKind"); el.hidden=!(me&&person(me)&&canWrite); if(el.hidden) return;
+  seg(el,[["shared","👫 משותפת"],["me","🔐 אישית"]],v=>v===k,v=>{ if(v!==k) switchAddKind(v); }); }
+function switchAddKind(kind){
+  const toMe=kind==="me";
+  if(toMe&&!(acct&&acctFor===me)){ toast("🔒 קודם פותחים את האישי עם הסיסמה","לאישי",()=>{ closeSheet("addSheet"); goView("personal"); }); renderAddKind("shared"); return; }
+  const [a,b]= toMe ? [["fAmt","fDesc","fDate"],["pAmt","pDesc","pDate"]] : [["pAmt","pDesc","pDate"],["fAmt","fDesc","fDate"]];
+  a.forEach((id,i)=>{ if($(id).value) $(b[i]).value=$(id).value; });
+  if(toMe){ cur.pCur=cur.fCur||cur.pCur; pform.cat=form.cat||pform.cat; pform.pm=form.pm||pform.pm; }
+  else { cur.fCur=cur.pCur||cur.fCur; form.cat=pform.cat||form.cat; form.pm=pform.pm||form.pm; }
+  restoreAdd(); openAdd(toMe?"me":"shared"); buzz(6);
+}
+/* the save button says what it will add, so it can be checked without scrolling */
+function saveLabel(){
+  const one=(btn,amtId,c,editing)=>{ const v=parseFloat(String($(amtId).value).replace(/,/g,"")); btn.textContent=(editing?"שמירת שינויים":"הוספה")+(v>0?" · "+fmt(v,c):""); };
+  one($("saveBtn"),"fAmt",cur.fCur||S.localCur,!!editingId); one($("pSave"),"pAmt",cur.pCur||S.localCur,!!pEditingId);
+}
+$("fAmt").addEventListener("input",saveLabel); $("pAmt").addEventListener("input",saveLabel);
 let cxHome=null;
 function sheetExchange(on){
   const X=$("cashX"), f=$("addSlot").querySelector("#form,#pForm");

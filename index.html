@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261114092008"></script>
+<script src="theme.js?v=20261114092519"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -799,6 +799,14 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 .tabbar .tab-ind{position:absolute;left:0;top:7px;height:56px;border-radius:16px;background:color-mix(in srgb,var(--brand) 13%,transparent);pointer-events:none;transition:opacity .2s ease;z-index:0}
 .tabbar button{position:relative;z-index:1}
 .tabbar button.on svg{fill:none}
+
+/* add sheet: shared/personal switch, and the save row stays in reach above the keyboard */
+.add-head{gap:8px}
+.kindseg{flex-wrap:nowrap;gap:2px;padding:3px;background:var(--surface-2);border-radius:999px}
+.kindseg button{border:0;background:transparent;padding:6px 11px;font-size:.86rem;font-weight:700;color:var(--muted);white-space:nowrap}
+.kindseg button[aria-pressed="true"]{color:var(--surface)}
+#addSlot .card > .actions{position:sticky;bottom:calc(-21px - env(safe-area-inset-bottom,0px));z-index:3;margin:0 -18px -18px;padding:12px 18px calc(14px + env(safe-area-inset-bottom,0px));background:var(--surface);box-shadow:0 -14px 18px -14px rgba(30,22,64,.25);border-radius:0 0 var(--r) var(--r)}
+#addSlot .card > .actions .btn.primary{flex:1}
 </style>
 </head>
 <body>
@@ -1232,7 +1240,7 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 
 <div class="sheet-bg" id="addSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-label="הוספת הוצאה">
-    <div class="sheet-head"><button class="btn small" id="addXBtn" type="button">💱 צ׳יינג׳</button><button class="btn small" id="addClose" type="button">סגירה</button></div>
+    <div class="sheet-head add-head"><button class="btn small" id="addXBtn" type="button">💱 צ׳יינג׳</button><div class="seg kindseg" id="addKind" hidden></div><button class="btn small" id="addClose" type="button">סגירה</button></div>
     <div id="addSlot"></div>
   </div>
 </div>
@@ -1443,10 +1451,10 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261114092008">
-<script src="config.js?v=20261114092008"></script>
-<script src="motion.js?v=20261114092008"></script>
-<script src="fx.js?v=20261114092008"></script>
-<script src="app.js?v=20261114092008"></script>
+<meta name="app-v" content="20261114092519">
+<script src="config.js?v=20261114092519"></script>
+<script src="motion.js?v=20261114092519"></script>
+<script src="fx.js?v=20261114092519"></script>
+<script src="app.js?v=20261114092519"></script>
 </body>
 </html>
