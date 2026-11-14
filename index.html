@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261114081732"></script>
+<script src="theme.js?v=20261114082550"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -784,6 +784,15 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:-8px auto -4px;flex-shrink:0}
 @media (min-width:640px){.grab{display:none}}
 .fly-chip{position:fixed;z-index:80;pointer-events:none;padding:7px 13px;border-radius:999px;background:var(--grad);color:#fff;font-family:var(--display);font-weight:800;font-size:.95rem;white-space:nowrap;box-shadow:var(--shadow)}
+
+/* one-choice rows: the chosen look lives on a pill that glides between options */
+.seg.glide{position:relative}
+.seg.glide > button{position:relative;z-index:1;transition:color .2s ease,border-color .2s ease}
+.seg.glide > button[aria-pressed="true"]{background:transparent;box-shadow:none}
+.seg-ind{position:absolute;z-index:0;border-radius:999px;background:var(--ink);pointer-events:none}
+.seg.sfseg .seg-ind{background:var(--surface);box-shadow:0 2px 8px -4px rgba(30,22,64,.35)}
+.seg.glide > button.pop{animation:none}
+.ticking{font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -1428,10 +1437,10 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<meta name="app-v" content="20261114081732">
-<script src="config.js?v=20261114081732"></script>
-<script src="motion.js?v=20261114081732"></script>
-<script src="fx.js?v=20261114081732"></script>
-<script src="app.js?v=20261114081732"></script>
+<meta name="app-v" content="20261114082550">
+<script src="config.js?v=20261114082550"></script>
+<script src="motion.js?v=20261114082550"></script>
+<script src="fx.js?v=20261114082550"></script>
+<script src="app.js?v=20261114082550"></script>
 </body>
 </html>

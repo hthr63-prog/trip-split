@@ -15,10 +15,10 @@ const MONEY=new Map();   /* last shown value per number, to count from it */
 function money(el,v,cur,key){
   if(!el) return; key=key||el.id||""; const prev=MONEY.get(key); MONEY.set(key,{v,cur});
   if(calm()||!prev||prev.cur!==cur||!isFinite(prev.v)||Math.abs(prev.v-v)<0.005){ el.textContent=fmt(v,cur); return; }
-  const from=prev.v, t0=performance.now(), dur=520; el.classList.add("ticking");
-  const step=now=>{ const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3); el.textContent=fmt(from+(v-from)*e,cur);
-    if(k<1) requestAnimationFrame(step); else { el.textContent=fmt(v,cur); el.classList.remove("ticking"); } };
-  requestAnimationFrame(step);
+  /* the number rolls to its new value on a spring (motion.js), like a meter settling */
+  el.classList.add("ticking");
+  if(window.Motion){ Motion.count(el,prev.v,v,x=>{ el.textContent=fmt(x,cur); if(x===v) el.classList.remove("ticking"); },"smooth"); return; }
+  el.textContent=fmt(v,cur); el.classList.remove("ticking");
 }
 function flash(el,cls,ms){ if(!el||calm()) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(()=>el.classList.remove(cls),ms||600); }
 function viewSwap(fn){ if(document.startViewTransition&&!calm()){ try{ document.startViewTransition(fn); return; }catch(e){} } fn(); }
@@ -250,13 +250,16 @@ $("curSearch").addEventListener("keydown",e=>{ if(e.key==="Enter"){ const f=$("c
 $("curClose").onclick=()=>closeSheet("curSheet");
 
 function seg(el,opts,isOn,onPick){
-  el.innerHTML="";
+  /* keep the gliding pill across re-renders, so a second render mid-glide does not cut it short */
+  const ind=el.querySelector(":scope > .seg-ind"), was=window.Motion&&el.offsetParent!==null ? Motion.rectIn(el) : null;
+  el.innerHTML=""; if(ind) el.prepend(ind);
   for(const [val,label] of opts){
     const b=document.createElement("button"); b.type="button"; b.textContent=label;
     const pk=(el.id||"")+"|"+val; b.setAttribute("aria-pressed",String(isOn(val)));
     if(popKey===pk){ b.classList.add("pop"); popKey=null; }
     b.onclick=()=>{ popKey=pk; buzz(6); onPick(val); }; el.appendChild(b);
   }
+  if(window.Motion) Motion.glide(el,was);
 }
 function showinRow(el){
   el.innerHTML="";

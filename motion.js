@@ -32,6 +32,23 @@
     return cache[name]={easing,duration};
   }
 
+  /* the same spring as a function of time, for things that are not CSS (numbers) */
+  const curves={};
+  function curve(name){
+    if(curves[name]) return curves[name];
+    const sp=SPRINGS[name]||SPRINGS.smooth, dt=1/240, pts=[0]; let x=0,v=0,t=0;
+    while(t<3){ const a=(-sp.stiffness*(x-1)-sp.damping*v)/sp.mass; v+=a*dt; x+=v*dt; t+=dt; pts.push(x); if(Math.abs(x-1)<0.0008&&Math.abs(v)<0.01) break; }
+    const dur=t*1000;
+    return curves[name]={dur, at:ms=> ms>=dur ? 1 : pts[Math.min(pts.length-1,Math.round(ms/1000*240))]};
+  }
+  /* roll a number from one value to another on a spring, painting each frame with fmt(value) */
+  function count(el,from,to,paint,name){
+    if(!el) return; const c=curve(name||"smooth"); if(calm()||from===to){ paint(to); return; }
+    const id=(el.__cnt||0)+1; el.__cnt=id; const t0=performance.now();
+    const step=now=>{ if(el.__cnt!==id) return; const k=c.at(now-t0); paint(from+(to-from)*k); if(now-t0<c.dur) requestAnimationFrame(step); else paint(to); };
+    requestAnimationFrame(step);
+  }
+
   /* play keyframes on an element with a spring; resolves when done */
   function animate(el,keyframes,opt){
     opt=opt||{}; if(!el||!el.animate) return Promise.resolve();
@@ -72,5 +89,22 @@
   /* a quick "done" pulse for things that just saved */
   function pop(el){ return animate(el,[{transform:"scale(.92)"},{transform:"scale(1)"}],{spring:"bouncy"}); }
 
-  window.Motion={SPRINGS,spring,animate,enter,flip,pop,calm};
+    /* a pill that glides behind the chosen option of a one-choice row of buttons */
+  function glide(row,prevRect){
+    const on=row.querySelectorAll('button[aria-pressed="true"]'); let ind=row.querySelector(":scope > .seg-ind");
+    if(on.length!==1||row.offsetParent===null){ row.classList.remove("glide"); if(ind) ind.remove(); return; }
+    row.classList.add("glide"); if(!ind){ ind=document.createElement("i"); ind.className="seg-ind"; ind.setAttribute("aria-hidden","true"); row.prepend(ind); }
+    const R=row.getBoundingClientRect(), b=on[0].getBoundingClientRect(), to={left:b.left-R.left,top:b.top-R.top,width:b.width,height:b.height};
+    const same=ind.dataset.to===JSON.stringify(to); if(same&&ind.getAnimations().length) return;   /* already gliding there */
+    ind.dataset.to=JSON.stringify(to);
+    const cur=ind.getAnimations().length&&ind.style.width ? (()=>{ const r=ind.getBoundingClientRect(); return {left:r.left-R.left,top:r.top-R.top,width:r.width,height:r.height}; })() : null;
+    if(cur) prevRect=cur; ind.getAnimations().forEach(a=>a.cancel());
+    Object.assign(ind.style,{left:to.left+"px",top:to.top+"px",width:to.width+"px",height:to.height+"px"});
+    if(prevRect&&!calm()&&(Math.abs(prevRect.left-to.left)>.5||Math.abs(prevRect.top-to.top)>.5))
+      animate(ind,[{left:prevRect.left+"px",top:prevRect.top+"px",width:prevRect.width+"px",height:prevRect.height+"px"},{left:to.left+"px",top:to.top+"px",width:to.width+"px",height:to.height+"px"}],{spring:"snappy"});
+  }
+  function rectIn(row){ const on=row.querySelectorAll('button[aria-pressed="true"]'); if(on.length!==1||row.offsetParent===null) return null;
+    const R=row.getBoundingClientRect(), b=on[0].getBoundingClientRect(); return {left:b.left-R.left,top:b.top-R.top,width:b.width,height:b.height}; }
+
+  window.Motion={SPRINGS,spring,curve,count,animate,enter,flip,pop,glide,rectIn,calm};
 })();
