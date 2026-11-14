@@ -467,7 +467,7 @@ function renderForm(){
       i.oninput=()=>{ form.pcts[id]=i.value; }; l.appendChild(i); Pc.appendChild(l);
     }
   }
-  $("fLoc").textContent=locName(form.loc||defLoc());
+  $("fLoc").textContent=locName(form.loc||defLoc()); moreSum();
   seg($("fCat"),CATS,v=>v===form.cat,v=>{form.cat=v;form.catSet=true;renderForm(); if(v==="other") $("fCatLabel").focus();});
   $("fCatAuto").hidden=!(form.cat&&!form.catSet);
   $("fCatLabel").hidden=form.cat!=="other";
@@ -599,7 +599,7 @@ function renderLedger_(){
       if(it.kind!=="transfer"){ const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.title="להוסיף את אותה הוצאה להיום"; ag.onclick=()=>again(it,false); acts.prepend(ag); }
       const d=delBtn(()=>delItem(it,false)); if(it.kind==="transfer"){ d.textContent="ביטול ההעברה"; d.dataset.label="ביטול ההעברה"; }
       acts.appendChild(d);
-      right.appendChild(acts);
+      r.appendChild(acts);
     }
     r.append(dot,main,right); tapRow(r); box.appendChild(swipeWrap(r,it,false));
   }
@@ -721,7 +721,7 @@ function myShareItems(){
 }
 function renderPForm(){
   if(!cur.pCur) cur.pCur=S.localCur; setCurBtn("pCur",cur.pCur);
-  $("pLoc").textContent=locName(pform.loc||defLoc());
+  $("pLoc").textContent=locName(pform.loc||defLoc()); moreSum();
   seg($("pPm"),[["cash","💵 מזומן"],["card","💳 כרטיס"]],v=>v===(pform.pm||"cash"),v=>{pform.pm=v;renderPForm();});
   seg($("pCat"),CATS,v=>v===pform.cat,v=>{pform.cat=v;pform.catSet=true;renderPForm(); if(v==="other") $("pCatLabel").focus();});
   $("pCatAuto").hidden=!(pform.cat&&!pform.catSet);
@@ -750,7 +750,7 @@ function renderPersonal_(){
   const pq=norm($("pSearch").value);
   const list=P.filter(it=>matches(it,pq)).sort((x,y)=>(y.date||"").localeCompare(x.date||"")||(y.createdAt||0)-(x.createdAt||0));
   if(!list.length){ const e=document.createElement("div");
-    if(pLoaded&&!pq) richEmpty(e,"🔐","עוד אין הוצאות אישיות","מזכרות, קפה, עיסוי. רק את/ה רואה אותן.","➕ הוצאה אישית",openAdd);
+    if(pLoaded&&!pq) richEmpty(e,"🔐","עוד אין הוצאות אישיות","מזכרות, קפה, עיסוי. "+(fem(me)?"רק את רואה אותן.":"רק אתה רואה אותן."),"➕ הוצאה אישית",openAdd);
     else { e.className="empty"; e.textContent=!pLoaded?"טוען…":"לא נמצאה הוצאה שמתאימה לחיפוש"; }
     L.appendChild(e); }
   let curDay=null, box=null;
@@ -774,7 +774,7 @@ function renderPersonal_(){
     const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>pStartEdit(it); acts.appendChild(e);
     const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.onclick=()=>again(it,true); acts.prepend(ag);
     acts.appendChild(delBtn(()=>delItem(it,true)));
-    right.appendChild(acts);
+    r.appendChild(acts);
     r.append(dot,main,right); tapRow(r); box.appendChild(swipeWrap(r,it,true));
   }
   moreBtn(L,list.length-shown.length,()=>{ listLim.mine+=LIST_STEP; renderPersonal(); });
@@ -930,7 +930,7 @@ function recapSlides(d){
   if(d.bigOne) S2.push({bg:"g6",kick:"ההוצאה הכי גדולה",big:catEmoji(d.bigOne),h:d.bigOne.desc||"הוצאה",p:fmt(+d.bigOne.amount,d.bigOne.cur)+(d.bigOne.cur!=="ILS"?" ≈ "+fmt(conv(+d.bigOne.amount,d.bigOne.cur,"ILS"),"ILS"):"")});
   const pe=Object.entries(d.paid).sort((x,y)=>y[1]-x[1]);
   if(pe.length>1) S2.push({bg:"g2",kick:"מי פתח יותר את הארנק",bars:pe.map(([id,v])=>[nm(id),Math.round(v/d.total*100)]),p:nm(pe[0][0])+" "+g.paid(pe[0][0])+" "+Math.round(pe[0][1]/d.total*100)+"% מההוצאות"});
-  if(me) S2.push({bg:"g3",kick:"ואת/ה?",money:d.share+(d.alone||0),p:(d.alone!=null?"🙋 לבד "+fmt(d.alone,"ILS")+" · ":"")+"👫 ביחד "+fmt(d.share,"ILS")});
+  if(me) S2.push({bg:"g3",kick:fem(me)?"ואת?":"ואתה?",money:d.share+(d.alone||0),p:(d.alone!=null?"🙋 לבד "+fmt(d.alone,"ILS")+" · ":"")+"👫 ביחד "+fmt(d.share,"ILS")});
   S2.push({bg:"g4",kick:"בשורה התחתונה",h:d.items.length+" הוצאות · "+d.transfers+" העברות",p:"🔥 הרצף הכי ארוך שלכם: "+bestStreak(d)+" ימים של רישום"});
   S2.push({bg:"g1",end:true,kick:"היה שווה כל שקל 💜",h:title,p:"שתפו את הסיכום"});
   return S2;
@@ -1179,7 +1179,7 @@ function renderSofar(){
   const sh=$("sfShow"); sh.hidden=!personal; if(personal) showinRow(sh);
 }
 function renderAll(){
-  renderHero(); renderInsight(); renderSofar();
+  applyG(); renderHero(); renderInsight(); renderSofar();
   { const arch=loaded&&curTrip!==activeTrip(); $("tripNote").hidden=!arch; if(arch) $("tripNoteTxt").textContent="🗂️ אתם צופים בטיול "+(S.trip||"קודם")+" מהארכיון"; }
   requestAnimationFrame(()=>{ watchReveal(); renderMini(); onScroll(); });
   renderHeader();
@@ -1202,7 +1202,7 @@ async function run(fn){
     /* without reception the write is kept on the phone and uploads later; don't wait for the server */
     const job=Promise.resolve().then(fn);
     const r=await Promise.race([job.then(()=>"ok"),new Promise(res=>setTimeout(()=>res("slow"),2500))]);
-    if(r==="slow"){ $("status").textContent="⏳ נשמר בטלפון, יעלה כשתחזור קליטה"; job.then(done).catch(e=>{ console.error(e); $("status").textContent="השמירה נכשלה. נסו שוב."; }); return true; }
+    if(r==="slow"){ $("status").textContent="⏳ נשמר בטלפון, יעלה כשתחזור קליטה"; toast("⏳ נשמר בטלפון, יעלה כשתחזור קליטה"); job.then(done).catch(e=>{ console.error(e); $("status").textContent="השמירה נכשלה. נסו שוב."; }); return true; }
     done(); return true; }
   catch(e){ if(e&&e.code==="needs-network"){ $("status").textContent="📶 בשביל זה צריך קליטה. נסו שוב כשתחזור."; toast("📶 בשביל זה צריך קליטה. ההוצאות עצמן נשמרות גם בלי."); return false; }
     console.error(e); $("status").textContent= e&&e.code==="permission-denied" ? "אין הרשאה לשמור." : "השמירה נכשלה. בדקו את החיבור ונסו שוב."; return false; }
@@ -1258,7 +1258,18 @@ $("nuSave").onclick=async()=>{
 };
 
 /* ---- shared form ---- */
-function showErr(id,msg){ const e=$(id); e.textContent=msg||""; e.hidden=!msg; if(msg){ flash(e.closest(".card,.sheet,.stack")||e,"shake",450); buzz([10,40,10]); } }
+/* field: the input that is missing. It gets a red ring, the cursor, and scrolls into view; typing clears both. */
+function showErr(id,msg,field){ const e=$(id); e.textContent=msg||""; e.hidden=!msg; document.querySelectorAll(".bad-f").forEach(x=>x.classList.remove("bad-f"));
+  if(!msg) return; flash(e.closest(".card,.sheet,.stack")||e,"shake",450); buzz([10,40,10]);
+  if(field){ const box=field.closest(".amount")||field; box.classList.add("bad-f");
+    try{ box.scrollIntoView({block:"center",behavior:calm()?"auto":"smooth"}); field.focus({preventScroll:true}); }catch(_){}
+    const clear=()=>{ box.classList.remove("bad-f"); if(e.textContent===msg){ e.hidden=true; e.textContent=""; } };
+    field.addEventListener("input",clear,{once:true}); field.addEventListener("click",clear,{once:true}); } }
+function dayWord(v){ const t=todayStr(); if(!v||v===t) return "היום"; const y=new Date(Date.now()-864e5), ys=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0"); if(v===ys) return "אתמול"; const a=v.split("-").map(Number); return a[2]+"."+a[1]; }
+/* the folded "date · place" line of both forms; it turns amber when the date is not today */
+function moreSum(){ for(const [k,f] of [["f",form],["p",pform]]){ const el=$(k+"MoreSum"); if(!el) continue; const v=$(k+"Date").value; el.textContent="📅 "+dayWord(v)+" · "+locName(f.loc||defLoc()); $(k+"More").classList.toggle("off",!!v&&v!==todayStr()); } }
+/* texts that speak to one person, in his or her gender */
+function applyG(){ if(!me) return; const f=fem(me); document.querySelectorAll("[data-gm]").forEach(e=>{ const t=f?e.dataset.gf:e.dataset.gm; if(e.textContent!==t) e.textContent=t; }); }
 function done(btn){ if(!btn) return; buzz(10); if(calm()) return; btn.classList.add("ok"); setTimeout(()=>btn.classList.remove("ok"),900); }
 $("fCur").onclick=()=>openCurPicker("באיזה מטבע שילמתם?",cur.fCur,c=>{ cur.fCur=c; renderForm(); });
 $("cFrom").onclick=()=>openCurPicker("יש לי…",cur.cFrom,c=>{ cur.cFrom=c; renderConv(); });
@@ -1280,9 +1291,9 @@ function resetForm(){ setTimeout(()=>fDateChips(),0);
 async function save(){
   showErr("fErr");
   const amount=parseFloat(String($("fAmt").value).replace(/,/g,""));
-  if(!(amount>0)) return showErr("fErr","צריך להזין סכום גדול מאפס");
-  if(!$("fDesc").value.trim()){ $("fDesc").focus(); return showErr("fErr","צריך לתת שם להוצאה, למשל: ארוחת ערב"); }
-  if(!form.among.length) return showErr("fErr","צריך לבחור לפחות אדם אחד שמתחלק בהוצאה");
+  if(!(amount>0)) return showErr("fErr","צריך להזין סכום גדול מאפס",$("fAmt"));
+  if(!$("fDesc").value.trim()) return showErr("fErr","צריך לתת שם להוצאה, למשל: ארוחת ערב",$("fDesc"));
+  if(!form.among.length) return showErr("fErr","צריך לבחור לפחות אדם אחד שמתחלק בהוצאה",$("fAmong"));
   let pcts=null;
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
   const data={rIls:(editingId&&editOrig&&editOrig.cur===cur.fCur&&editOrig.rIls>0)?editOrig.rIls:rateNow(cur.fCur),kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat||"other",catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr()};
@@ -1297,6 +1308,7 @@ async function save(){
   const ok=await job;
   if(!ok&&canWrite){ setTimeout(()=>{ openAdd(); showErr("fErr","לא נשמר. בדקו את החיבור ונסו שוב."); },400); return; }
   if(ok&&!editingId) notifyOthers("🧾 "+nm(me||form.payer)+" "+(fem(me||form.payer)?"הוסיפה":"הוסיף")+": "+data.desc+" "+fmt(amount,data.cur));
+  if(ok&&!editingId) toast((/^⏳/.test($("status").textContent)?"⏳ נשמר בטלפון, יעלה כשתחזור קליטה · ":"✓ נוסף: ")+label,"ביטול",()=>run(()=>EXP().doc(id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null})),6000);
   if(ok){ done($("saveBtn")); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
@@ -1309,9 +1321,9 @@ async function addTransfer(from,to,amt,pm,tc){
   if(ok) toast("💸 נרשם: "+nm(from)+" "+g.transferred(from)+" ל"+nm(to)+" "+fmt(amt,showCur2)+(pm==="cash"?" במזומן · עודכן בארנק":" בהעברה · עודכן בתקציב"),"ביטול",()=>run(()=>EXP().doc(id).delete()).then(k=>{ if(k) toast("ההעברה בוטלה"); }));
 }
 let toastTimer=null;
-function toast(msg,actLabel,act){
+function toast(msg,actLabel,act,ms){
   const T=$("toast"); T.innerHTML=""; const s=document.createElement("span"); s.textContent=msg; T.appendChild(s);
-  const life=actLabel?10000:3000;
+  const life=ms||(actLabel?10000:3000);
   const hide=()=>{ if(calm()){ T.hidden=true; return; } T.classList.add("out"); setTimeout(()=>{ T.hidden=true; T.classList.remove("out"); },200); };
   if(actLabel){ const b=document.createElement("button"); b.type="button"; b.textContent=actLabel; b.onclick=()=>{ clearTimeout(toastTimer); hide(); buzz(8); act(); }; T.appendChild(b);
     const bar=document.createElement("i"); bar.className="tbar"; bar.style.animationDuration=life+"ms"; T.appendChild(bar); }
@@ -1334,8 +1346,8 @@ function pReset(){
 async function pSave(){
   showErr("pErr");
   const amount=parseFloat(String($("pAmt").value).replace(/,/g,""));
-  if(!(amount>0)) return showErr("pErr","צריך להזין סכום גדול מאפס");
-  if(!$("pDesc").value.trim()){ $("pDesc").focus(); return showErr("pErr","צריך לתת שם להוצאה, למשל: קפה"); }
+  if(!(amount>0)) return showErr("pErr","צריך להזין סכום גדול מאפס",$("pAmt"));
+  if(!$("pDesc").value.trim()) return showErr("pErr","צריך לתת שם להוצאה, למשל: קפה",$("pDesc"));
   const c=await loadAcct(); if(!c) return showErr("pErr","צריך להיכנס לחשבון האישי קודם.");
   const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat||"other",catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||defLoc(),pm:pform.pm||"cash",date:$("pDate").value||todayStr(),trip:curTrip};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
@@ -1344,6 +1356,7 @@ async function pSave(){
   if(!$("addSheet").hidden){ buzz(10); flyToTotal($("pSave"),catEmoji(data)+" "+fmt(amount,data.cur)); closeSheet("addSheet"); }
   const ok=await job;
   if(!ok&&canWrite){ setTimeout(()=>{ openAdd(); showErr("pErr","לא נשמר. בדקו את החיבור ונסו שוב."); },400); return; }
+  if(ok&&!old) toast((/^⏳/.test($("status").textContent)?"⏳ נשמר בטלפון, יעלה כשתחזור קליטה · ":"✓ נוסף: ")+catEmoji(data)+" "+fmt(amount,data.cur),"ביטול",()=>run(()=>EXP().doc(id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null})),6000);
   if(ok){ done($("pSave")); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
@@ -1493,6 +1506,7 @@ function openAdd(kind){
   const id= kind==="me"||(!kind&&view==="personal"&&me) ? "pForm" : "form";
   if(id==="pForm"&&!(acct&&acctFor===me)){ window.scrollTo({top:0,behavior:"smooth"}); $("lockPw").focus(); return; }
   const f=$(id); addHome={f,parent:f.parentNode,next:f.nextSibling};
+  for(const k of ["fMore","pMore"]) if($(k)) $(k).open=false;
   $("addSlot").appendChild(f); f.hidden=false; openSheet("addSheet");
   if(id==="pForm") renderPForm(); else renderForm();
   renderAddKind(id==="pForm"?"me":"shared");
@@ -1565,6 +1579,7 @@ function dateChips(inp,box){
   inp.addEventListener("change",paint); inp.addEventListener("input",paint); paint(); return paint;
 }
 const fDateChips=dateChips($("fDate"),$("fDateChips"));
+for(const k of ["fDate","pDate"]) if($(k)){ $(k).addEventListener("change",moreSum); $(k).addEventListener("input",moreSum); }
 const pDateChips=$("pDate")&&$("pDateChips")?dateChips($("pDate"),$("pDateChips")):()=>{};
 /* bottom tab bar */
 function renderTabs(){
@@ -1598,11 +1613,7 @@ window.addEventListener("scroll",()=>{ $("fabUp").hidden= window.scrollY<400; },
 
 /* ---- daily summary in the personal view: alone / together / combined, in shekels unless chosen otherwise ---- */
 function renderDaily(){
-  const S2=$("dShowin"); S2.innerHTML="";
-  const quick=["ILS",S.localCur,"USD"].filter((x,i,arr)=>arr.indexOf(x)===i);
-  for(const q of quick){ const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=(CUR[q].sym?CUR[q].sym+" ":"")+CUR[q].name; b.setAttribute("aria-pressed",String(dayCur===q)); b.onclick=()=>{ dayCur=q; renderDaily(); }; S2.appendChild(b); }
-  const o=document.createElement("button"); o.type="button"; o.className="curbtn"; o.textContent=quick.includes(dayCur)?"🔎 מטבע אחר":curText(dayCur);
-  o.onclick=()=>openCurPicker("להציג את הסיכום היומי ב…",dayCur,c=>{ dayCur=c; renderDaily(); }); S2.appendChild(o);
+  $("dShowin").hidden=true; dayCur=showCur;   /* one currency choice for the whole page: the card above */
   const share=myShareItems(); const days=new Map();
   const add=(it,k,v)=>{ if(!it.date) return; const o=days.get(it.date)||{alone:0,tog:0}; o[k]+=v; days.set(it.date,o); };
   for(const it of P) add(it,"alone",conv(+it.amount||0,it.cur,dayCur));
@@ -1613,7 +1624,7 @@ function renderDaily(){
   for(const [d,o] of list.slice(0,dayLimit)){
     const tr=document.createElement("tr");
     const c=(txt,cls)=>{ const td=document.createElement("td"); td.textContent=txt; if(cls) td.className=cls; tr.appendChild(td); };
-    c(shortDay(d)); c(fmt(o.alone,dayCur),"num"); c(fmt(o.tog,dayCur),"num"); c(fmt(o.alone+o.tog,dayCur),"num strong");
+    c(shortDay(d)); c(o.alone>0.004?fmt(o.alone,dayCur):"—","num"); c(o.tog>0.004?fmt(o.tog,dayCur):"—","num"); c(fmt(o.alone+o.tog,dayCur),"num strong");
     T.appendChild(tr);
   }
   $("dMore").hidden=list.length<=dayLimit;
@@ -1686,7 +1697,7 @@ function renderCash_(){
     const rep1= x.sub==="withdraw"||x.sub==="exchange"||x.sub==="adjust"||x.sub==="gift";
     const acts=document.createElement("div"); acts.className="acts";
     if(rep1){ const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.onclick=()=>againCash(x); acts.appendChild(ag); }
-    acts.appendChild(delBtn(()=>delItem({id:x.id,desc:label[x.sub]||"ארנק"},true))); right.appendChild(acts);
+    acts.appendChild(delBtn(()=>delItem({id:x.id,desc:label[x.sub]||"ארנק"},true))); r.appendChild(acts);
     r.append(dot,main,right); tapRow(r);
     L.appendChild(swipeWrap(r,{id:x.id},true,{again:rep1?()=>againCash(x):null,againLabel:x.sub==="withdraw"?"🔁 עוד משיכה כזו":"🔁 שוב להיום",del:()=>delItem({id:x.id,desc:(label[x.sub]||"ארנק").replace(/^\S+ /,"")},true)}));
   }
@@ -1989,7 +2000,7 @@ function renderSettings(){
   }
   $("acctSec").hidden=!me;
   if(me){ const p=person(me); const inNow=!!(acct&&acctFor===me);
-    $("acctText").textContent= !p?.vk ? "עוד לא נוצר חשבון אישי. נכנסים אליו דרך הכפתור \"האישי שלי\"." : inNow ? "את/ה מחובר/ת לחשבון האישי של "+nm(me)+" במכשיר הזה." : "החשבון קיים, אבל במכשיר הזה עוד לא נכנסת אליו.";
+    $("acctText").textContent= !p?.vk ? "עוד לא נוצר חשבון אישי. נכנסים אליו דרך הכפתור \"האישי שלי\"." : inNow ? (fem(me)?"את מחוברת":"אתה מחובר")+" לחשבון האישי של "+nm(me)+" במכשיר הזה." : "החשבון קיים, אבל במכשיר הזה עוד לא נכנסת אליו.";
     $("acctChange").hidden=!inNow; $("acctLogout").hidden=!inNow; }
 }
 async function renamePerson(id,name){

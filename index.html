@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261114094713"></script>
+<script src="theme.js?v=20261114095829"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -808,6 +808,28 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 .kindseg button[aria-pressed="true"]{color:var(--surface)}
 #addSlot .card > .actions{position:sticky;bottom:calc(-21px - env(safe-area-inset-bottom,0px));z-index:3;margin:0 -18px -18px;padding:12px 18px calc(14px + env(safe-area-inset-bottom,0px));background:var(--surface);box-shadow:0 -14px 18px -14px rgba(30,22,64,.25);border-radius:0 0 var(--r) var(--r)}
 #addSlot .card > .actions .btn.primary{flex:1}
+
+/* the error sits in the save row, so it is always in view; the missing field is ringed */
+.actions > .err{flex:1 0 100%;text-align:center;background:color-mix(in srgb,var(--bad) 12%,var(--surface));padding:9px 12px;border-radius:12px;font-weight:600}
+.bad-f{box-shadow:0 0 0 2.5px var(--bad)!important;border-radius:18px}
+input.bad-f{border-color:var(--bad)!important}
+/* date and place fold into one line: they are right most of the time */
+.more-f{border:1.5px solid var(--line);border-radius:16px;padding:0 14px;background:var(--surface)}
+.more-f summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;cursor:pointer;font-weight:600;-webkit-tap-highlight-color:transparent}
+.more-f summary::-webkit-details-marker{display:none}
+.more-f summary em{font-style:normal;color:var(--brand);font-size:.86rem;font-weight:600;white-space:nowrap}
+.more-f summary em::after{content:"לשינוי ▾"}
+.more-f[open] summary em::after{content:"סגירה ▴"}
+.more-f[open]{padding-bottom:14px}
+.more-f[open] > :not(summary){margin-top:10px}
+.more-f.off{border-color:#F59E0B;background:color-mix(in srgb,#F59E0B 10%,var(--surface))}
+/* row actions get their own line, so the name keeps its width */
+.row .acts{order:9;grid-column:1/-1}
+/* finger-sized targets */
+.showin .chip,.showin .curbtn{min-height:38px;padding-inline:13px}
+.seg.sfseg button{min-height:38px;padding-inline:13px}
+.btn.small{min-height:40px}
+.bighead small,.sf-k{font-size:.78rem}
 </style>
 </head>
 <body>
@@ -1006,9 +1028,12 @@ details.fold-note>summary::-webkit-details-marker{display:none}
       <div class="hint num" id="fConv"></div>
       <div class="grid">
         <label>שם ההוצאה *<input id="fDesc" required maxlength="60" placeholder="ארוחת ערב, סליפר לצ׳יאנג מאי…" autocomplete="off"><span class="seg suggest" id="fSuggest" hidden></span></label>
-        <div class="datefield"><span class="dlab" id="fDateLab">תאריך</span><div class="seg datechips" id="fDateChips" role="group" aria-labelledby="fDateLab"></div><span class="datebox"><input id="fDate" type="date" aria-labelledby="fDateLab"></span></div>
       </div>
-      <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="fLoc" type="button"></button></div>
+      <div class="fieldset"><span class="hint">קטגוריה <span class="cat-auto" id="fCatAuto" hidden>🪄 לפי השם · אפשר לשנות</span></span><div class="seg" id="fCat"></div><input id="fCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
+      <details class="more-f" id="fMore"><summary><span id="fMoreSum">📅 היום</span><em></em></summary>
+        <div class="datefield"><span class="dlab" id="fDateLab">תאריך</span><div class="seg datechips" id="fDateChips" role="group" aria-labelledby="fDateLab"></div><span class="datebox"><input id="fDate" type="date" aria-labelledby="fDateLab"></span></div>
+        <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="fLoc" type="button"></button></div>
+      </details>
       <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="fPm"></div></div>
       <div class="fieldset"><span class="hint">מי שילם?</span><div class="seg" id="fPayer"></div></div>
       <div class="fieldset">
@@ -1017,9 +1042,8 @@ details.fold-note>summary::-webkit-details-marker{display:none}
         <div class="seg" id="fMode"></div>
         <div class="pcts" id="fPcts" hidden></div>
       </div>
-      <div class="fieldset"><span class="hint">קטגוריה <span class="cat-auto" id="fCatAuto" hidden>🪄 לפי השם · אפשר לשנות</span></span><div class="seg" id="fCat"></div><input id="fCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
-      <div class="err" id="fErr" hidden></div>
       <div class="actions">
+        <div class="err" id="fErr" role="alert" hidden></div>
         <button class="btn primary big" id="saveBtn" type="button">הוספה</button>
         <button class="btn" id="cancelEdit" type="button" hidden>ביטול עריכה</button>
       </div>
@@ -1080,21 +1104,23 @@ details.fold-note>summary::-webkit-details-marker{display:none}
         <div class="showin" id="pShowin"></div>
       </section>
 
-      <button class="add-cta" id="pAddCtaBtn" type="button" data-tone="peach"><span class="plus" aria-hidden="true">+</span><span class="tx"><b>הוצאה אישית חדשה</b><small>רק את/ה רואה אותה</small></span><span class="go" aria-hidden="true">←</span></button>
+      <button class="add-cta" id="pAddCtaBtn" type="button" data-tone="peach"><span class="plus" aria-hidden="true">+</span><span class="tx"><b>הוצאה אישית חדשה</b><small data-gm="רק אתה רואה אותה" data-gf="רק את רואה אותה">רק אתה רואה אותה</small></span><span class="go" aria-hidden="true">←</span></button>
       <div class="recent" id="pRecentChips" hidden></div>
       <section class="card" id="pForm" hidden>
-        <div class="card-head"><h2 id="pFormTitle">➕ הוצאה אישית</h2><span class="hint" id="pOnly">רק את/ה רואה</span></div>
+        <div class="card-head"><h2 id="pFormTitle">➕ הוצאה אישית</h2><span class="hint" id="pOnly">רק אתה רואה</span></div>
         <div class="amount"><input id="pAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="pCur" type="button" aria-label="מטבע"></button></div>
         <div class="hint num" id="pConv"></div>
         <div class="grid">
           <label>שם ההוצאה *<input id="pDesc" required maxlength="60" placeholder="מזכרת, קפה, עיסוי…" autocomplete="off"><span class="seg suggest" id="pSuggest" hidden></span></label>
-          <div class="datefield"><span class="dlab" id="pDateLab">תאריך</span><div class="seg datechips" id="pDateChips" role="group" aria-labelledby="pDateLab"></div><span class="datebox"><input id="pDate" type="date" aria-labelledby="pDateLab"></span></div>
         </div>
-        <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="pLoc" type="button"></button></div>
-        <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="pPm"></div></div>
         <div class="fieldset"><span class="hint">קטגוריה <span class="cat-auto" id="pCatAuto" hidden>🪄 לפי השם · אפשר לשנות</span></span><div class="seg" id="pCat"></div><input id="pCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
-        <div class="err" id="pErr" hidden></div>
+        <details class="more-f" id="pMore"><summary><span id="pMoreSum">📅 היום</span><em></em></summary>
+          <div class="datefield"><span class="dlab" id="pDateLab">תאריך</span><div class="seg datechips" id="pDateChips" role="group" aria-labelledby="pDateLab"></div><span class="datebox"><input id="pDate" type="date" aria-labelledby="pDateLab"></span></div>
+          <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="pLoc" type="button"></button></div>
+        </details>
+        <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="pPm"></div></div>
         <div class="actions">
+          <div class="err" id="pErr" role="alert" hidden></div>
           <button class="btn primary big" id="pSave" type="button">הוספה</button>
           <button class="btn" id="pCancel" type="button" hidden>ביטול עריכה</button>
         </div>
@@ -1322,7 +1348,7 @@ details.fold-note>summary::-webkit-details-marker{display:none}
         <div class="actions"><button class="btn primary" id="budSave" type="button">שמירה</button><button class="btn" id="budCancel" type="button">ביטול</button></div>
         <div class="err" id="budErr" hidden></div>
       </div>
-      <details class="fold-note"><summary>איך זה מחושב?</summary><small class="bud-note">יורד מהיתרה: משיכות מכספומט עם העמלה, תשלומים בכרטיס (אישיים, ומשותפים ששילמת), והתחשבנות בהעברה לחשבון. התחשבנות במזומן עוברת לארנק. תשלום במזומן לא יורד שוב, כי הכסף כבר ירד במשיכה. רק את/ה רואה את התקציב.</small></details>
+      <details class="fold-note"><summary>איך זה מחושב?</summary><small class="bud-note">יורד מהיתרה: משיכות מכספומט עם העמלה, תשלומים בכרטיס (אישיים, ומשותפים ששילמת), והתחשבנות בהעברה לחשבון. התחשבנות במזומן עוברת לארנק. תשלום במזומן לא יורד שוב, כי הכסף כבר ירד במשיכה. <span data-gm="רק אתה רואה את התקציב." data-gf="רק את רואה את התקציב.">רק אתה רואה את התקציב.</span></small></details>
     </section>
     <details class="fold" id="acctQuickBox"><summary><span>⚡ הוספה מהירה ממסך הבית</span></summary><div class="quick">
       <div class="quick-pair">
@@ -1432,7 +1458,7 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 
     <div class="sec">
       <h3>🗑 סל מחזור <span class="hint" id="binCount"></span></h3>
-      <div class="hint">הוצאות שנמחקו נשמרות כאן 30 יום, ואפשר לשחזר אותן. הוצאות אישיות שלך מסומנות ב-🔐 ורק את/ה רואה אותן.</div>
+      <div class="hint">הוצאות שנמחקו נשמרות כאן 30 יום, ואפשר לשחזר אותן. הוצאות אישיות שלך מסומנות ב-🔐 <span data-gm="ורק אתה רואה אותן." data-gf="ורק את רואה אותן.">ורק אתה רואה אותן.</span></div>
       <div id="binList" class="stack" style="gap:8px"></div>
     </div>
 
@@ -1452,10 +1478,10 @@ details.fold-note>summary::-webkit-details-marker{display:none}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261114094713">
-<script src="config.js?v=20261114094713"></script>
-<script src="motion.js?v=20261114094713"></script>
-<script src="fx.js?v=20261114094713"></script>
-<script src="app.js?v=20261114094713"></script>
+<meta name="app-v" content="20261114095829">
+<script src="config.js?v=20261114095829"></script>
+<script src="motion.js?v=20261114095829"></script>
+<script src="fx.js?v=20261114095829"></script>
+<script src="app.js?v=20261114095829"></script>
 </body>
 </html>
