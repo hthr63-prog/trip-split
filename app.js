@@ -506,9 +506,11 @@ function timeOf(it){
   try{ return new Date(it.createdAt).toLocaleTimeString("he-IL",it.tz?{...o,timeZone:it.tz}:o); }catch(e){ return new Date(it.createdAt).toLocaleTimeString("he-IL",o); }
 }
 function withTime(it,txt){ const t=timeOf(it); return t? "🕒 "+t+" · "+txt : txt; }
+/* how it was paid, on every expense row; old entries without a mark count as cash, so they say so */
+function pmText(it){ if(!it||it.kind==="transfer"||it._fee) return ""; return it.pm==="card" ? "💳 כרטיס"+(feeRate(it)?" · עמלה 1%":"") : "💵 מזומן"; }
 function matches(it,q){
   if(!q) return true;
-  const hay=norm([it.desc,catName(catKey(it)),nm(it.payer),it.to?nm(it.to):"",it.cur,CUR[it.cur]?.name,String(it.amount),dayLabel(it.date)].join(" "));
+  const hay=norm([it.desc,pmText(it),catName(catKey(it)),nm(it.payer),it.to?nm(it.to):"",it.cur,CUR[it.cur]?.name,String(it.amount),dayLabel(it.date)].join(" "));
   return q.split(" ").every(w=>hay.includes(w));
 }
 const CTRY={THB:"🇹🇭 תאילנד",VND:"🇻🇳 וייטנאם",LAK:"🇱🇦 לאוס",KHR:"🇰🇭 קמבודיה",MMK:"🇲🇲 מיאנמר",MYR:"🇲🇾 מלזיה",SGD:"🇸🇬 סינגפור",IDR:"🇮🇩 אינדונזיה",PHP:"🇵🇭 פיליפינים",BND:"🇧🇳 ברוניי",JPY:"🇯🇵 יפן",KRW:"🇰🇷 קוריאה",CNY:"🇨🇳 סין",HKD:"🇭🇰 הונג קונג",MOP:"🇲🇴 מקאו",TWD:"🇹🇼 טייוואן",MNT:"🇲🇳 מונגוליה",INR:"🇮🇳 הודו",NPR:"🇳🇵 נפאל",LKR:"🇱🇰 סרי לנקה",BTN:"🇧🇹 בהוטן",MVR:"🇲🇻 מלדיביים",BDT:"🇧🇩 בנגלדש",PKR:"🇵🇰 פקיסטן",KZT:"🇰🇿 קזחסטן",UZS:"🇺🇿 אוזבקיסטן",KGS:"🇰🇬 קירגיזסטן",AED:"🇦🇪 אמירויות",ILS:"🇮🇱 ישראל",USD:"🇺🇸 ארה״ב",EUR:"🇪🇺 אירופה",GBP:"🇬🇧 בריטניה",CHF:"🇨🇭 שווייץ",AUD:"🇦🇺 אוסטרליה",NZD:"🇳🇿 ניו זילנד",CAD:"🇨🇦 קנדה",TRY:"🇹🇷 טורקיה",GEL:"🇬🇪 גאורגיה",AMD:"🇦🇲 ארמניה",AZN:"🇦🇿 אזרבייג׳ן",JOD:"🇯🇴 ירדן",EGP:"🇪🇬 מצרים",QAR:"🇶🇦 קטאר",OMR:"🇴🇲 עומאן",MAD:"🇲🇦 מרוקו",ZAR:"🇿🇦 דרום אפריקה",KES:"🇰🇪 קניה",TZS:"🇹🇿 טנזניה",FJD:"🇫🇯 פיג׳י",MXN:"🇲🇽 מקסיקו",BRL:"🇧🇷 ברזיל",ARS:"🇦🇷 ארגנטינה",CLP:"🇨🇱 צ׳ילה",PEN:"🇵🇪 פרו",COP:"🇨🇴 קולומביה",CZK:"🇨🇿 צ׳כיה",HUF:"🇭🇺 הונגריה",PLN:"🇵🇱 פולין",RON:"🇷🇴 רומניה",BGN:"🇧🇬 בולגריה",RSD:"🇷🇸 סרביה",SEK:"🇸🇪 שוודיה",NOK:"🇳🇴 נורווגיה",DKK:"🇩🇰 דנמרק",ISK:"🇮🇸 איסלנד"};
@@ -615,7 +617,7 @@ function renderLedger_(){
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; const m=document.createElement("div"); m.className="m";
     if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent=withTime(it,"סגירת חשבון"+(it.pm==="cash"?" · 💵 מזומן":it.pm==="bank"?" · 🏦 העברה לחשבון":"")); }
-    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+(feeRate(it)?" בכרטיס (+1% עמלה, מתחלקת)":"")+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
+    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+pmText(it)+(feeRate(it)?" מתחלקת":"")+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
@@ -793,7 +795,7 @@ function renderPersonal_(){
     const dot=catTile(it,null);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; t.textContent=it.desc||"הוצאה";
-    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(it,"אישי · "+catName(catKey(it)).replace(/^\S+\s/,""));
+    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(it,"אישי · "+(it._fee?"":pmText(it)+" · ")+catName(catKey(it)).replace(/^\S+\s/,""));
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
