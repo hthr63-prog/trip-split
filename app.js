@@ -565,6 +565,27 @@ function flipList(box,render){
   if(fresh.length&&fresh.length<8) M.enter(fresh,{spring:"bouncy",stagger:45});
   return out; }
 const LIST_STEP=40, listLim={shared:LIST_STEP,mine:LIST_STEP};
+/* folded days: which past days were opened by hand (per list), kept while the app is open */
+const DAY_OPEN={shared:new Set(),mine:new Set()};
+function groupDays(list){ const m=new Map(); for(const it of list){ const a=m.get(it.date)||[]; a.push(it); m.set(it.date,a); } return m; }
+/* today is always open; on a day with nothing yet, the latest day stays open so the screen is not empty */
+function foldOpen(list,k){ const o=new Set(DAY_OPEN[k]), t=todayStr(); o.add(t); if(list.length&&!list.some(it=>it.date===t)) o.add(list[0].date); return o; }
+function dayFold(box,h,date,items,open,k,redraw){
+  box.classList.add("fold"); box.classList.toggle("shut",!open);
+  if(date===todayStr()) return;
+  /* one compact line replaces the day title: date and what was in it on the right, the day's total and ▾ on the left */
+  const sum=document.createElement("button"); sum.type="button"; sum.className="dayfold"; sum.setAttribute("aria-expanded",String(open));
+  const n=(items||[]).filter(it=>it.kind!=="transfer").length, tr=(items||[]).length-n;
+  const tx=document.createElement("span"); tx.className="df-tx";
+  const d=document.createElement("b"); d.textContent=h.firstChild?h.firstChild.textContent:date;
+  const sub=document.createElement("small"); sub.textContent=[...new Set((items||[]).map(catEmoji))].slice(0,5).join(" ")+"  "+(n===1?"הוצאה אחת":n+" הוצאות")+(tr?" · "+(tr===1?"העברה":tr+" העברות"):"");
+  tx.append(d,sub);
+  const c=document.createElement("span"); c.className="df-go num"; c.textContent=((h.querySelector(".daysum")||{}).textContent||"").replace(/^סה״כ /,"");
+  const ch=document.createElement("i"); ch.className="df-ch"; ch.setAttribute("aria-hidden","true"); ch.textContent="▾";
+  sum.append(tx,c,ch); h.hidden=true;
+  sum.onclick=()=>{ buzz(5); if(open) DAY_OPEN[k].delete(date); else DAY_OPEN[k].add(date); redraw(); };
+  h.after(sum);
+}
 function moreBtn(L,left,fn){ if(left<=0) return; const b=document.createElement("button"); b.type="button"; b.className="btn block more-rows"; b.textContent="עוד "+Math.min(left,LIST_STEP)+" הוצאות · נשארו "+left; b.onclick=()=>{ buzz(5); fn(); }; L.appendChild(b); }
 function renderLedger(){ return flipList($("ledger"),renderLedger_); }
 function renderLedger_(){
@@ -577,11 +598,15 @@ function renderLedger_(){
     if(loaded&&!q&&!S.items.length){ richEmpty(e,"🧳","עוד אין הוצאות בטיול","הקפה הראשון, המונית מהשדה, הכול מתחיל כאן.","➕ הוצאה ראשונה",openAdd); }
     else { e.className="empty"; e.textContent=!loaded?"":q?"לא נמצאה הוצאה שמתאימה לחיפוש":"אין הוצאות בסינון הזה"; }
     L.appendChild(e); return; }
-  let curDay=null, box=null;
+  let curDay=null, box=null, skip=false;
+  /* today in full; earlier days fold into one line each (tap to open). Searching or filtering opens everything. */
+  const fold=!q&&filter==="all", openDays=foldOpen(list,"shared"), byDay=fold?groupDays(list):null;
   /* a long trip has hundreds of rows: draw the newest ones, more on request */
-  const shown=list.slice(0,listLim.shared);
+  const shown=fold?list:list.slice(0,listLim.shared);
   for(const it of shown){
-    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,sharedDay(it.date)); box.appendChild(h); L.appendChild(box); }
+    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,sharedDay(it.date)); box.appendChild(h); L.appendChild(box);
+      skip=fold&&!openDays.has(it.date); if(fold) dayFold(box,h,it.date,byDay.get(it.date),!skip,"shared",renderLedger); }
+    if(skip) continue;
     const r=document.createElement("div"); r.className="row"+(it.kind==="transfer"?" transfer":"")+(FRESH.has(it.id)?" fresh":"")+(PENDING.has(it.id)?" pending":"")+(isNew(it.id)?" enter":""); r.dataset.id=it.id;
     const dot=catTile(it, it.kind==="transfer"?null:it.payer);
     const main=document.createElement("div"); main.className="main";
@@ -603,7 +628,7 @@ function renderLedger_(){
     }
     r.append(dot,main,right); tapRow(r); box.appendChild(swipeWrap(r,it,false));
   }
-  moreBtn(L,list.length-shown.length,()=>{ listLim.shared+=LIST_STEP; renderLedger(); });
+  if(!fold) moreBtn(L,list.length-shown.length,()=>{ listLim.shared+=LIST_STEP; renderLedger(); });
 }
 
 /* ---- personal account: password-protected, works on any device ----
@@ -753,10 +778,13 @@ function renderPersonal_(){
     if(pLoaded&&!pq) richEmpty(e,"🔐","עוד אין הוצאות אישיות","מזכרות, קפה, עיסוי. "+(fem(me)?"רק את רואה אותן.":"רק אתה רואה אותן."),"➕ הוצאה אישית",openAdd);
     else { e.className="empty"; e.textContent=!pLoaded?"טוען…":"לא נמצאה הוצאה שמתאימה לחיפוש"; }
     L.appendChild(e); }
-  let curDay=null, box=null;
-  const shown=list.slice(0,listLim.mine);
+  let curDay=null, box=null, skip=false;
+  const fold=!pq, openDays=foldOpen(list,"mine"), byDay=fold?groupDays(list):null;
+  const shown=fold?list:list.slice(0,listLim.mine);
   for(const it of shown){
-    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,""); box.appendChild(h); L.appendChild(box); }
+    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,""); box.appendChild(h); L.appendChild(box);
+      skip=fold&&!openDays.has(it.date); if(fold) dayFold(box,h,it.date,byDay.get(it.date),!skip,"mine",renderPersonal); }
+    if(skip) continue;
     const r=document.createElement("div"); r.className="row"+(isNew(it.id)?" enter":""); r.dataset.id=it.id;
     const dot=catTile(it,null);
     const main=document.createElement("div"); main.className="main";
@@ -777,7 +805,7 @@ function renderPersonal_(){
     r.appendChild(acts);
     r.append(dot,main,right); tapRow(r); box.appendChild(swipeWrap(r,it,true));
   }
-  moreBtn(L,list.length-shown.length,()=>{ listLim.mine+=LIST_STEP; renderPersonal(); });
+  if(!fold) moreBtn(L,list.length-shown.length,()=>{ listLim.mine+=LIST_STEP; renderPersonal(); });
 }
 
 /* ================= playful layer ================= */
@@ -1174,6 +1202,7 @@ function renderSofar(){
   { const bb=$("sfBud"), r= personal ? budgetCalc() : null; bb.hidden=!r;
     if(r){ bb.querySelector(".t").textContent= r.left<0 ? "עברת את התקציב ב-"+fmt(-r.left,r.cur) : "נשארו "+fmt(r.left,r.cur)+" מהתקציב";
       { const W=worthCalc(r); bb.querySelector(".w").textContent= W.cash.length ? "· עם המזומן "+fmt(W.total,W.cur) : ""; }
+      { const rw=runwayCalc(r), el=bb.querySelector(".rw"); el.hidden=!(rw&&rw.days!=null); if(rw&&rw.days!=null) el.textContent= rw.days>365 ? "⏳ בקצב הזה הכסף מספיק ליותר משנה" : "⏳ בקצב הזה הכסף מספיק לעוד כ-"+rw.days+" ימים · עד "+rw.until; }
       bb.querySelector("i").style.width=Math.round((1-r.pct)*100)+"%"; bb.classList.toggle("warn",r.left>=0&&r.left<r.amount*0.15); bb.classList.toggle("over",r.left<0); } }
   /* the personal screen has no other card with the currency switch now */
   const sh=$("sfShow"); sh.hidden=!personal; if(personal) showinRow(sh);
@@ -2082,6 +2111,18 @@ function budgetCalc(){
   if(st&&st<=td){ const days=Math.round((new Date(td+"T12:00")-new Date(st+"T12:00"))/864e5)+1; perDay=usedTrip/days; if(perDay>0) pace=Math.floor(left/perDay); }
   return {cur,amount,gifts,used,left,parts,adj,adjAt:B.adjAt||null,pace,perDay,pct:Math.max(0,Math.min(1,used/(amount+gifts))),prep:B.prep!==false};
 }
+/* how long the money lasts: everything I have (bank left + cash in the wallet, at plain rates)
+   divided by what I actually spend a day on the trip (my own + my share of the shared) */
+function runwayCalc(r){
+  if(!r) return null; const st=tripStart(), td=todayStr(); if(!st||st>td) return null;
+  const W=worthCalc(r), days=Math.round((new Date(td+"T12:00")-new Date(st+"T12:00"))/864e5)+1;
+  const onTrip=it=> locOf(it)!=="prep" && (it.date||"")>=st && (it.date||"")<=td;
+  const spent=P.filter(onTrip).reduce((a,it)=>a+conv(+it.amount||0,it.cur,r.cur),0)+myShareItems().filter(onTrip).reduce((a,it)=>a+conv(+it.amount||0,it.cur,r.cur)*(sharesOf(it)[me]||0),0);
+  const perDay=spent/days; if(!(perDay>0)||!(W.total>0)) return {total:W.total,perDay,days:null,cur:r.cur};
+  const left=Math.floor(W.total/perDay), end=new Date(Date.now()+left*864e5);
+  return {total:W.total,perDay,days:left,cur:r.cur,until:end.getDate()+"."+(end.getMonth()+1)+(end.getFullYear()!==new Date().getFullYear()?"."+String(end.getFullYear()).slice(2):"")};
+}
+function runwayText(rw){ if(!rw||rw.days==null) return ""; return "⏳ בקצב של "+fmt(rw.perDay,rw.cur)+" ליום, כל הכסף ("+fmt(rw.total,rw.cur)+", בבנק ובמזומן) מספיק "+(rw.days>365?"ליותר משנה":"לעוד כ-"+rw.days+" ימים · עד "+rw.until); }
 let budEditing=false, budSyncing=false;
 function renderBudget(){
   const open=!!(acct&&acctFor===me);
@@ -2126,7 +2167,7 @@ function renderBudget(){
   if(Math.abs(r.parts.tr)>0.004) row("💸","העברות בהתחשבנות (בנק)",r.parts.tr);
   if(Math.abs(r.adj)>0.004) row("🏦","עדכון לפי הבנק"+(r.adjAt?" · "+new Date(r.adjAt).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"}):""),-r.adj);
   $("budPace").textContent= r.left<0 ? "⚠️ עברת את התקציב ב-"+fmt(-r.left,r.cur)
-    : r.pace!==null ? "⏳ בקצב של "+fmt(r.perDay,r.cur)+" ליום, זה מספיק לעוד כ-"+r.pace+" ימים" : (r.prep?"כולל ההוצאות לפני הטיול":"מתחיל לספור מיום הטיסה");
+    : runwayText(runwayCalc(r)) ? runwayText(runwayCalc(r)) : (r.prep?"כולל ההוצאות לפני הטיול":"מתחיל לספור מיום הטיסה");
 }
 function budgetForm(){ budEditing=true; const B=BUDGET; $("budAmt").value=B?group(String(B.amount)):""; cur.bud=B?.cur||"ILS"; setCurBtn("budCur",cur.bud); $("budPrep").checked=B?B.prep!==false:true; showErr("budErr"); renderBudget(); setTimeout(()=>$("budAmt").focus(),60); }
 $("budStart").onclick=budgetForm; $("budEdit").onclick=budgetForm;

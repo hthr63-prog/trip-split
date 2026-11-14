@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261114095829"></script>
+<script src="theme.js?v=20261114113511"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -830,6 +830,19 @@ input.bad-f{border-color:var(--bad)!important}
 .seg.sfseg button{min-height:38px;padding-inline:13px}
 .btn.small{min-height:40px}
 .bighead small,.sf-k{font-size:.78rem}
+
+/* past days fold to one line */
+.day.fold.shut > :not(.dayhead):not(.dayfold){display:none}
+.dayfold{font:inherit;display:flex;align-items:center;gap:10px;width:100%;min-height:56px;padding:9px 14px;border:1.5px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);cursor:pointer;text-align:right}
+.day.fold:not(.shut) .dayfold{background:var(--surface-2);margin-bottom:2px}
+.dayfold .df-tx{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.dayfold .df-tx b{font-weight:700;font-size:.95rem}
+.dayfold .df-tx small{color:var(--muted);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dayfold .df-go{font-weight:600;font-size:.92rem;white-space:nowrap}
+.dayfold .df-ch{font-style:normal;color:var(--brand);transition:transform .25s ease}
+.day.fold:not(.shut) .dayfold .df-ch{transform:rotate(180deg)}
+.day.fold.shut + .day.fold.shut{margin-top:-6px}
+.sf-budget .rw{order:4;flex-basis:100%;font-size:.82rem;font-weight:600;color:var(--ink);opacity:.85}
 </style>
 </head>
 <body>
@@ -974,7 +987,7 @@ input.bad-f{border-color:var(--bad)!important}
     <div class="sf-big"><b class="num" id="sfBig">—</b><span class="sf-sub" id="sfSub"></span></div>
     <div class="sf-bar" id="sfBar" hidden><i id="sfBarA"></i><i id="sfBarB"></i></div>
     <div class="sf-row" id="sfRow"></div>
-    <button class="sf-budget" id="sfBud" type="button" hidden><span class="t"></span><span class="w num"></span><span class="bar"><i></i></span><span class="go" aria-hidden="true">←</span></button>
+    <button class="sf-budget" id="sfBud" type="button" hidden><span class="t"></span><span class="w num"></span><span class="bar"><i></i></span><span class="rw" hidden></span><span class="go" aria-hidden="true">←</span></button>
     <div class="showin sf-show" id="sfShow" hidden></div>
   </section>
   <div class="insight" id="insight" hidden><span class="ins-ico" id="insIco">💡</span><span id="insTxt"></span></div>
@@ -1478,10 +1491,10 @@ input.bad-f{border-color:var(--bad)!important}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261114095829">
-<script src="config.js?v=20261114095829"></script>
-<script src="motion.js?v=20261114095829"></script>
-<script src="fx.js?v=20261114095829"></script>
-<script src="app.js?v=20261114095829"></script>
+<meta name="app-v" content="20261114113511">
+<script src="config.js?v=20261114113511"></script>
+<script src="motion.js?v=20261114113511"></script>
+<script src="fx.js?v=20261114113511"></script>
+<script src="app.js?v=20261114113511"></script>
 </body>
 </html>
