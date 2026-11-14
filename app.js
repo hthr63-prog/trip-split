@@ -688,7 +688,7 @@ async function refreshPersonal(){
     for(const x of CASH){ const v=cardFee(x); if(v>0) fees.push({id:"cfee-"+x.id,_wid:x.id,_fee:true,desc:"עמלת כרטיס 1% על משיכה",amount:v,cur:x.cur,cat:"other",catLabel:"עמלות משיכה",pm:"fee",date:x.date,createdAt:(x.createdAt||0)+1,tz:x.tz,loc:x.loc}); }
     INCOME=mine.filter(x=>x.type==="budget-in");
     BUDGET=mine.filter(x=>x.type==="budget").sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||null;
-    P=[...mine.filter(x=>x.type!=="cash"&&x.type!=="budget"&&x.type!=="budget-in"),...fees]; pLoaded=true; if(!$("acctSheet").hidden) fillAcct(); if(view==="personal") renderAll();
+    P=[...mine.filter(x=>x.type!=="cash"&&x.type!=="budget"&&x.type!=="budget-in"),...fees]; pLoaded=true; syncCardFees(); if(!$("acctSheet").hidden) fillAcct(); if(view==="personal") renderAll();
   }catch(e){ console.error(e); pLoaded=true; }
 }
 /* too easy to guess offline: only digits, or built from the person's name or username */
@@ -796,7 +796,7 @@ function renderPersonal_(){
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
     if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(conv(+it.amount,it.cur,"ILS"),"ILS"); right.appendChild(s); }
     const acts=document.createElement("div"); acts.className="acts";
-    if(it._fee){ const n=document.createElement("span"); n.className="m fee-note"; n.textContent= it.catLabel==="הפרשי שער" ? "💱 מתוך החלפה בארנק" : "🏧 מתוך משיכה בארנק"; right.appendChild(n);
+    if(it._fee){ const n=document.createElement("span"); n.className="m fee-note"; n.textContent= it.catLabel==="הפרשי שער" ? "💱 מתוך החלפה בארנק" : it._pfx ? "💳 מחושב לבד מהתשלומים בכרטיס" : "🏧 מתוך משיכה בארנק"; right.appendChild(n);
       const w=CASH.find(x=>x.id===it._wid);
       r.append(dot,main,right); r.dataset.id=it.id;
       box.appendChild(w ? swipeWrap(r,it,true,{again:()=>againCash(w),againLabel:w.sub==="exchange"?"🔁 עוד החלפה כזו":"🔁 עוד משיכה כזו",del:()=>delItem({id:w.id,desc:w.sub==="exchange"?"החלפת מטבע":"משיכה מכספומט"},true),delLabel:w.sub==="exchange"?"🗑 מחיקת ההחלפה":"🗑 מחיקת המשיכה"}) : r); continue; }
@@ -1014,7 +1014,7 @@ async function shareRecap(){
 
 /* ---- visual layer: category tiles, hero, insights ---- */
 const CAT_TINT={food:"#FF8A3D",stay:"#6C4BFF",transport:"#14B8A6",fun:"#FF4D8D",party:"#B84DFF",laundry:"#3B82F6",shop:"#F59E0B",other:"#8B85A8"};
-function catEmoji(it){ if(it.kind==="transfer") return "💸"; if(it._fee) return it.catLabel==="הפרשי שער"?"💱":"🏧"; const k=it.cat||"other"; const l=(CATNAME[k]||OLD_CATS[k]||"✨").split(" ")[0]; return l; }
+function catEmoji(it){ if(it.kind==="transfer") return "💸"; if(it._fee) return it.catLabel==="הפרשי שער"?"💱":it._pfx?"💳":"🏧"; const k=it.cat||"other"; const l=(CATNAME[k]||OLD_CATS[k]||"✨").split(" ")[0]; return l; }
 function catTile(it,payer){
   const d=document.createElement("div"); d.className="cattile"; d.style.setProperty("--tint",it.kind==="transfer"?"#0E9F7E":(CAT_TINT[it.cat]||CAT_TINT.other)); d.textContent=catEmoji(it);
   if(payer){ const w=document.createElement("span"); w.className="who c"+pidx(payer); w.textContent=nm(payer).trim().charAt(0); d.appendChild(w); }
@@ -1209,7 +1209,7 @@ function renderSofar(){
   const sh=$("sfShow"); sh.hidden=!personal; if(personal) showinRow(sh);
 }
 function renderAll(){
-  applyG(); renderHero(); renderInsight(); renderSofar();
+  syncCardFees(); applyG(); renderHero(); renderInsight(); renderSofar();
   { const arch=loaded&&curTrip!==activeTrip(); $("tripNote").hidden=!arch; if(arch) $("tripNoteTxt").textContent="🗂️ אתם צופים בטיול "+(S.trip||"קודם")+" מהארכיון"; }
   requestAnimationFrame(()=>{ watchReveal(); renderMini(); onScroll(); });
   renderHeader();
@@ -1671,10 +1671,24 @@ function cashPaidByMe(){
 }
 /* settle-ups paid in cash between me and someone else */
 function cashTransfers(){ return me ? S.items.filter(it=>it.kind==="transfer"&&it.pm==="cash"&&(it.payer===me||it.to===me)&&tripOf(it)===curTrip) : []; }
-/* the travel card (Max "Backpacker") takes 1% of every cash withdrawal, on top of what the ATM takes.
-   It is worked out from each withdrawal, so it also covers withdrawals recorded before this rule. */
+/* Max "Backpacker" (מוצ'ילר) terms: one 1% conversion fee on every foreign-currency charge, card payments and
+   ATM withdrawals alike (not 1% + 1%). The charge is in shekels at the Bank of Israel representative rate, immediately.
+   The ATM's own fee is part of the amount the card is charged, so the 1% applies to it too.
+   Cash brought from home and anything in shekels have no such fee.
+   Worked out from each entry, so it also covers what was recorded before this rule. */
 const CARD_FEE=0.01;
-function cardFee(x){ return x&&x.sub==="withdraw" ? Math.round((+x.amount||0)*CARD_FEE*100)/100 : 0; }
+const r2=v=>Math.round(v*100)/100;
+function cardFee(x){ if(!x||x.sub!=="withdraw"||x.cur==="ILS") return 0; const atm=(x.feeCur||x.cur)===x.cur?(+x.fee||0):0; return r2(((+x.amount||0)+atm)*CARD_FEE); }
+function payFee(it){ return it&&it.pm==="card"&&!it._fee&&it.kind!=="transfer"&&it.cur&&it.cur!=="ILS" ? r2((+it.amount||0)*CARD_FEE) : 0; }
+/* one line a day in the personal list for the 1% on card payments (mine, and shared ones I paid) */
+function syncCardFees(){
+  if(!pLoaded||!me) return; const days=new Map();
+  const add=(it,v)=>{ if(!(v>0)||!it.date) return; const k=it.date+"|"+it.cur; const o=days.get(k)||{date:it.date,cur:it.cur,v:0,n:0,loc:it.loc,tz:it.tz,createdAt:0}; o.v+=v; o.n++; o.createdAt=Math.max(o.createdAt,(it.createdAt||0)+1); days.set(k,o); };
+  for(const it of P) if(!it._pfx) add(it,payFee(it));
+  for(const it of S.items) if(it.payer===me&&!it.deleted) add(it,payFee(it));
+  const out=[...days.values()].map(o=>({id:"pfee-"+o.date+"-"+o.cur,_fee:true,_pfx:true,desc:"עמלת כרטיס 1% על "+(o.n===1?"תשלום בכרטיס":o.n+" תשלומים בכרטיס"),amount:r2(o.v),cur:o.cur,cat:"other",catLabel:"עמלות כרטיס",pm:"fee",date:o.date,createdAt:o.createdAt,tz:o.tz,loc:o.loc}));
+  P=[...P.filter(x=>!x._pfx),...out];
+}
 function cashBalances(){
   const since=Math.min(...CASH.map(x=>x.createdAt||Infinity));
   const bal={};
@@ -1787,7 +1801,10 @@ $("cashRBtn").onclick=()=>openCash("r");
 $("cwCur").onclick=()=>openCurPicker("באיזה מטבע משכת?",cur.cw||S.localCur,c=>{ cur.cw=c; renderCash(); });
 /* live: what the card adds on top */
 function cwCardHint(){ const a=num("cwAmt"), el=$("cwCard"); if(!el) return; const c=cur.cw||S.localCur;
-  el.textContent= a>0 ? "💳 עמלת כרטיס 1%: "+fmt(cardFee({sub:"withdraw",amount:a}),c)+" · יורד מהבנק בסך הכול "+fmt(a+cardFee({sub:"withdraw",amount:a}),c)+(num("cwFee")>0&&(cur.cwFee||S.localCur)===c?" + עמלת הכספומט":"") : "💳 על כל משיכה הכרטיס לוקח עוד 1%, והוא נרשם לבד כהוצאה"; }
+  const fee=num("cwFee")>0?num("cwFee"):0, fc=cur.cwFee||S.localCur, x={sub:"withdraw",amount:a,cur:c,fee,feeCur:fc}, k=cardFee(x);
+  el.textContent= !(a>0) ? "💳 הכרטיס לוקח 1% על כל משיכה במט״ח, גם על עמלת הכספומט. נרשם לבד כהוצאה"
+    : c==="ILS" ? "💳 משיכה בשקלים: בלי עמלת 1%"
+    : "💳 עמלת כרטיס 1%"+(fee>0&&fc===c?" (על המשיכה + עמלת הכספומט)":"")+": "+fmt(k,c)+" · יורד מהבנק בסך הכול "+fmt(a+(fc===c?fee:0)+k,c)+(fee>0&&fc!==c?" + "+fmt(fee,fc):""); }
 for(const id of ["cwAmt","cwFee"]) $(id).addEventListener("input",cwCardHint);
 $("cwFeeCur").onclick=()=>openCurPicker("באיזה מטבע העמלה?",cur.cwFee||S.localCur,c=>{ cur.cwFee=c; renderCash(); });
 $("caCur").onclick=()=>openCurPicker("איזה מטבע?",cur.ca||S.localCur,c=>{ cur.ca=c; renderCash(); });
@@ -1819,7 +1836,7 @@ $("cwSave").onclick=async()=>{
   showErr("cwErr"); const amt=num("cwAmt"), fee=num("cwFee")||0;
   if(!(amt>0)) return showErr("cwErr","כמה משכת?");
   const ok=await cashSave({sub:"withdraw",amount:amt,cur:cur.cw||S.localCur,fee,feeCur:cur.cwFee||S.localCur,desc:"משיכה מכספומט"});
-  if(ok){ $("cwAmt").value=""; $("cwFee").value=""; cashForm=null; toast("🏧 נרשמה משיכה של "+fmt(amt,cur.cw||S.localCur)+" · עמלות "+(fee>0?fmt(fee,cur.cwFee||S.localCur)+" + ":"")+fmt(cardFee({sub:"withdraw",amount:amt}),cur.cw||S.localCur)+" (1% כרטיס) נרשמו כהוצאה"); }
+  if(ok){ $("cwAmt").value=""; $("cwFee").value=""; cashForm=null; toast("🏧 נרשמה משיכה של "+fmt(amt,cur.cw||S.localCur)+" · עמלות "+(fee>0?fmt(fee,cur.cwFee||S.localCur)+" + ":"")+fmt(cardFee({sub:"withdraw",amount:amt,cur:cur.cw||S.localCur,fee,feeCur:cur.cwFee||S.localCur}),cur.cw||S.localCur)+" (1% כרטיס) נרשמו כהוצאה"); }
 };
 $("caSave").onclick=async()=>{
   showErr("caErr"); const v=num("caAmt"); const c=cur.ca||S.localCur;
@@ -2103,19 +2120,19 @@ function budgetCalc(){
   const onTrip=it=> locOf(it)!=="prep" && (!st||(it.date||"")>=st);
   const inc=it=> B.prep!==false || onTrip(it);
   const C=(a,c)=>conv(+a||0,c||cur,cur);
-  const parts={atm:0,home:0,cardP:0,cardS:0,tr:0,gift:0}; let usedTrip=0;
+  const parts={atm:0,home:0,cardP:0,cardS:0,fx:0,tr:0,gift:0}; let usedTrip=0;
   const add=(k,v,it)=>{ parts[k]+=v; if(onTrip(it)) usedTrip+=v; };
   for(const x of CASH) if(x.sub==="withdraw"&&inc(x)) add("atm",C(x.amount,x.cur)+C(x.fee||0,x.feeCur||x.cur)+C(cardFee(x),x.cur),x);
   /* cash bought from the bank counts only if bought after the budget was set: a budget is "what is in the bank now" */
   const since=+B.since||+B.createdAt||0;
   for(const x of CASH) if(x.sub==="bring"&&x.bank&&(x.createdAt||0)>since) add("home",C(x.amount,x.cur),x);
   for(const x of INCOME) add("gift",-C(x.amount,x.cur),x);
-  for(const it of P) if(!it._fee&&it.pm==="card"&&inc(it)) add("cardP",C(it.amount,it.cur),it);
+  for(const it of P) if(!it._fee&&it.pm==="card"&&inc(it)){ add("cardP",C(it.amount,it.cur),it); if(payFee(it)) add("fx",C(payFee(it),it.cur),it); }
   for(const it of S.items){ if(!inc(it)) continue;
     if(it.kind==="transfer"){ if(it.pm==="cash") continue; if(it.payer===me) add("tr",C(it.amount,it.cur),it); else if(it.to===me) add("tr",-C(it.amount,it.cur),it); }
-    else if(it.payer===me&&it.pm==="card") add("cardS",C(it.amount,it.cur),it); }
+    else if(it.payer===me&&it.pm==="card"){ add("cardS",C(it.amount,it.cur),it); if(payFee(it)) add("fx",C(payFee(it),it.cur),it); } }
   const adj=+B.adj||0;
-  const used=parts.atm+parts.home+parts.cardP+parts.cardS+parts.tr-adj, gifts=-parts.gift, amount=+B.amount, left=amount+gifts-used;
+  const used=parts.atm+parts.home+parts.cardP+parts.cardS+parts.fx+parts.tr-adj, gifts=-parts.gift, amount=+B.amount, left=amount+gifts-used;
   let pace=null, perDay=null;
   if(st&&st<=td){ const days=Math.round((new Date(td+"T12:00")-new Date(st+"T12:00"))/864e5)+1; perDay=usedTrip/days; if(perDay>0) pace=Math.floor(left/perDay); }
   return {cur,amount,gifts,used,left,parts,adj,adjAt:B.adjAt||null,pace,perDay,pct:Math.max(0,Math.min(1,used/(amount+gifts))),prep:B.prep!==false};
@@ -2177,6 +2194,7 @@ function renderBudget(){
   if(r.parts.home>0.004) row("💼","מזומן שנקנה מהבית",r.parts.home);
   row("💳","כרטיס · אישי",r.parts.cardP);
   row("💳","כרטיס · משותף ששילמת",r.parts.cardS);
+  row("💳","עמלת כרטיס 1% על תשלומים במט״ח",r.parts.fx);
   if(Math.abs(r.parts.tr)>0.004) row("💸","העברות בהתחשבנות (בנק)",r.parts.tr);
   if(Math.abs(r.adj)>0.004) row("🏦","עדכון לפי הבנק"+(r.adjAt?" · "+new Date(r.adjAt).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"}):""),-r.adj);
   $("budPace").textContent= r.left<0 ? "⚠️ עברת את התקציב ב-"+fmt(-r.left,r.cur)
