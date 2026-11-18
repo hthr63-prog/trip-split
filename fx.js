@@ -11,14 +11,19 @@
     const line=innerHeight*0.38; let best=null;
     for(const el of marks){ const r=el.getBoundingClientRect(); if(r.top<=line) best=el; }
     const t=(best&&best.dataset.tone)||"base";
-    if(t!==tone){ tone=t; root.dataset.tone=t; }
+    if(t!==tone){
+      /* the old colour stays on a fixed layer and fades away (opacity only: no repaint of the page) */
+      if(tone&&!calm()&&document.body){ const old=getComputedStyle(document.body).backgroundColor, f=document.createElement("div"); f.className="tone-fade"; f.style.background=old; document.body.appendChild(f);
+        const a=f.animate([{opacity:1},{opacity:0}],{duration:700,easing:"ease-out"}); a.onfinish=()=>f.remove(); setTimeout(()=>f.remove(),1200); }
+      tone=t; root.dataset.tone=t; }
   }
 
   /* hero: 0 when the hero is fully on screen, 1 once it has scrolled away */
   function stack(){
     const h=document.getElementById("hero"); if(!h||h.hidden) return;
     const r=h.getBoundingClientRect(); const p=Math.min(1,Math.max(0,-r.top/(r.height*0.9)));
-    h.style.setProperty("--p",calm()?0:p.toFixed(3));
+    /* only when it really changed: each change repaints the drawing */
+    const v=calm()?0:Math.round(p*40)/40; if(h.__p===v) return; h.__p=v; h.style.setProperty("--p",v);
   }
 
   /* day / sunrise-sunset / night in the hero, by the clock on this phone */
@@ -64,7 +69,8 @@
 
 
   let queued=false;
-  function frame(){ queued=false; pickTone(); stack(); sky(); }
+  let lastTone=0;
+  function frame(){ queued=false; const n=performance.now(); if(n-lastTone>120){ lastTone=n; pickTone(); } stack(); sky(); }
   function ask(){ if(!queued){ queued=true; requestAnimationFrame(frame); } }
   addEventListener("scroll",ask,{passive:true});
   addEventListener("resize",ask);

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261118191203"></script>
+<script src="theme.js?v=20261118195133"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -490,7 +490,9 @@ table.daily td.num{text-align:right}
 :root[data-theme="dark"]{--t-base:#100C22;--t-peach:#22111B;--t-sage:#0E1D1A;--t-cream:#1D1914;--t-sky:#0E1627;--t-sand:#21190E}
 html[data-tone="base"]{--bg:var(--t-base)} html[data-tone="peach"]{--bg:var(--t-peach)} html[data-tone="sage"]{--bg:var(--t-sage)}
 html[data-tone="cream"]{--bg:var(--t-cream)} html[data-tone="sky"]{--bg:var(--t-sky)} html[data-tone="sand"]{--bg:var(--t-sand)}
-body{transition:background-color .9s cubic-bezier(.2,.8,.2,1)}
+/* chapter colours change instantly underneath; a fixed layer with the old colour fades out on top of the background (fx.js).
+   Fading the page background itself repainted the whole page on every frame, right in the middle of scrolling. */
+.tone-fade{position:fixed;inset:0;z-index:-1;pointer-events:none}
 #title{font-family:var(--serif);font-weight:800;font-size:2.2rem;letter-spacing:-.01em}
 .ticket .verdict{font-family:var(--serif);font-weight:800;font-size:1.8rem}
 .ticket .verdict .amt{font-family:var(--display)}
@@ -498,7 +500,8 @@ body{transition:background-color .9s cubic-bezier(.2,.8,.2,1)}
 .bighead small{font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .bighead h2{font-family:var(--serif);font-weight:800;font-size:clamp(2.6rem,12vw,3.6rem);line-height:.95;letter-spacing:-.02em;color:var(--ink)}
 .bighead:has(+ [hidden]){display:none}
-.card{background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+/* no see-through blur on cards: on iPhone every card had to re-blur what is behind it on every frame of scrolling */
+.card{background:color-mix(in srgb,var(--surface) 95%,transparent)}
 /* the travel stack: rests packed, comes apart into layers as the hero scrolls away */
 .hero{min-height:200px}
 .hero-txt{grid-template-columns:1fr;grid-template-areas:"place" "day" "chips";padding-inline-end:132px;min-height:200px}
@@ -864,9 +867,9 @@ input.bad-f{border-color:var(--bad)!important}
 #ledger,#pLedger{overflow-x:clip}
 /* the big titles start a little larger than their place; keep that inside the page */
 .bighead{overflow-x:clip}
-.bighead h2{transform-origin:100% 100%;will-change:transform}
+.bighead h2{transform-origin:100% 100%}
 .bighead h2 .kw{display:inline-block;overflow:visible}
-.bighead h2 .kw > span{display:inline-block;will-change:transform,opacity,filter}
+.bighead h2 .kw > span{display:inline-block}
 .hero .stars,.hero .cloud,.hero .sc,.hero .waves{transform-box:view-box;transform-origin:50% 100%}
 @media (prefers-reduced-motion:reduce){.bighead h2,.bighead h2 .kw > span{transform:none!important;opacity:1!important;filter:none!important}}
 
@@ -890,7 +893,7 @@ html.vt-hole::view-transition-new(root){animation:vtNew .6s cubic-bezier(.3,0,.1
 @keyframes vtOld{to{transform:scale(.9);filter:blur(6px) brightness(.85);opacity:.6}}
 @keyframes vtNew{from{clip-path:circle(0 at var(--vx,50%) var(--vy,90%))}to{clip-path:circle(150vmax at var(--vx,50%) var(--vy,90%))}}
 /* 10. the sheen on the balance card follows the tilt */
-.ticket{transform-style:preserve-3d;will-change:transform}
+.ticket{transform-style:preserve-3d}
 .ticket > .sheen{position:absolute;inset:0;pointer-events:none;z-index:2;border-radius:inherit;background:radial-gradient(circle at var(--sx,50%) var(--sy,30%),rgba(255,255,255,.28),rgba(255,255,255,0) 45%);mix-blend-mode:soft-light}
 /* 11. the automatic switch at sunset fades slowly */
 html.theming-slow,html.theming-slow *{transition-duration:1.5s!important}
@@ -1596,11 +1599,11 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261118191203">
-<script src="config.js?v=20261118191203"></script>
-<script src="motion.js?v=20261118191203"></script>
-<script src="fx.js?v=20261118191203"></script>
-<script src="cinema.js?v=20261118191203"></script>
-<script src="app.js?v=20261118191203"></script>
+<meta name="app-v" content="20261118195133">
+<script src="config.js?v=20261118195133"></script>
+<script src="motion.js?v=20261118195133"></script>
+<script src="fx.js?v=20261118195133"></script>
+<script src="cinema.js?v=20261118195133"></script>
+<script src="app.js?v=20261118195133"></script>
 </body>
 </html>

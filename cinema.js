@@ -10,23 +10,29 @@
   const ease=t=>1-Math.pow(1-t,3);
   window.__cinema=true;
 
-  /* ---- 1. depth: cards rise out of the page ---- */
-  const DEPTH="#viewShared > section:not(.hero):not(.ticket), #viewShared > .add-cta, #viewPersonal > .stack > section, #viewPersonal > section, #viewPersonal .add-cta, #viewStats > section, .insight, #ledger > .monthfold, #pLedger > .monthfold";
-  const touched=new Set();
-  function depth(){
-    const vh=innerHeight;
-    for(const el of document.querySelectorAll(DEPTH)){
-      if(!el.offsetParent) continue;
-      const r=el.getBoundingClientRect();
-      if(r.top>vh*0.62&&r.top<vh+40){
-        const e=ease(clamp((vh-r.top)/(vh*0.38),0,1)), k=1-e;
-        el.style.transform=`perspective(1000px) translate3d(0,${(k*70).toFixed(1)}px,${(-k*160).toFixed(1)}px) rotateX(${(k*16).toFixed(2)}deg)`;
-        el.style.opacity=(0.2+0.8*e).toFixed(3); el.style.transformOrigin="50% 0"; touched.add(el);
-      }else if(touched.has(el)){ el.style.transform=""; el.style.opacity=""; touched.delete(el); }
+  /* Scroll-linked motion lagged behind the iPhone's own scrolling (the page shook and stalled), so nothing here
+     follows the scroll any more: things play ONCE, on the compositor, when they come into view. */
+
+  /* ---- 1. depth: a card rises out of the page the first time it comes into view ---- */
+  const DEPTH="#viewShared > section:not(.hero):not(.ticket), #viewShared > .add-cta, #viewPersonal section, #viewPersonal .add-cta, #viewStats > section, .insight, #ledger > .monthfold, #pLedger > .monthfold";
+  const seen=new WeakSet();
+  const io=("IntersectionObserver" in window) ? new IntersectionObserver(es=>{
+    for(const e of es){ if(!e.isIntersecting) continue; const el=e.target; io.unobserve(el); if(calm()||!el.animate) continue;
+      if(el.classList.contains("bighead")){ words(el); continue; }
+      el.animate([{opacity:0,transform:"perspective(1000px) translate3d(0,56px,-120px) rotateX(14deg)"},{opacity:1,transform:"none"}],
+        {duration:720,easing:"cubic-bezier(.2,.85,.25,1)"});
+    } },{rootMargin:"0px 0px -8% 0px",threshold:0.01}) : null;
+  function watch(){
+    if(!io) return; const vh=innerHeight;
+    for(const el of document.querySelectorAll(DEPTH+", .bighead")){
+      if(seen.has(el)||!el.offsetParent) continue; seen.add(el);
+      /* already on screen when the page opens: leave it alone */
+      if(el.getBoundingClientRect().top<vh*0.92) continue;
+      io.observe(el);
     }
   }
 
-  /* ---- 2. kinetic titles: words rise into focus, the title settles from large to its size ---- */
+  /* ---- 2. kinetic titles: words rise into focus one after another ---- */
   function splitTitles(){
     for(const h of document.querySelectorAll(".bighead h2:not([data-cut])")){
       h.dataset.cut="1"; const parts=[];
@@ -39,39 +45,20 @@
       h.setAttribute("aria-label",h.textContent);
     }
   }
-  function titles(){
-    const vh=innerHeight;
-    for(const b of document.querySelectorAll(".bighead")){
-      if(!b.offsetParent) continue; const r=b.getBoundingClientRect();
-      if(r.bottom<-40||r.top>vh+40) continue;
-      const p=clamp((vh*0.95-r.top)/(vh*0.42),0,1);
-      const ws=b.querySelectorAll(".kw > span"), n=ws.length||1;
-      ws.forEach((w,i)=>{ const l=ease(clamp(p*1.55-i*(0.55/n),0,1)), k=1-l;
-        w.style.transform=`translate3d(0,${(k*0.95).toFixed(3)}em,0) rotate(${(k*-7).toFixed(2)}deg)`;
-        w.style.opacity=l.toFixed(3); w.style.filter=k>0.02?`blur(${(k*7).toFixed(1)}px)`:""; });
-      const h=b.querySelector("h2"); if(h) h.style.transform=`scale(${(1+(1-ease(p))*0.18).toFixed(3)})`;
-      const s=b.querySelector("small"); if(s){ s.style.letterSpacing=(0.18+(1-ease(p))*0.5).toFixed(3)+"em"; s.style.opacity=(0.3+0.7*ease(p)).toFixed(3); }
-    }
+  function words(b){
+    const ws=[...b.querySelectorAll(".kw > span")];
+    ws.forEach((w,i)=>w.animate([{opacity:0,transform:"translate3d(0,.9em,0) rotate(-7deg)",filter:"blur(6px)"},{opacity:1,transform:"none",filter:"blur(0)"}],
+      {duration:700,delay:i*110,easing:"cubic-bezier(.2,.9,.25,1.05)",fill:"backwards"}));
+    const h=b.querySelector("h2"); if(h) h.animate([{transform:"scale(1.14)"},{transform:"none"}],{duration:900+ws.length*110,easing:"cubic-bezier(.2,.8,.2,1)"});
+    const s=b.querySelector("small"); if(s) s.animate([{opacity:0,letterSpacing:".6em"},{opacity:1}],{duration:800,easing:"ease-out"});
   }
 
-  /* ---- 3. hero camera push: near layers move and grow faster than far ones ---- */
-  const LAYERS=[[".hero .stars",.12],[".hero .cloud",.28],[".hero .sc:not([style])",.5],[".hero .waves",.68],[".hero .sc[style]",.85]];
-  function camera(){
-    const h=document.getElementById("hero"); if(!h||h.hidden) return;
-    const r=h.getBoundingClientRect(); if(r.bottom<0) return;
-    const y=clamp(scrollY,0,r.bottom+scrollY);   /* the camera moves from the first pixel of scroll */
-    for(const [sel,d] of LAYERS) for(const g of h.querySelectorAll(sel)){
-      g.style.transform=y>0?`translate(0px,${(-y*d*0.32).toFixed(1)}px) scale(${(1+y/r.height*d*0.55).toFixed(4)})`:"";
-    }
-  }
-
-  let ticking=false;
-  function frame(){ ticking=false; if(calm()) return; depth(); titles(); camera(); }
-  const ask=()=>{ if(!ticking){ ticking=true; requestAnimationFrame(frame); } };
-  addEventListener("scroll",ask,{passive:true}); addEventListener("resize",ask);
-  /* re-renders replace parts of the page: pick up new titles and positions */
-  new MutationObserver(()=>{ splitTitles(); ask(); }).observe(document.documentElement,{childList:true,subtree:true});
-  splitTitles(); ask(); setTimeout(ask,400);
+  /* re-renders replace parts of the page: look for new titles and cards, at most a few times a second */
+  let pend=0;
+  const later=()=>{ if(pend) return; pend=setTimeout(()=>{ pend=0; splitTitles(); watch(); },250); };
+  new MutationObserver(later).observe(document.getElementById("app")||document.body,{childList:true,subtree:true});
+  splitTitles(); setTimeout(watch,300);
+  const ask=later;
 
   /* ---- 5. the balance card is a real card: it leans with the phone (or the finger) and its sheen moves ---- */
   (function tilt(){
@@ -83,7 +70,10 @@
       t.style.setProperty("--sx",(50+cur.x*40).toFixed(1)+"%"); t.style.setProperty("--sy",(30+cur.y*40).toFixed(1)+"%");
       if(Math.abs(tx-cur.x)>.002||Math.abs(ty-cur.y)>.002) raf=requestAnimationFrame(paint); };
     const go=()=>{ if(!raf) raf=requestAnimationFrame(paint); };
-    addEventListener("deviceorientation",e=>{ if(e.gamma==null) return; gx=clamp(e.gamma/30,-1,1); gy=clamp((e.beta-45)/30,-1,1); go(); });
+    addEventListener("deviceorientation",e=>{ if(e.gamma==null) return; const nx=clamp(e.gamma/30,-1,1), ny=clamp((e.beta-45)/30,-1,1);
+      if(Math.abs(nx-gx)<.03&&Math.abs(ny-gy)<.03) return;   /* ignore the sensor's tiny noise: no work while the phone is still */
+      const t=T(); if(!t) return; const r=t.getBoundingClientRect(); if(r.bottom<0||r.top>innerHeight) return;   /* only while the card is on screen */
+      gx=nx; gy=ny; go(); },{passive:true});
     document.addEventListener("pointerdown",e=>{ const t=T(); if(!t||!t.contains(e.target)) return;
       /* iPhone asks once for permission to use the motion sensor, on the first touch of the card */
       if(!asked&&window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==="function"){ asked=true; DeviceOrientationEvent.requestPermission().catch(()=>{}); }

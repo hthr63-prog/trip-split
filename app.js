@@ -137,11 +137,13 @@ function rateNow(c){ return c==="ILS" ? 1 : conv(1,c,"ILS"); }
 function feeRate(it){ return it&&it.kind!=="transfer"&&it.pm==="card"&&!it._fee&&it.cur&&it.cur!=="ILS" ? 0.01 : 0; }
 function ils(it){ const v=+it.amount||0; return it.rIls>0 ? v*it.rIls : conv(v,it.cur||"ILS","ILS"); }
 function conv(v,from,to){ if(from===to) return v; return v/perUsd(from)*perUsd(to); }
+/* number formatters are costly to create: make the three once */
+const NF=[0,1,2].map(d=>new Intl.NumberFormat("en-US",{minimumFractionDigits:0,maximumFractionDigits:d}));
 function fmt(v,cur){
   const info=CUR[cur]||{sym:""}; const a=Math.abs(v);
   if(!isFinite(a)) return "—";
   const dig=a>=1000?0:a>=100?1:2;
-  let t=a.toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:dig});
+  let t=NF[dig].format(a);
   if(a>0&&a<0.01) t=a.toPrecision(2);
   const sign=v<0?"-":"";
   return info.sym? sign+info.sym+t : sign+t+" "+cur;
@@ -334,8 +336,17 @@ $("curSearch").addEventListener("keydown",e=>{ if(e.key==="Enter"){ const f=$("c
 $("curClose").onclick=()=>closeSheet("curSheet");
 
 function seg(el,opts,isOn,onPick){
+  if(!el) return;
+  /* same buttons, same choice as last time: just refresh what a tap does. Rebuilding and measuring every row on
+     every render forced the whole page to be laid out again and again (the main cause of stalls). */
+  const key=JSON.stringify(opts.map(([v,l])=>[v,l,!!isOn(v)]));
+  if(el.__segKey===key&&el.children.length){ const bs=el.querySelectorAll(":scope > button"); opts.forEach(([val],i)=>{ const b=bs[i]; if(b){ const pk=(el.id||"")+"|"+val; b.onclick=()=>{ popKey=pk; buzz(6); onPick(val); }; } });
+    /* drawn while hidden (a closed sheet): give it its pill once it can be seen */
+    if(window.Motion&&!el.querySelector(":scope > .seg-ind")) queueGlide(el,null); return; }
+  el.__segKey=key;
   /* keep the gliding pill across re-renders, so a second render mid-glide does not cut it short */
-  const ind=el.querySelector(":scope > .seg-ind"), was=window.Motion&&el.offsetParent!==null ? Motion.rectIn(el) : null;
+  /* where the pill was: remembered from last time, not measured (measuring here forced a full layout per row) */
+  const ind=el.querySelector(":scope > .seg-ind"); let was=null; try{ was=ind&&ind.dataset.to?JSON.parse(ind.dataset.to):null; }catch(e){}
   el.innerHTML=""; if(ind) el.prepend(ind);
   for(const [val,label] of opts){
     const b=document.createElement("button"); b.type="button"; b.textContent=label;
@@ -343,8 +354,11 @@ function seg(el,opts,isOn,onPick){
     if(popKey===pk){ b.classList.add("pop"); popKey=null; }
     b.onclick=()=>{ popKey=pk; buzz(6); onPick(val); }; el.appendChild(b);
   }
-  if(window.Motion) Motion.glide(el,was);
+  if(window.Motion) queueGlide(el,was);
 }
+function queueGlide(el,was){ GLIDE.set(el,was); if(!glideRaf) glideRaf=requestAnimationFrame(()=>{ glideRaf=0; const q=[...GLIDE]; GLIDE.clear(); for(const [r,w] of q) if(r.isConnected) Motion.glide(r,w); }); }
+/* all pills are measured together once the page has been drawn: one layout instead of one per row */
+const GLIDE=new Map(); let glideRaf=0;
 function showinRow(el){
   el.innerHTML="";
   const lbl=document.createElement("span"); lbl.textContent="להציג ב:"; el.appendChild(lbl);
@@ -1583,12 +1597,15 @@ function renderJourney(){
   try{ const L=path.getTotalLength(); path.style.strokeDasharray=L; path.style.strokeDashoffset=L; box.style.setProperty("--jl",L); }catch(e){}
   drawJourney();
 }
-/* the line draws itself as the map comes into view (scroll-linked) */
-function drawJourney(){ const box=$("jMap"), path=box&&box.querySelector(".jline"); if(!path) return; const L=+box.style.getPropertyValue("--jl")||0; if(L<1){ box.classList.add("drawn"); return; }
-  if(calm()){ path.style.strokeDashoffset=0; box.classList.add("drawn"); return; }
-  const r=box.getBoundingClientRect(), p=Math.min(1,Math.max(0,(innerHeight*0.95-r.top)/(innerHeight*0.55)));
-  path.style.strokeDashoffset=(L*(1-p)).toFixed(1); box.classList.toggle("drawn",p>0.98); box.style.setProperty("--jp",p.toFixed(3)); }
-addEventListener("scroll",()=>{ if(view==="stats") requestAnimationFrame(drawJourney); },{passive:true});
+/* the line draws itself once, when the map comes into view */
+let jIO=null;
+function drawJourney(){ const box=$("jMap"), path=box&&box.querySelector(".jline"); if(!path) return; const L=+box.style.getPropertyValue("--jl")||0;
+  if(L<1||calm()||!("IntersectionObserver" in window)){ path.style.strokeDashoffset=0; box.classList.add("drawn"); return; }
+  if(jIO) jIO.disconnect();
+  jIO=new IntersectionObserver(es=>{ if(!es.some(e=>e.isIntersecting)) return; jIO.disconnect();
+    path.animate([{strokeDashoffset:L},{strokeDashoffset:0}],{duration:1500,easing:"cubic-bezier(.45,.05,.25,1)",fill:"forwards"}).finished.then(()=>{ path.style.strokeDashoffset=0; });
+    setTimeout(()=>box.classList.add("drawn"),700); },{threshold:.35});
+  jIO.observe(box); }
 
 /* ================= good morning: a short card the first time the app opens each day ================= */
 /* celebrations wait while a sheet is open (adding an expense, the account…) so they never cover what you are doing */
@@ -1635,22 +1652,30 @@ const MEDALS=[
   ["owl","🦉","ינשוף לילה","הוצאה שנרשמה אחרי חצות",d=>d.owl],
   ["towns3","📍","שלוש ערים","שלוש עצירות במסע",d=>d.towns>=3],
   ["towns10","🧭","עשר ערים","עשר עצירות במסע",d=>d.towns>=10]];
+/* an action can be undone for ~10 seconds: medals only count what stayed */
+let UNDO_MS=12000;
 function medalData(){
-  const ex=S.items.filter(it=>it.kind!=="transfer"), t=todayStr(), st=tripStart();
+  const cut=Date.now()-UNDO_MS, kept=S.items.filter(it=>!(it.createdAt>cut));
+  const ex=kept.filter(it=>it.kind!=="transfer"), t=todayStr(), st=tripStart();
   const day= st&&st<=t ? daysBetween(st,t)+1 : 0;
   const countries=new Set(ex.map(it=>locOf(it)).filter(k=>k&&k!=="prep"&&k!=="?")).size;
   const onTrip=ex.filter(it=>st&&it.date>=st&&locOf(it)!=="prep"), tot=onTrip.reduce((a,it)=>a+ils(it),0), avg=day>0?tot/day:0;
   const w=new Date(); w.setDate(w.getDate()-7); const ws=w.getFullYear()+"-"+String(w.getMonth()+1).padStart(2,"0")+"-"+String(w.getDate()).padStart(2,"0");
   const last7=onTrip.filter(it=>it.date>ws&&it.date<t).reduce((a,it)=>a+ils(it),0);
   const owl=ex.some(it=>{ try{ const h=+new Date(it.createdAt).toLocaleTimeString("en-GB",{hour:"2-digit",hour12:false,...(it.tz?{timeZone:it.tz}:{})}).slice(0,2); return h>=0&&h<4; }catch(e){ return false; } });
-  return {n:ex.length,day,countries,streak:streak(),transfers:S.items.filter(it=>it.kind==="transfer").length,thrift:day>=14&&avg>0&&last7<avg*7*0.9,owl,towns:journeyLegs().length};
+  return {n:ex.length,day,countries,streak:streak(),transfers:kept.filter(it=>it.kind==="transfer").length,thrift:day>=14&&avg>0&&last7<avg*7*0.9,owl,towns:journeyLegs().length};
 }
 function medalsNow(){ const d=medalData(); return MEDALS.filter(m=>{ try{ return m[4](d); }catch(e){ return false; } }).map(m=>m[0]); }
 let medalQ=[], medalBusy=false;
 function checkMedals(){
   if(!loaded||!me) return; if(sheetOpen()){ clearTimeout(window.__mdT); window.__mdT=setTimeout(checkMedals,4000); return; } const k="trip-medals-"+me; const seen=new Set((load(k)||"").split(",").filter(Boolean)); const first=!load(k);
-  const now=medalsNow(), fresh=now.filter(id=>!seen.has(id)); if(!fresh.length) return;
-  store(k,[...new Set([...seen,...now])].join(","));
+  /* something new may still be undone: look again once the undo time is over */
+  if(S.items.some(it=>it.createdAt>Date.now()-UNDO_MS)){ clearTimeout(window.__mdU); window.__mdU=setTimeout(checkMedals,UNDO_MS+800); }
+  const now=medalsNow(), fresh=now.filter(id=>!seen.has(id));
+  /* a medal whose reason was undone (a test settle-up, a deleted expense) is taken back */
+  const keep=[...seen].filter(id=>now.includes(id)); if(!first&&keep.length!==seen.size&&!fresh.length){ store(k,keep.join(",")||","); return; }
+  if(!fresh.length) return;
+  store(k,[...new Set([...keep,...now])].join(","));
   /* the first time: no parade of old ones, one note with how many there are */
   if(first){ if(now.length>1) setTimeout(()=>!sheetOpen()&&toast("🏅 כבר יש לכם "+now.length+" מדליות","לאוסף",()=>{ fillAcct(); openSheet("acctSheet"); setTimeout(()=>$("medalBox")&&$("medalBox").scrollIntoView({behavior:"smooth",block:"center"}),300); }),4200); else if(now.length===1){ medalQ.push(now[0]); showMedal(); } return; }
   medalQ.push(...fresh); showMedal();
