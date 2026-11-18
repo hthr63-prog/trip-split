@@ -11,7 +11,7 @@
   window.__cinema=true;
 
   /* ---- 1. depth: cards rise out of the page ---- */
-  const DEPTH="#viewShared > section:not(.hero), #viewShared > .add-cta, #viewPersonal > .stack > section, #viewPersonal > section, #viewPersonal .add-cta, #viewStats > section, #ticket, .insight, #ledger > .monthfold, #pLedger > .monthfold";
+  const DEPTH="#viewShared > section:not(.hero):not(.ticket), #viewShared > .add-cta, #viewPersonal > .stack > section, #viewPersonal > section, #viewPersonal .add-cta, #viewStats > section, .insight, #ledger > .monthfold, #pLedger > .monthfold";
   const touched=new Set();
   function depth(){
     const vh=innerHeight;
@@ -72,6 +72,25 @@
   /* re-renders replace parts of the page: pick up new titles and positions */
   new MutationObserver(()=>{ splitTitles(); ask(); }).observe(document.documentElement,{childList:true,subtree:true});
   splitTitles(); ask(); setTimeout(ask,400);
+
+  /* ---- 5. the balance card is a real card: it leans with the phone (or the finger) and its sheen moves ---- */
+  (function tilt(){
+    const T=()=>document.getElementById("ticket");
+    let gx=0, gy=0, fx=null, asked=false, cur={x:0,y:0}, raf=0;
+    const paint=()=>{ raf=0; const t=T(); if(!t||calm()) return; if(!t.querySelector(":scope > .sheen")){ const i=document.createElement("i"); i.className="sheen"; i.setAttribute("aria-hidden","true"); t.appendChild(i); } const tx=fx?fx.x:gx, ty=fx?fx.y:gy;
+      cur.x+=(tx-cur.x)*.18; cur.y+=(ty-cur.y)*.18;
+      t.style.transform=`perspective(900px) rotateX(${(-cur.y*7).toFixed(2)}deg) rotateY(${(cur.x*9).toFixed(2)}deg)`;
+      t.style.setProperty("--sx",(50+cur.x*40).toFixed(1)+"%"); t.style.setProperty("--sy",(30+cur.y*40).toFixed(1)+"%");
+      if(Math.abs(tx-cur.x)>.002||Math.abs(ty-cur.y)>.002) raf=requestAnimationFrame(paint); };
+    const go=()=>{ if(!raf) raf=requestAnimationFrame(paint); };
+    addEventListener("deviceorientation",e=>{ if(e.gamma==null) return; gx=clamp(e.gamma/30,-1,1); gy=clamp((e.beta-45)/30,-1,1); go(); });
+    document.addEventListener("pointerdown",e=>{ const t=T(); if(!t||!t.contains(e.target)) return;
+      /* iPhone asks once for permission to use the motion sensor, on the first touch of the card */
+      if(!asked&&window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==="function"){ asked=true; DeviceOrientationEvent.requestPermission().catch(()=>{}); }
+      if(e.target.closest("button")) return; const r=t.getBoundingClientRect(); fx={x:(e.clientX-r.left)/r.width*2-1,y:(e.clientY-r.top)/r.height*2-1}; go(); },{passive:true});
+    document.addEventListener("pointermove",e=>{ if(!fx) return; const t=T(); if(!t) return; const r=t.getBoundingClientRect(); fx={x:clamp((e.clientX-r.left)/r.width*2-1,-1,1),y:clamp((e.clientY-r.top)/r.height*2-1,-1,1)}; go(); },{passive:true});
+    const up=()=>{ if(fx){ fx=null; go(); } }; document.addEventListener("pointerup",up); document.addEventListener("pointercancel",up);
+  })();
 
   /* ---- 4. deal: cards fly in from depth one after another ---- */
   function deal(els){

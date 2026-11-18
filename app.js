@@ -207,15 +207,15 @@ let cLast="A";                     // which converter field the person typed in
 
 /* ---- theme ---- */
 function themePref(){ return load("trip-theme")||"auto"; }
-function isDark(){ const t=themePref(); return t==="dark"||(t==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches); }
+function isDark(){ const t=themePref(); return t==="dark"||(t==="auto"&&document.documentElement.dataset.theme==="dark"); }
 function applyTheme(t){
-  if(t==="auto"){ delete document.documentElement.dataset.theme; store("trip-theme",""); }
+  if(t==="auto"){ store("trip-theme",""); window.FX&&FX.autoTheme(true); }
   else { document.documentElement.dataset.theme=t; store("trip-theme",t); }
   $("themeBtn").setAttribute("aria-checked",String(isDark()));
-  if($("themeSeg")) seg($("themeSeg"),[["light","☀️ בהיר"],["dark","🌙 כהה"],["auto","📱 לפי המכשיר"]],v=>v===themePref(),v=>applyTheme(v));
+  if($("themeSeg")) seg($("themeSeg"),[["auto","🌅 אוטומטי"],["light","☀️ בהיר"],["dark","🌙 כהה"]],v=>v===themePref(),v=>applyTheme(v));
 }
 $("themeBtn").onclick=()=>{ const r=document.documentElement; if(!calm()){ r.classList.add("theming"); setTimeout(()=>r.classList.remove("theming"),500); } buzz(6); applyTheme(isDark()?"light":"dark"); };
-try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>applyTheme(themePref())); }catch(e){}
+/* automatic: dark after sunset where you are, light after sunrise (fx.js); the switch above sets it by hand */
 
 /* ---- search keywords per currency ---- */
 const KW={THB:"תאילנד thailand bangkok בנגקוק",VND:"וייטנאם vietnam",LAK:"לאוס laos",KHR:"קמבודיה cambodia",MMK:"מיאנמר בורמה myanmar burma",MYR:"מלזיה malaysia",SGD:"סינגפור singapore",IDR:"אינדונזיה באלי indonesia bali",PHP:"פיליפינים philippines",BND:"ברוניי brunei",JPY:"יפן japan",KRW:"קוריאה korea",CNY:"סין china",HKD:"הונג קונג hong kong",MOP:"מקאו macau",TWD:"טייוואן taiwan",MNT:"מונגוליה mongolia",INR:"הודו india",NPR:"נפאל nepal",LKR:"סרי לנקה sri lanka",BTN:"בהוטן bhutan",MVR:"מלדיביים maldives",BDT:"בנגלדש bangladesh",PKR:"פקיסטן pakistan",KZT:"קזחסטן kazakhstan",UZS:"אוזבקיסטן uzbekistan",KGS:"קירגיזסטן kyrgyzstan",AED:"אמירויות דובאי uae dubai emirates",ILS:"ישראל israel שקל nis shekel",USD:"ארצות הברית אמריקה usa us dollar",EUR:"אירופה europe euro",GBP:"בריטניה אנגליה לונדון uk england pound",CHF:"שווייץ switzerland",AUD:"אוסטרליה australia",NZD:"ניו זילנד new zealand",CAD:"קנדה canada",TRY:"טורקיה turkey",GEL:"גאורגיה גרוזיה georgia",AMD:"ארמניה armenia",AZN:"אזרבייגן azerbaijan",JOD:"ירדן jordan",EGP:"מצרים egypt",QAR:"קטאר qatar",OMR:"עומאן oman",MAD:"מרוקו morocco",ZAR:"דרום אפריקה south africa",KES:"קניה kenya",TZS:"טנזניה tanzania",FJD:"פיגי fiji",MXN:"מקסיקו mexico",BRL:"ברזיל brazil",ARS:"ארגנטינה argentina",CLP:"צילה chile",PEN:"פרו peru",COP:"קולומביה colombia",CZK:"צכיה פראג czech prague",HUF:"הונגריה hungary",PLN:"פולין poland",RON:"רומניה romania",BGN:"בולגריה bulgaria",RSD:"סרביה serbia",SEK:"שוודיה sweden",NOK:"נורווגיה norway",DKK:"דנמרק denmark",ISK:"איסלנד iceland"};
@@ -1494,7 +1494,13 @@ $("pDesc").addEventListener("keydown",e=>{ if(e.key==="Enter") $("pAmt").focus()
 
 /* ---- stats page: spending per month and by category ---- */
 let stScope="trip", stMonth=null, locScope="couple";
+/* where the last tap was: the next screen grows out of that spot */
+let lastTap=null; document.addEventListener("pointerdown",e=>{ lastTap={x:e.clientX,y:e.clientY,t:Date.now()}; },{capture:true,passive:true});
 function goView(v){
+  /* the current screen shrinks back into the distance and the new one opens as a circle from the button you pressed */
+  if(document.startViewTransition&&!calm()&&v!==view){ const R=document.documentElement, tp=lastTap&&Date.now()-lastTap.t<1500?lastTap:{x:innerWidth/2,y:innerHeight-40};
+    R.style.setProperty("--vx",tp.x+"px"); R.style.setProperty("--vy",tp.y+"px"); R.classList.add("vt-hole");
+    try{ const t=document.startViewTransition(()=>{ view=v; syncUrl(); renderAll(); window.scrollTo({top:0}); }); const done=()=>R.classList.remove("vt-hole"); t.finished.then(done,done); setTimeout(done,1200); return; }catch(e){ R.classList.remove("vt-hole"); } }
   /* with motion.js: the new screen's blocks rise in one after another instead of a whole-page cross-fade */
   if(M&&!calm()){ view=v; syncUrl(); renderAll(); window.scrollTo({top:0});
     const box=$(v==="stats"?"viewStats":v==="personal"?"viewPersonal":"viewShared");

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261118181156"></script>
+<script src="theme.js?v=20261118182254"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -883,6 +883,17 @@ input.bad-f{border-color:var(--bad)!important}
 .kiss-b.l{background:linear-gradient(135deg,#6C4BFF,#3B82F6)}.kiss-b.r{background:linear-gradient(135deg,#FF4D8D,#FF8F4F)}
 .kiss-h{position:absolute;left:50%;top:45%;font-size:46px}
 .kiss-sh{position:absolute;inset:-10% -40%;background:linear-gradient(90deg,transparent 35%,rgba(255,255,255,.55) 50%,transparent 65%)}
+
+/* 3. a new screen opens as a circle from the button you pressed; the old one falls back into the distance */
+html.vt-hole::view-transition-old(root){animation:vtOld .55s cubic-bezier(.4,0,.2,1) both}
+html.vt-hole::view-transition-new(root){animation:vtNew .6s cubic-bezier(.3,0,.1,1) both;mix-blend-mode:normal}
+@keyframes vtOld{to{transform:scale(.9);filter:blur(6px) brightness(.85);opacity:.6}}
+@keyframes vtNew{from{clip-path:circle(0 at var(--vx,50%) var(--vy,90%))}to{clip-path:circle(150vmax at var(--vx,50%) var(--vy,90%))}}
+/* 10. the sheen on the balance card follows the tilt */
+.ticket{transform-style:preserve-3d;will-change:transform}
+.ticket > .sheen{position:absolute;inset:0;pointer-events:none;z-index:2;border-radius:inherit;background:radial-gradient(circle at var(--sx,50%) var(--sy,30%),rgba(255,255,255,.28),rgba(255,255,255,0) 45%);mix-blend-mode:soft-light}
+/* 11. the automatic switch at sunset fades slowly */
+html.theming-slow,html.theming-slow *{transition-duration:1.5s!important}
 </style>
 </head>
 <body>
@@ -1532,11 +1543,11 @@ input.bad-f{border-color:var(--bad)!important}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261118181156">
-<script src="config.js?v=20261118181156"></script>
-<script src="motion.js?v=20261118181156"></script>
-<script src="fx.js?v=20261118181156"></script>
-<script src="cinema.js?v=20261118181156"></script>
-<script src="app.js?v=20261118181156"></script>
+<meta name="app-v" content="20261118182254">
+<script src="config.js?v=20261118182254"></script>
+<script src="motion.js?v=20261118182254"></script>
+<script src="fx.js?v=20261118182254"></script>
+<script src="cinema.js?v=20261118182254"></script>
+<script src="app.js?v=20261118182254"></script>
 </body>
 </html>

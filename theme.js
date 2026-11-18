@@ -1,5 +1,9 @@
 /* apply the saved theme before first paint */
-try{ const t=localStorage.getItem("trip-theme"); if(t==="light"||t==="dark") document.documentElement.dataset.theme=t; }catch(e){}
+try{ const t=localStorage.getItem("trip-theme"); const a=localStorage.getItem("trip-autodark");
+  /* by hand: as chosen. Automatic: what the sun said last time (fx.js checks again right away) */
+  if(t==="light"||t==="dark") document.documentElement.dataset.theme=t;
+  else if(a==="light"||a==="dark") document.documentElement.dataset.theme=a;
+  else { const h=new Date().getHours(); document.documentElement.dataset.theme=(h>=19||h<6)?"dark":"light"; } }catch(e){}
 /* opened as the quick-add shortcut: its own icon and name when added to the home screen */
 try{ const qa=new URLSearchParams(location.search).get("add"); if(qa==="1"||qa==="me"){ const me=qa==="me";
   const set=(sel,attr,val)=>{ const el=document.querySelector(sel); if(el) el.setAttribute(attr,val); };

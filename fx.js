@@ -47,7 +47,20 @@
       } else { const hr=new Date().getHours(); skyVal=(hr>=20||hr<5)?"night":(hr<7||hr>=17)?"dusk":"day"; }
     }
     if(h.dataset.sky!==skyVal) h.dataset.sky=skyVal;
+    autoTheme(false);
   }
+  /* automatic theme: dark at night where you are (from sunset to sunrise), light in the day.
+     It fades over a second and a half instead of flipping. A choice made by hand (light/dark) wins. */
+  function autoTheme(now){
+    let pref=""; try{ pref=localStorage.getItem("trip-theme")||""; }catch(e){}
+    if(pref==="light"||pref==="dark") return;
+    const want=skyVal==="night"?"dark":"light";
+    if(root.dataset.theme===want) return;
+    if(!calm()&&root.dataset.theme){ root.classList.add("theming","theming-slow"); setTimeout(()=>root.classList.remove("theming","theming-slow"),1700); }
+    root.dataset.theme=want; try{ localStorage.setItem("trip-autodark",want); }catch(e){}
+    const b=document.getElementById("themeBtn"); if(b) b.setAttribute("aria-checked",String(want==="dark"));
+  }
+  window.FX={autoTheme:()=>{ skyKey=""; sky(); autoTheme(true); }};
 
 
   let queued=false;
