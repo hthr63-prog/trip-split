@@ -364,6 +364,10 @@ function renderHeader(){
 }
 
 /* ---- render: shared ---- */
+const SETTLE_AT=500;   /* ₪ */
+/* once a day per phone, a short note when the debt crosses the line */
+function settleToast(d){ const k="trip-nudge-"+todayStr(); if(load(k)) return; store(k,"1");
+  setTimeout(()=>toast("🤝 "+(d.to===me?nm(d.from)+" "+g.owes(d.from)+" לך ":g.you(me)+" "+g.owes(me)+" ל"+nm(d.to)+" ")+fmt(d.amt,showCur)+". אולי זה זמן לסגור חשבון","לסגירה",()=>{ const b=document.querySelector("#debts .btn.nudge"); if(b){ b.scrollIntoView({block:"center",behavior:"smooth"}); setTimeout(()=>b.click(),450); } }),1800); }
 function renderTicket(){
   const c=compute();
   const V=$("verdict"), D=$("debts"), B=$("breakdown"); V.innerHTML=""; D.innerHTML=""; B.innerHTML="";
@@ -399,6 +403,11 @@ function renderTicket(){
       row.appendChild(t); D.appendChild(row);
     }
   }
+  /* a gentle reminder to settle once the debt is worth ₪500 or more (at today's rate) */
+  const big=d=>conv(d.amt,showCur,"ILS")>=SETTLE_AT;
+  if(loaded&&me&&mine.some(big)){ const d=mine.find(big), n=document.createElement("div"); n.className="settle-nudge"; n.setAttribute("role","note");
+    n.textContent="🤝 החוב עבר "+fmt(SETTLE_AT,"ILS")+". אולי זה זמן טוב לסגור חשבון";
+    D.appendChild(n); settleToast(d); }
   if(canWrite){
     for(const d of mine){
       const row=document.createElement("div"); row.className="debt";
@@ -412,6 +421,7 @@ function renderTicket(){
         else mk("💵 מזומן","cash",showCur);
         mk("🏦 העברה לחשבון","bank",showCur);
         const no=document.createElement("button"); no.type="button"; no.className="link"; no.textContent="ביטול"; no.onclick=()=>renderAll(); row.appendChild(no); };
+      if(big(d)) b.classList.add("nudge");
       row.appendChild(b); D.appendChild(row);
       b.dataset.share="• "+nm(d.from)+" "+(fem(d.from)?"צריכה":"צריך")+" להעביר ל"+nm(d.to)+" "+fmt(d.amt,showCur);
     }

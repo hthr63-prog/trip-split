@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261114200249"></script>
+<script src="theme.js?v=20261118172342"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -853,6 +853,11 @@ input.bad-f{border-color:var(--bad)!important}
 .monthfold .df-ch{font-style:normal;color:var(--brand);transition:transform .25s ease}
 .monthfold.on .df-ch{transform:rotate(180deg)}
 .monthfold.on + .day{margin-top:4px}
+
+.settle-nudge{background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.4);border-radius:14px;padding:9px 12px;font-weight:600;font-size:.9rem;color:var(--grad-ink)}
+.debts .btn.nudge{animation:nudge 2.4s ease-in-out 3;box-shadow:0 0 0 0 rgba(255,255,255,.6)}
+@keyframes nudge{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}50%{box-shadow:0 0 0 8px rgba(255,255,255,0)}}
+@media (prefers-reduced-motion:reduce){.debts .btn.nudge{animation:none}}
 </style>
 </head>
 <body>
@@ -1502,10 +1507,10 @@ input.bad-f{border-color:var(--bad)!important}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261114200249">
-<script src="config.js?v=20261114200249"></script>
-<script src="motion.js?v=20261114200249"></script>
-<script src="fx.js?v=20261114200249"></script>
-<script src="app.js?v=20261114200249"></script>
+<meta name="app-v" content="20261118172342">
+<script src="config.js?v=20261118172342"></script>
+<script src="motion.js?v=20261118172342"></script>
+<script src="fx.js?v=20261118172342"></script>
+<script src="app.js?v=20261118172342"></script>
 </body>
 </html>
