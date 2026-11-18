@@ -894,6 +894,54 @@ html.vt-hole::view-transition-new(root){animation:vtNew .6s cubic-bezier(.3,0,.1
 .ticket > .sheen{position:absolute;inset:0;pointer-events:none;z-index:2;border-radius:inherit;background:radial-gradient(circle at var(--sx,50%) var(--sy,30%),rgba(255,255,255,.28),rgba(255,255,255,0) 45%);mix-blend-mode:soft-light}
 /* 11. the automatic switch at sunset fades slowly */
 html.theming-slow,html.theming-slow *{transition-duration:1.5s!important}
+
+/* 2. the journey map */
+.jmap{position:relative;border-radius:20px;overflow:hidden;background:radial-gradient(circle at 30% 20%,color-mix(in srgb,var(--brand) 16%,var(--surface)),var(--surface-2));min-height:120px}
+.jmap::before{content:"";position:absolute;inset:0;background-image:linear-gradient(color-mix(in srgb,var(--ink) 6%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--ink) 6%,transparent) 1px,transparent 1px);background-size:28px 28px;pointer-events:none}
+.jsvg{position:relative;display:block;width:100%;height:auto}
+.jline{fill:none;stroke:var(--brand);stroke-width:3.5;stroke-linecap:round;stroke-dasharray:0;filter:drop-shadow(0 3px 6px rgba(108,75,255,.45))}
+.jpin circle{fill:var(--surface);stroke:var(--hot,#FF4D8D);stroke-width:3.5}
+.jpin.now circle{fill:var(--hot,#FF4D8D);stroke:#fff}
+.jpin text{font:700 12px var(--display,inherit);fill:var(--ink)}
+.jpin .jsub{font-weight:500;font-size:10.5px;fill:var(--muted)}
+.jpin{opacity:0;transform:translateY(6px);transition:opacity .4s ease,transform .5s cubic-bezier(.2,.9,.3,1.3);transition-delay:calc(var(--i)*.12s)}
+.jmap.drawn .jpin,.jmap:not([style*="--jl"]) .jpin{opacity:1;transform:none}
+.jpin.now circle{animation:jpulse 1.8s ease-in-out infinite}
+@keyframes jpulse{50%{stroke-width:7}}
+@media (prefers-reduced-motion:reduce){.jpin{opacity:1;transform:none;transition:none}.jpin.now circle{animation:none}}
+/* 8. good morning */
+.morning{position:fixed;inset:0;z-index:95;display:grid;place-items:center;text-align:center;color:#fff;cursor:pointer;background:linear-gradient(180deg,#2F7FE8,#9FD3FF);animation:mnIn .6s cubic-bezier(.2,.8,.2,1) both;overflow:hidden}
+.morning[data-sky="dusk"]{background:linear-gradient(180deg,#B48CFF,#FF7FA8 55%,#FFB37A)}
+.morning[data-sky="night"]{background:linear-gradient(180deg,#0E0A2A,#2A1660 60%,#5A2C8F)}
+.morning.out{animation:mnOut .5s ease both}
+.mn-orb{position:absolute;width:260px;height:260px;border-radius:50%;top:12%;left:50%;transform:translateX(-50%);background:radial-gradient(circle,rgba(255,240,180,.9),rgba(255,240,180,0) 65%);animation:mnOrb 3s ease-out both}
+.morning[data-sky="night"] .mn-orb{background:radial-gradient(circle,rgba(230,225,255,.7),rgba(230,225,255,0) 60%)}
+.mn-in{position:relative;display:flex;flex-direction:column;gap:6px;padding:24px;text-shadow:0 2px 14px rgba(0,0,0,.25)}
+.mn-ic{font-size:64px;animation:mnRise .9s .1s cubic-bezier(.2,.9,.3,1.2) both}
+.morning h2{margin:6px 0 0;font-family:var(--display);font-size:2.2rem;font-weight:800;animation:mnRise .8s .25s cubic-bezier(.2,.9,.3,1.1) both}
+.mn-day{margin:0;font-size:1.15rem;font-weight:700;opacity:.95;animation:mnRise .8s .4s both}
+.mn-y{margin:4px 0 0;font-size:1rem;opacity:.9;animation:mnRise .8s .55s both}
+.morning small{margin-top:18px;opacity:.65;font-size:.8rem;animation:mnRise .8s .9s both}
+@keyframes mnIn{from{opacity:0;transform:scale(1.06)}to{opacity:1;transform:none}}
+@keyframes mnOut{to{opacity:0;transform:scale(.96);filter:blur(6px)}}
+@keyframes mnRise{from{opacity:0;transform:translateY(24px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+@keyframes mnOrb{from{transform:translate(-50%,60px) scale(.6);opacity:0}to{transform:translateX(-50%);opacity:1}}
+/* 9. medals */
+.medal-o{position:fixed;inset:0;z-index:96;display:grid;place-items:center;align-content:center;gap:22px;background:rgba(14,10,42,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;animation:mnIn .4s ease both;perspective:800px}
+.medal-o.out{animation:mnOut .45s ease both}
+.medal{width:150px;height:150px;position:relative;transform-style:preserve-3d;animation:medalSpin 1.6s cubic-bezier(.2,.75,.25,1) both}
+.medal-f,.medal-b{position:absolute;inset:0;border-radius:50%;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#FFF3B0,#FFC93C 45%,#E09A00);box-shadow:inset 0 0 0 7px rgba(255,255,255,.35),0 18px 40px -12px rgba(255,170,0,.7)}
+.medal-b{transform:rotateY(180deg);background:radial-gradient(circle at 35% 30%,#FFE58A,#D99000)}
+.medal-f span{font-size:64px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.25))}
+.medal-t{display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff;text-align:center;animation:mnRise .7s .7s both}
+.medal-t small{opacity:.8;letter-spacing:.2em;font-size:.75rem}
+.medal-t b{font-family:var(--display);font-size:1.7rem;font-weight:800}
+.medal-t span{opacity:.85}
+@keyframes medalSpin{from{transform:rotateY(-720deg) scale(.2);opacity:0}60%{opacity:1}to{transform:rotateY(0) scale(1)}}
+.mdl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mdl{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;padding:10px 6px;border-radius:16px;background:var(--surface-2);opacity:.55}
+.mdl.on{opacity:1;background:linear-gradient(160deg,color-mix(in srgb,#FFC93C 22%,var(--surface)),var(--surface))}
+.mdl-i{font-size:28px}.mdl b{font-size:.82rem}.mdl small{font-size:.7rem;color:var(--muted);line-height:1.25}
 </style>
 </head>
 <body>
@@ -1270,6 +1318,7 @@ html.theming-slow,html.theming-slow *{transition-duration:1.5s!important}
   <!-- stats view -->
   <div id="viewStats" class="stack" style="gap:18px" hidden>
     <div class="actions"><button class="btn small" id="statsBack" type="button">→ חזרה</button><div class="seg" id="stScope"></div></div>
+    <section class="card journey" id="journey" aria-labelledby="jTitle"><div class="card-head"><h2 id="jTitle">🧭 המסע שלנו</h2><span class="hint" id="jNote"></span></div><div class="jmap" id="jMap"></div></section>
     <button class="recapcta" id="recapBtn" type="button"><span>🎬</span><span><b>הטיול שלנו בסיכום</b><small>סטוריז עם כל המספרים הכי מעניינים · לחיצה על מדינה למטה תיתן סיכום שלה</small></span></button>
     <section class="ticket stats-ticket">
       <div class="top">
@@ -1368,6 +1417,7 @@ html.theming-slow,html.theming-slow *{transition-duration:1.5s!important}
       <button class="btn block" id="acctLockBtn" type="button">🔒 לנעול את האישי בטלפון הזה</button>
       <button class="btn block" id="acctSwitch" type="button">🔄 החלפת משתמש</button>
     </div>
+    <section class="card medals" id="medalBox" aria-labelledby="mdTitle"><div class="card-head"><h2 id="mdTitle">🏅 המדליות שלנו</h2><span class="hint" id="medalCount"></span></div><div class="mdl-grid" id="medalGrid"></div></section>
     <section class="budget" id="budgetBox" aria-labelledby="budTitle">
       <div class="bud-head"><b id="budTitle">💰 התקציב שלי לטיול</b><button class="link" id="budEdit" type="button">✏️ עריכה</button></div>
       <div class="bud-lock" id="budLock" hidden><span>🔒 התקציב שמור מוצפן, יחד עם ההוצאות האישיות.</span><button class="btn small" id="budOpen" type="button">פתיחת האישי</button></div>

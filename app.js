@@ -750,7 +750,10 @@ async function refreshPersonal(){
     for(const x of CASH){ const v=cardFee(x); if(v>0) fees.push({id:"cfee-"+x.id,_wid:x.id,_fee:true,desc:"עמלת כרטיס 1% על משיכה",amount:v,cur:x.cur,cat:"other",catLabel:"עמלות משיכה",pm:"fee",date:x.date,createdAt:(x.createdAt||0)+1,tz:x.tz,loc:x.loc}); }
     INCOME=mine.filter(x=>x.type==="budget-in");
     BUDGET=mine.filter(x=>x.type==="budget").sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||null;
-    P=[...mine.filter(x=>x.type!=="cash"&&x.type!=="budget"&&x.type!=="budget-in"),...fees]; pLoaded=true; syncCardFees(); if(!$("acctSheet").hidden) fillAcct(); if(view==="personal") renderAll();
+    STOPS=mine.filter(x=>x.type==="stop");
+    /* only a place newer than the last stop counts (an old reading must not add a stop back) */
+    { const h=hereNow(), last=Math.max(0,...STOPS.map(x=>x.createdAt||0)); if(h&&(h.at||0)>last) setTimeout(()=>recordStop(h.lat,h.lng,h.at),400); }
+    P=[...mine.filter(x=>x.type!=="cash"&&x.type!=="budget"&&x.type!=="budget-in"&&x.type!=="stop"),...fees]; pLoaded=true; syncCardFees(); if(!$("acctSheet").hidden) fillAcct(); if(view==="personal") renderAll();
   }catch(e){ console.error(e); pLoaded=true; }
 }
 /* too easy to guess offline: only digits, or built from the person's name or username */
@@ -1159,7 +1162,7 @@ function askHere(){
   try{ navigator.geolocation.getCurrentPosition(p=>{
       const lat=Math.round(p.coords.latitude*100)/100, lng=Math.round(p.coords.longitude*100)/100;
       const moved=!HERE||Math.abs(HERE.lat-lat)>0.01||Math.abs(HERE.lng-lng)>0.01;
-      HERE={lat,lng,at:Date.now()}; store("trip-here",JSON.stringify(HERE)); if(moved&&loaded) renderHero();
+      HERE={lat,lng,at:Date.now()}; store("trip-here",JSON.stringify(HERE)); if(moved&&loaded) renderHero(); recordStop(lat,lng); if(window.__mnTown){ const t=nearTown(lat,lng); if(t) window.__mnTown(t.name); window.__mnTown=null; }
     },()=>{},{enableHighAccuracy:false,maximumAge:30*60e3,timeout:20000}); }catch(e){}
 }
 setTimeout(askHere,1500);
@@ -1303,7 +1306,7 @@ function renderSofar(){
   const sh=$("sfShow"); sh.hidden=!personal; if(personal) showinRow(sh);
 }
 function renderAll(){
-  syncCardFees(); applyG(); renderHero(); renderInsight(); renderSofar();
+  syncCardFees(); applyG(); if(loaded&&!window.__mornT){ window.__mornT=setTimeout(()=>{ window.__mornT=0; morning(); checkMedals(); },900); } renderHero(); renderInsight(); renderSofar();
   { const arch=loaded&&curTrip!==activeTrip(); $("tripNote").hidden=!arch; if(arch) $("tripNoteTxt").textContent="🗂️ אתם צופים בטיול "+(S.trip||"קודם")+" מהארכיון"; }
   requestAnimationFrame(()=>{ watchReveal(); renderMini(); onScroll(); });
   renderHeader();
@@ -1516,9 +1519,163 @@ function statItems(){
   if(stScope==="mine"&&me){ return [...myShareItems(), ...(acct&&acctFor===me?P:[])]; }
   return S.items.filter(it=>it.kind!=="transfer");
 }
+/* ================= the journey: where you were, day by day (private) =================
+   The phone's place is matched to the nearest town from a built-in list (nothing is looked up online)
+   and kept as an encrypted personal entry, one per town change, so only you see it. */
+const TOWNS=[["תל אביב",32.08,34.78],["ירושלים",31.77,35.21],["בנגקוק",13.75,100.5],["צ׳יאנג מאי",18.79,98.98],["פאי",19.36,98.44],["צ׳יאנג ראי",19.91,99.83],["צ׳יאנג דאו",19.37,98.96],["מה הונג סון",19.3,97.97],["סוקוטאי",17.01,99.82],["איוטאיה",14.35,100.57],["קנצ׳נבורי",14.02,99.53],["הואה הין",12.57,99.96],["פטאיה",12.93,100.88],["קו צ׳אנג",12.06,102.33],["קו סמט",12.57,101.45],["קו פנגן",9.73,100.02],["קו סמוי",9.51,100.01],["קו טאו",10.1,99.84],["קרבי",8.09,98.91],["אאו נאנג",8.04,98.82],["פוקט",7.88,98.39],["קו פי פי",7.74,98.77],["קו לנטה",7.62,99.05],["קו ליפה",6.49,99.3],["קאו סוק",8.91,98.53],["האט יאי",7.01,100.47],["אודון תאני",17.41,102.79],["נונג קאי",17.88,102.74],["לואנג פרבנג",19.89,102.13],["ונג ויינג",18.92,102.45],["ויינטיאן",17.97,102.6],["נונג קיאו",20.57,102.62],["פאקסה",15.12,105.8],["4000 האיים",14.11,105.85],["האנוי",21.03,105.85],["הא לונג",20.95,107.08],["סאפה",22.34,103.84],["הא ג׳יאנג",22.82,104.98],["נין בין",20.25,105.97],["פונג נה",17.59,106.28],["הואה",16.46,107.59],["דה נאנג",16.05,108.2],["הוי אן",15.88,108.33],["נה טראנג",12.24,109.19],["דלאת",11.94,108.44],["מוי נה",10.93,108.29],["הו צ׳י מין",10.78,106.7],["קאן טו",10.03,105.78],["פו קוק",10.29,103.98],["סיאם ריפ",13.36,103.86],["פנום פן",11.56,104.92],["קמפוט",10.61,104.18],["קו רונג",10.73,103.25],["בטמבנג",13.1,103.2],["יאנגון",16.84,96.17],["בגאן",21.17,94.86],["מנדליי",21.97,96.08],["אגם אינלה",20.55,96.92],["קואלה לומפור",3.14,101.69],["פנאנג",5.41,100.33],["לנגקאווי",6.35,99.8],["מלאקה",2.19,102.25],["קמרון היילנדס",4.47,101.38],["האיים פרהנטיאן",5.92,102.73],["סינגפור",1.35,103.82],["אובוד",-8.51,115.26],["קוטה, באלי",-8.72,115.17],["צ׳אנגו",-8.65,115.14],["האיים גילי",-8.35,116.04],["לומבוק",-8.65,116.32],["יוגיקרטה",-7.8,110.36],["ג׳קרטה",-6.2,106.85],["לבואן באג׳ו",-8.5,119.88],["מנילה",14.6,120.98],["אל נידו",11.19,119.4],["קורון",12.0,120.2],["סבו",10.32,123.89],["סיארגאו",9.85,126.05],["בוהול",9.65,123.85],["דלהי",28.61,77.21],["מומבאי",19.08,72.88],["גואה",15.5,73.83],["ריישיקש",30.09,78.27],["מנאלי",32.24,77.19],["דרמסלה",32.22,76.32],["וארנסי",25.32,83.0],["ג׳איפור",26.91,75.79],["אגרה",27.18,78.01],["קטמנדו",27.7,85.32],["פוקרה",28.21,83.99],["קולומבו",6.93,79.86],["אלה",6.87,81.05],["קנדי",7.29,80.63],["טוקיו",35.68,139.69],["קיוטו",35.01,135.77],["אוסקה",34.69,135.5],["סיאול",37.57,126.98],["הונג קונג",22.32,114.17],["טאיפיי",25.03,121.57],["בייג׳ינג",39.9,116.4]];
+function kmBetween(a,b,c,d){ const R=6371, r=Math.PI/180, x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2; return 2*R*Math.asin(Math.sqrt(x)); }
+function nearTown(lat,lng){ let best=null, km=1e9; for(const t of TOWNS){ const k=kmBetween(lat,lng,t[1],t[2]); if(k<km){ km=k; best=t; } } return best&&km<60 ? {name:best[0],lat:best[1],lng:best[2],km} : best ? {name:"ליד "+best[0],lat:Math.round(lat*10)/10,lng:Math.round(lng*10)/10,km} : null; }
+let STOPS=[];
+let stopBusy=false;
+async function recordStop(lat,lng,at){
+  if(!me||!(acct&&acctFor===me)||stopBusy) return; const t=nearTown(lat,lng); if(!t) return;
+  const last=[...STOPS].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).pop();
+  if(last&&last.name===t.name) return;   /* still in the same town */
+  if(last&&at&&at<=(last.createdAt||0)) return;
+  stopBusy=true; setTimeout(()=>{ stopBusy=false; },1500);
+  try{ const c=await loadAcct(); if(!c) return; const id="s"+Date.now().toString(36);
+    const doc=await encFor(c,{type:"stop",name:t.name,lat:t.lat,lng:t.lng,date:todayStr(),createdAt:Date.now(),trip:curTrip});
+    STOPS=[...STOPS,{id,name:t.name,lat:t.lat,lng:t.lng,date:todayStr(),createdAt:Date.now()}];
+    EXP().doc(id).set(doc).catch(()=>{}); if(view==="stats") renderJourney(); }catch(e){}
+}
+/* the legs of the trip: consecutive days in the same town are one leg */
+function journeyLegs(){
+  const s=[...STOPS].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); const legs=[];
+  for(const x of s){ const l=legs[legs.length-1]; if(l&&l.name===x.name) continue; legs.push({...x,from:x.date}); }
+  legs.forEach((l,i)=>{ l.to= legs[i+1] ? legs[i+1].from : todayStr(); l.days=Math.max(1,daysBetween(l.from,l.to)+(legs[i+1]?0:1)); });
+  const mine=[...myShareItems(),...(acct&&acctFor===me?P:[])];
+  for(const l of legs) l.spent=mine.filter(it=>it.date>=l.from&&(it.date<l.to||(!legs[legs.indexOf(l)+1]&&it.date<=l.to))).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0);
+  return legs;
+}
+function renderJourney(){
+  const box=$("jMap"); if(!box) return; const legs=journeyLegs(); const note=$("jNote");
+  box.innerHTML=""; if(!legs.length){ note.textContent= !(acct&&acctFor===me) ? "המסע נשמר באישי (מוצפן, רק אתה רואה). פותחים את האישי, ומאז כל עיר חדשה תיכנס למפה." : "המסע יתחיל להצטייר מהעיר הבאה. האפליקציה מזהה את העיר לפי מיקום הטלפון, בלי לשלוח אותו לשום מקום."; return; }
+  note.textContent=legs.length===1?"כאן זה מתחיל. כל עיר חדשה תתחבר לקו.":legs.length+" עצירות · "+legs.reduce((a,l)=>a+l.days,0)+" ימים";
+  const W=360, H=Math.max(220,Math.min(420,120+legs.length*40)), pad=46;
+  const lats=legs.map(l=>l.lat), lngs=legs.map(l=>l.lng), k=Math.cos((Math.max(...lats)+Math.min(...lats))/2*Math.PI/180);
+  let x0=Math.min(...lngs)*k, x1=Math.max(...lngs)*k, y0=Math.min(...lats), y1=Math.max(...lats);
+  const span=Math.max(x1-x0,y1-y0,0.6); const cx=(x0+x1)/2, cy=(y0+y1)/2; x0=cx-span/2; x1=cx+span/2; y0=cy-span/2; y1=cy+span/2;
+  const sc=Math.min((W-pad*2)/(x1-x0),(H-pad*2)/(y1-y0));
+  const P2=l=>[W/2-(l.lng*k-cx)*sc*-1, H/2-(l.lat-cy)*sc];
+  const ns="http://www.w3.org/2000/svg", svg=document.createElementNS(ns,"svg"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`); svg.setAttribute("class","jsvg"); svg.setAttribute("direction","ltr"); svg.style.direction="ltr";   /* text-anchor start/end as on paper */ svg.setAttribute("role","img"); svg.setAttribute("aria-label","מפת המסע: "+legs.map(l=>l.name).join(", "));
+  const pts=legs.map(P2);
+  /* a soft curve through the stops */
+  let d="M"+pts[0][0].toFixed(1)+" "+pts[0][1].toFixed(1);
+  for(let i=1;i<pts.length;i++){ const [a,b]=pts[i-1],[c,e]=pts[i], mx=(a+c)/2, my=(b+e)/2-Math.abs(c-a)*.25-14; d+=` Q${mx.toFixed(1)} ${my.toFixed(1)} ${c.toFixed(1)} ${e.toFixed(1)}`; }
+  const path=document.createElementNS(ns,"path"); path.setAttribute("d",d); path.setAttribute("class","jline"); svg.appendChild(path);
+  /* labels: each town takes the first free spot around its pin (above, below, right, left) so close towns do not overlap */
+  const taken=pts.map(([x,y])=>({x0:x-10,x1:x+10,y0:y-10,y1:y+10}));
+  const hit=b=>taken.some(o=>!(b.x1<o.x0||b.x0>o.x1||b.y1<o.y0||b.y0>o.y1));
+  pts.forEach(([x,y],i)=>{ const l=legs[i], g=document.createElementNS(ns,"g"); g.setAttribute("class","jpin"+(i===pts.length-1?" now":"")); g.style.setProperty("--i",i);
+    const c=document.createElementNS(ns,"circle"); c.setAttribute("cx",x); c.setAttribute("cy",y); c.setAttribute("r",i===pts.length-1?9:7); g.appendChild(c);
+    const sub=(l.days===1?"יום":l.days+" ימים")+(l.spent>0?" · "+fmt(l.spent,showCur):"");
+    const w=Math.max(l.name.length*7.2,sub.length*5.6)+8, hgt=30;
+    const spots=[[x,y-14,"middle",-1],[x,y+20,"middle",1],[x+14,y+4,"start",0],[x-14,y+4,"end",0]];
+    let pick=null; for(const [lx,ly,an,dir] of spots){ const x0=an==="middle"?lx-w/2:an==="start"?lx:lx-w, y0=dir<0?ly-hgt+12:dir>0?ly-12:ly-15;
+      const box={x0,x1:x0+w,y0,y1:y0+hgt}; if(box.x0<2||box.x1>W-2||box.y0<2||box.y1>H-2) continue; if(!hit(box)){ pick=[lx,ly,an,dir,box]; break; } }
+    if(!pick){ const [lx,ly,an,dir]=spots[i%2]; pick=[lx,ly,an,dir,null]; }
+    const [lx,ly,an,dir,box]=pick; if(box) taken.push(box);
+    const nameY= dir<0 ? ly-12 : ly, subY= dir<0 ? ly : ly+13;
+    const t=document.createElementNS(ns,"text"); t.setAttribute("x",lx); t.setAttribute("y",nameY); t.setAttribute("text-anchor",an); t.textContent=l.name; g.appendChild(t);
+    const st=document.createElementNS(ns,"text"); st.setAttribute("x",lx); st.setAttribute("y",subY); st.setAttribute("text-anchor",an); st.setAttribute("class","jsub"); st.textContent=sub; g.appendChild(st);
+    svg.appendChild(g); });
+  box.appendChild(svg);
+  try{ const L=path.getTotalLength(); path.style.strokeDasharray=L; path.style.strokeDashoffset=L; box.style.setProperty("--jl",L); }catch(e){}
+  drawJourney();
+}
+/* the line draws itself as the map comes into view (scroll-linked) */
+function drawJourney(){ const box=$("jMap"), path=box&&box.querySelector(".jline"); if(!path) return; const L=+box.style.getPropertyValue("--jl")||0; if(L<1){ box.classList.add("drawn"); return; }
+  if(calm()){ path.style.strokeDashoffset=0; box.classList.add("drawn"); return; }
+  const r=box.getBoundingClientRect(), p=Math.min(1,Math.max(0,(innerHeight*0.95-r.top)/(innerHeight*0.55)));
+  path.style.strokeDashoffset=(L*(1-p)).toFixed(1); box.classList.toggle("drawn",p>0.98); box.style.setProperty("--jp",p.toFixed(3)); }
+addEventListener("scroll",()=>{ if(view==="stats") requestAnimationFrame(drawJourney); },{passive:true});
+
+/* ================= good morning: a short card the first time the app opens each day ================= */
+/* celebrations wait while a sheet is open (adding an expense, the account…) so they never cover what you are doing */
+const sheetOpen=()=>!!document.querySelector(".sheet-bg:not([hidden])");
+function morning(){
+  const k="trip-morning-"+(me||""), t=todayStr(); if(!loaded||!me||load(k)===t||document.documentElement.dataset.quick) return;
+  if(sheetOpen()){ setTimeout(morning,4000); return; } store(k,t);
+  if(calm()) return;
+  const h=new Date().getHours(), hi= h<5?"לילה טוב":h<12?"בוקר טוב":h<17?"צהריים טובים":h<21?"ערב טוב":"לילה טוב";
+  const st=tripStart(), day= st&&st<=t ? daysBetween(st,t)+1 : null;
+  const here=hereNow&&hereNow(); const town= here? (nearTown(here.lat,here.lng)||{}).name : null;
+  const y=new Date(); y.setDate(y.getDate()-1); const ys=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0");
+  const yday=S.items.filter(it=>it.kind!=="transfer"&&it.date===ys).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0);
+  const sky=($("hero")&&$("hero").dataset.sky)||"day";
+  const o=document.createElement("div"); o.className="morning"; o.dataset.sky=sky; o.setAttribute("role","dialog"); o.setAttribute("aria-label",hi);
+  const ic= sky==="night"?"🌙":sky==="dusk"?"🌅":"☀️";
+  o.innerHTML='<div class="mn-orb"></div><div class="mn-in"><div class="mn-ic"></div><h2></h2><p class="mn-day"></p><p class="mn-y"></p><small>נגיעה כדי להמשיך</small></div>';
+  o.querySelector(".mn-ic").textContent=ic; o.querySelector("h2").textContent=hi+", "+nm(me);
+  const dayLine=tw=>[day?"יום "+day+" בטיול":null,tw].filter(Boolean).join(" · ")||(S.trip||"");
+  o.querySelector(".mn-day").textContent=dayLine(town);
+  /* the place may arrive a moment after the card opens */
+  if(!town) window.__mnTown=tw=>{ const e=o.querySelector(".mn-day"); if(o.isConnected&&e) e.textContent=dayLine(tw); };
+  o.querySelector(".mn-y").textContent= yday>0 ? "אתמול הוצאתם ביחד "+fmt(yday,showCur) : "אתמול לא נרשמו הוצאות משותפות";
+  document.body.appendChild(o); buzz(8);
+  const bye=()=>{ if(!o.isConnected) return; o.classList.add("out"); setTimeout(()=>o.remove(),520); };
+  o.addEventListener("click",bye); setTimeout(bye,3200);
+}
+
+/* ================= medals: little milestones along the way ================= */
+const MEDALS=[
+  ["first","🧾","ההוצאה הראשונה","רשמתם את ההוצאה הראשונה",d=>d.n>=1],
+  ["n50","🎯","50 הוצאות","50 הוצאות משותפות",d=>d.n>=50],
+  ["n100","💯","100 הוצאות","100 הוצאות משותפות",d=>d.n>=100],
+  ["n250","🏆","250 הוצאות","250 הוצאות משותפות",d=>d.n>=250],
+  ["week","🎒","שבוע בדרכים","7 ימים בטיול",d=>d.day>=7],
+  ["month","🗺️","חודש בדרכים","30 ימים בטיול",d=>d.day>=30],
+  ["d100","🌏","100 ימים","100 ימים בטיול",d=>d.day>=100],
+  ["c2","🛂","מדינה חדשה","הוצאות בשתי מדינות",d=>d.countries>=2],
+  ["c4","✈️","ארבע מדינות","הוצאות בארבע מדינות",d=>d.countries>=4],
+  ["streak7","🔥","שבוע ברצף","7 ימים ברצף עם רישום",d=>d.streak>=7],
+  ["settle","🤝","חשבון נקי","סגרתם חשבון בפעם הראשונה",d=>d.transfers>=1],
+  ["thrift","🌱","שבוע חסכוני","7 ימים אחרונים מתחת לממוצע",d=>d.thrift],
+  ["owl","🦉","ינשוף לילה","הוצאה שנרשמה אחרי חצות",d=>d.owl],
+  ["towns3","📍","שלוש ערים","שלוש עצירות במסע",d=>d.towns>=3],
+  ["towns10","🧭","עשר ערים","עשר עצירות במסע",d=>d.towns>=10]];
+function medalData(){
+  const ex=S.items.filter(it=>it.kind!=="transfer"), t=todayStr(), st=tripStart();
+  const day= st&&st<=t ? daysBetween(st,t)+1 : 0;
+  const countries=new Set(ex.map(it=>locOf(it)).filter(k=>k&&k!=="prep"&&k!=="?")).size;
+  const onTrip=ex.filter(it=>st&&it.date>=st&&locOf(it)!=="prep"), tot=onTrip.reduce((a,it)=>a+ils(it),0), avg=day>0?tot/day:0;
+  const w=new Date(); w.setDate(w.getDate()-7); const ws=w.getFullYear()+"-"+String(w.getMonth()+1).padStart(2,"0")+"-"+String(w.getDate()).padStart(2,"0");
+  const last7=onTrip.filter(it=>it.date>ws&&it.date<t).reduce((a,it)=>a+ils(it),0);
+  const owl=ex.some(it=>{ try{ const h=+new Date(it.createdAt).toLocaleTimeString("en-GB",{hour:"2-digit",hour12:false,...(it.tz?{timeZone:it.tz}:{})}).slice(0,2); return h>=0&&h<4; }catch(e){ return false; } });
+  return {n:ex.length,day,countries,streak:streak(),transfers:S.items.filter(it=>it.kind==="transfer").length,thrift:day>=14&&avg>0&&last7<avg*7*0.9,owl,towns:journeyLegs().length};
+}
+function medalsNow(){ const d=medalData(); return MEDALS.filter(m=>{ try{ return m[4](d); }catch(e){ return false; } }).map(m=>m[0]); }
+let medalQ=[], medalBusy=false;
+function checkMedals(){
+  if(!loaded||!me) return; if(sheetOpen()){ clearTimeout(window.__mdT); window.__mdT=setTimeout(checkMedals,4000); return; } const k="trip-medals-"+me; const seen=new Set((load(k)||"").split(",").filter(Boolean)); const first=!load(k);
+  const now=medalsNow(), fresh=now.filter(id=>!seen.has(id)); if(!fresh.length) return;
+  store(k,[...new Set([...seen,...now])].join(","));
+  /* the first time: no parade of old ones, one note with how many there are */
+  if(first){ if(now.length>1) setTimeout(()=>!sheetOpen()&&toast("🏅 כבר יש לכם "+now.length+" מדליות","לאוסף",()=>{ fillAcct(); openSheet("acctSheet"); setTimeout(()=>$("medalBox")&&$("medalBox").scrollIntoView({behavior:"smooth",block:"center"}),300); }),4200); else if(now.length===1){ medalQ.push(now[0]); showMedal(); } return; }
+  medalQ.push(...fresh); showMedal();
+}
+function showMedal(){
+  if(medalBusy||!medalQ.length) return; if(sheetOpen()){ setTimeout(showMedal,3000); return; } const id=medalQ.shift(), m=MEDALS.find(x=>x[0]===id); if(!m) return showMedal();
+  if(calm()){ toast(m[1]+" מדליה חדשה: "+m[2]); return showMedal(); }
+  medalBusy=true; const o=document.createElement("div"); o.className="medal-o"; o.setAttribute("role","dialog"); o.setAttribute("aria-label","מדליה חדשה: "+m[2]);
+  o.innerHTML='<div class="medal"><div class="medal-f"><span></span></div><div class="medal-b"></div></div><div class="medal-t"><small>מדליה חדשה</small><b></b><span></span></div>';
+  o.querySelector(".medal-f span").textContent=m[1]; o.querySelector(".medal-t b").textContent=m[2]; o.querySelector(".medal-t span").textContent=m[3];
+  document.body.appendChild(o); buzz([10,40,10,40,24]); setTimeout(confetti,700);
+  const bye=()=>{ if(!o.isConnected) return; o.classList.add("out"); setTimeout(()=>{ o.remove(); medalBusy=false; setTimeout(showMedal,300); },450); };
+  o.addEventListener("click",bye); setTimeout(bye,3600);
+}
+function renderMedals(){
+  const box=$("medalGrid"); if(!box) return; box.innerHTML=""; const have=new Set(loaded?medalsNow():[]);
+  for(const m of MEDALS){ const d=document.createElement("div"); d.className="mdl"+(have.has(m[0])?" on":""); d.title=m[3];
+    const i=document.createElement("span"); i.className="mdl-i"; i.textContent=have.has(m[0])?m[1]:"🔒"; const t=document.createElement("b"); t.textContent=m[2]; const s=document.createElement("small"); s.textContent=m[3];
+    d.append(i,t,s); box.appendChild(d); }
+  $("medalCount").textContent=have.size+" מתוך "+MEDALS.length;
+}
+
 function renderStats(){
   const mineOk=!!me;
   if(!mineOk) stScope="trip";
+  try{ renderJourney(); }catch(e){}
   seg($("stScope"),mineOk?[["trip","כל הטיול"],["mine","שלי"]]:[["trip","כל הטיול"]],v=>v===stScope,v=>{stScope=v;renderStats();});
   const items=statItems();
   const byMonth={}; let all=0;
@@ -2361,7 +2518,7 @@ function renderBackup(){ const d=backupAge(), due= d===null||d>=7, el=$("backupS
   if(el){ el.textContent=(due?"⚠️ ":"✓ ")+"גיבוי אחרון: "+backupText()+(due?". מומלץ פעם בשבוע.":""); el.classList.toggle("due",due); }
   if($("acctBackup")){ $("acctBackup").textContent=backupText(); $("acctBackup").style.color= due?"#b45309":""; } }
 function quickUrl(kind){ return PAGE_URL+"?u="+encodeURIComponent(me)+"&add="+(kind==="me"?"me":"1")+keyHash(); }
-function fillAcct(){
+function fillAcct(){ try{ renderMedals(); }catch(e){}
   const f=fem(me), open=!!(acct&&acctFor===me), hasPw=!!person(me)?.vk;
   $("acctAv2").textContent=ini(nm(me));
   $("acctName2").textContent=nm(me);
