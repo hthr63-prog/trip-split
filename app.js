@@ -1595,7 +1595,8 @@ addEventListener("scroll",()=>{ if(view==="stats") requestAnimationFrame(drawJou
 const sheetOpen=()=>!!document.querySelector(".sheet-bg:not([hidden])");
 function morning(){
   const k="trip-morning-"+(me||""), t=todayStr(); if(!loaded||!me||load(k)===t||document.documentElement.dataset.quick) return;
-  if(sheetOpen()){ setTimeout(morning,4000); return; } store(k,t);
+  /* it is a hello, not an interruption: if you were busy in the first seconds, skip it for today */
+  if(sheetOpen()||performance.now()>12000){ store(k,t); return; } store(k,t);
   if(calm()) return;
   const h=new Date().getHours(), hi= h<5?"לילה טוב":h<12?"בוקר טוב":h<17?"צהריים טובים":h<21?"ערב טוב":"לילה טוב";
   const st=tripStart(), day= st&&st<=t ? daysBetween(st,t)+1 : null;
