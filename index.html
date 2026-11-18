@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261118175258"></script>
+<script src="theme.js?v=20261118181156"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -869,6 +869,20 @@ input.bad-f{border-color:var(--bad)!important}
 .bighead h2 .kw > span{display:inline-block;will-change:transform,opacity,filter}
 .hero .stars,.hero .cloud,.hero .sc,.hero .waves{transform-box:view-box;transform-origin:50% 100%}
 @media (prefers-reduced-motion:reduce){.bighead h2,.bighead h2 .kw > span{transform:none!important;opacity:1!important;filter:none!important}}
+
+/* delight: the hit, the gulp, coins, the kiss */
+.hit-ring{position:fixed;z-index:81;pointer-events:none;width:70px;height:70px;border-radius:50%;border:3px solid var(--brand);box-shadow:0 0 18px color-mix(in srgb,var(--brand) 60%,transparent)}
+.hit-spark{position:fixed;z-index:81;pointer-events:none;width:7px;height:7px;border-radius:50%;background:var(--hot,#FF4D8D);box-shadow:0 0 8px currentColor}
+.hit-spark:nth-of-type(3n){background:#FFC93C}.hit-spark:nth-of-type(3n+1){background:var(--brand)}
+.fly-chip{box-shadow:0 0 0 0 transparent,0 10px 30px -8px rgba(108,75,255,.7)}
+.swipe.gulp .sw-bg{opacity:1}
+.coin{position:fixed;z-index:47;pointer-events:none;font-size:22px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.25))}
+.ptr{font-size:22px}
+.kiss{position:fixed;inset:0;z-index:90;pointer-events:none;display:grid;place-items:center;background:radial-gradient(circle at 50% 45%,rgba(255,255,255,.35),transparent 60%);overflow:hidden}
+.kiss-b{grid-area:1/1;width:84px;height:84px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:1.6rem;color:#fff;box-shadow:0 12px 30px -10px rgba(40,20,120,.6)}
+.kiss-b.l{background:linear-gradient(135deg,#6C4BFF,#3B82F6)}.kiss-b.r{background:linear-gradient(135deg,#FF4D8D,#FF8F4F)}
+.kiss-h{position:absolute;left:50%;top:45%;font-size:46px}
+.kiss-sh{position:absolute;inset:-10% -40%;background:linear-gradient(90deg,transparent 35%,rgba(255,255,255,.55) 50%,transparent 65%)}
 </style>
 </head>
 <body>
@@ -1289,7 +1303,7 @@ input.bad-f{border-color:var(--bad)!important}
   <div class="rc-body" id="rcBody"></div>
   <div class="rc-hint">לחיצה = הבא</div>
 </div>
-<div class="ptr" id="ptr" aria-hidden="true">✈️</div>
+<div class="ptr" id="ptr" aria-hidden="true">🎒</div>
 <button class="mini" id="mini" type="button" aria-label="חזרה למעלה"><span id="miniTxt"></span><small id="miniDay"></small></button>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -1518,11 +1532,11 @@ input.bad-f{border-color:var(--bad)!important}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261118175258">
-<script src="config.js?v=20261118175258"></script>
-<script src="motion.js?v=20261118175258"></script>
-<script src="fx.js?v=20261118175258"></script>
-<script src="cinema.js?v=20261118175258"></script>
-<script src="app.js?v=20261118175258"></script>
+<meta name="app-v" content="20261118181156">
+<script src="config.js?v=20261118181156"></script>
+<script src="motion.js?v=20261118181156"></script>
+<script src="fx.js?v=20261118181156"></script>
+<script src="cinema.js?v=20261118181156"></script>
+<script src="app.js?v=20261118181156"></script>
 </body>
 </html>
