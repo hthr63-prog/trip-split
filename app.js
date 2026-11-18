@@ -577,7 +577,7 @@ function flipList(box,render){
   for(const [k,el] of flipKeys(box)){ const b=el.getBoundingClientRect(); if(!vis(b)) continue; const a=before.get(k);
     if(a){ const dx=a.left-b.left, dy=a.top-b.top; if(Math.abs(dx)>.5||Math.abs(dy)>.5) M.animate(el,[{transform:`translate(${dx}px,${dy}px)`},{transform:"none"}],{spring:"smooth"}); }
     else if(k.startsWith("r:")&&before.size) fresh.push(el); }
-  if(fresh.length&&fresh.length<8) M.enter(fresh,{spring:"bouncy",stagger:45});
+  if(fresh.length&&fresh.length<8&&!window.__deck) M.enter(fresh,{spring:"bouncy",stagger:45});
   return out; }
 const LIST_STEP=40, listLim={shared:LIST_STEP,mine:LIST_STEP};
 /* folded days: which past days were opened by hand (per list), kept while the app is open */
@@ -597,7 +597,8 @@ function monthFold(L,ym,items,open,k,redraw,sum){
   const sub=document.createElement("small"); sub.textContent=(days===1?"יום אחד":days+" ימים")+" · "+(n===1?"הוצאה אחת":n+" הוצאות"); tx.append(t,sub);
   const c=document.createElement("span"); c.className="df-go num"; c.textContent=sum>0?fmt(sum,showCur):"";
   const ch=document.createElement("i"); ch.className="df-ch"; ch.setAttribute("aria-hidden","true"); ch.textContent="▾";
-  b.append(tx,c,ch); b.onclick=()=>{ buzz(5); FOLD[k].set("m"+ym,!open); redraw(); }; L.appendChild(b);
+  b.dataset.ym=ym;
+  b.append(tx,c,ch); b.onclick=()=>{ buzz(5); FOLD[k].set("m"+ym,!open); window.__deck=!open; redraw(); if(!open&&window.Cinema) Cinema.opened(k==="shared"?"ledger":"pLedger","m",ym); }; L.appendChild(b);
 }
 function dayFold(box,h,date,items,open,k,redraw){
   box.classList.add("fold"); box.classList.toggle("shut",!open);
@@ -612,7 +613,8 @@ function dayFold(box,h,date,items,open,k,redraw){
   const c=document.createElement("span"); c.className="df-go num"; c.textContent=((h.querySelector(".daysum")||{}).textContent||"").replace(/^סה״כ /,"");
   const ch=document.createElement("i"); ch.className="df-ch"; ch.setAttribute("aria-hidden","true"); ch.textContent="▾";
   sum.append(tx,c,ch); h.hidden=true;
-  sum.onclick=()=>{ buzz(5); FOLD[k].set("d"+date,!open); redraw(); };
+  box.dataset.date=date;
+  sum.onclick=()=>{ buzz(5); FOLD[k].set("d"+date,!open); window.__deck=!open; redraw(); if(!open&&window.Cinema) Cinema.opened(k==="shared"?"ledger":"pLedger","d",date); };
   h.after(sum);
 }
 function moreBtn(L,left,fn){ if(left<=0) return; const b=document.createElement("button"); b.type="button"; b.className="btn block more-rows"; b.textContent="עוד "+Math.min(left,LIST_STEP)+" הוצאות · נשארו "+left; b.onclick=()=>{ buzz(5); fn(); }; L.appendChild(b); }
@@ -941,7 +943,7 @@ $("mini").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
 const revealed=new WeakSet();
 const io=("IntersectionObserver" in window)? new IntersectionObserver(es=>{ for(const e of es){ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } } },{rootMargin:"0px 0px -6% 0px",threshold:.08}) : null;
 function watchReveal(){
-  if(!io||calm()) return;
+  if(!io||calm()||window.__cinema) return;   /* the cinema layer (cinema.js) moves the cards */
   document.querySelectorAll("#viewShared > section, #viewPersonal section, #viewStats > section, .insight").forEach(el=>{
     if(revealed.has(el)) return; revealed.add(el);
     const r=el.getBoundingClientRect(); if(r.top<innerHeight) return;   /* already on screen: leave it alone */

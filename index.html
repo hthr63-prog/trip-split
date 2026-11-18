@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261118172342"></script>
+<script src="theme.js?v=20261118175258"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -858,6 +858,17 @@ input.bad-f{border-color:var(--bad)!important}
 .debts .btn.nudge{animation:nudge 2.4s ease-in-out 3;box-shadow:0 0 0 0 rgba(255,255,255,.6)}
 @keyframes nudge{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}50%{box-shadow:0 0 0 8px rgba(255,255,255,0)}}
 @media (prefers-reduced-motion:reduce){.debts .btn.nudge{animation:none}}
+
+/* cinema layer (cinema.js) */
+/* cards dealt in with a small tilt must not widen the page */
+#ledger,#pLedger{overflow-x:clip}
+/* the big titles start a little larger than their place; keep that inside the page */
+.bighead{overflow-x:clip}
+.bighead h2{transform-origin:100% 100%;will-change:transform}
+.bighead h2 .kw{display:inline-block;overflow:visible}
+.bighead h2 .kw > span{display:inline-block;will-change:transform,opacity,filter}
+.hero .stars,.hero .cloud,.hero .sc,.hero .waves{transform-box:view-box;transform-origin:50% 100%}
+@media (prefers-reduced-motion:reduce){.bighead h2,.bighead h2 .kw > span{transform:none!important;opacity:1!important;filter:none!important}}
 </style>
 </head>
 <body>
@@ -1507,10 +1518,11 @@ input.bad-f{border-color:var(--bad)!important}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261118172342">
-<script src="config.js?v=20261118172342"></script>
-<script src="motion.js?v=20261118172342"></script>
-<script src="fx.js?v=20261118172342"></script>
-<script src="app.js?v=20261118172342"></script>
+<meta name="app-v" content="20261118175258">
+<script src="config.js?v=20261118175258"></script>
+<script src="motion.js?v=20261118175258"></script>
+<script src="fx.js?v=20261118175258"></script>
+<script src="cinema.js?v=20261118175258"></script>
+<script src="app.js?v=20261118175258"></script>
 </body>
 </html>
