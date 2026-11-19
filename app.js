@@ -1629,7 +1629,13 @@ let STOPS=[];   /* old personal stops (before the journey became shared); merged
    Every day of the trip belongs to the stay that covers it; that is how days, money and per-day averages are counted. */
 function tripStops(){ const T=tripById(curTrip)||{}; const sh=(T.stops||[]).map(x=>({...x}));
   for(const x of STOPS){ if(!sh.some(y=>y.n===x.name&&y.d===x.date)) sh.push({n:x.name,lat:x.lat,lng:x.lng,d:x.date,at:x.createdAt||0,old:true}); }
-  return sh.filter(x=>x&&x.n&&x.d).sort((a,b)=>a.d.localeCompare(b.d)||(a.at||0)-(b.at||0)); }
+  return mergeStays(sh.filter(x=>x&&x.n&&x.d).sort((a,b)=>a.d.localeCompare(b.d)||(a.at||0)-(b.at||0))); }
+/* the same town twice in a row without leaving it in between is one stay, not two visits */
+function mergeStays(list){ const out=[];
+  for(const x of list){ const p=out[out.length-1];
+    if(p&&p.n===x.n&&(!p.e||p.e>=x.d)){ if(!p.e||!x.e) p.e= p.e&&!x.e&&p.e>=x.d ? null : (x.e||null); else p.e= x.e>p.e ? x.e : p.e; if(x.pin&&!p.pin){ p.lat=x.lat; p.lng=x.lng; p.pin=1; } continue; }
+    out.push(x); }
+  return out; }
 const dayAdd=(s,n)=>{ const [y,m,d]=s.split("-").map(Number); const t=new Date(y,m-1,d+n); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); };
 /* which stay each day belongs to: the latest arrival on or before it, unless that stay had already been left */
 function stayDays(stays){
@@ -1681,7 +1687,7 @@ async function recordTown(t,fix){
   stopBusy=true; let added=false;
   /* through updateTrips: it also builds the trip list for older spaces that never had one */
   try{ await updateTrips(list=>{ const T=list.find(x=>x.id===curTrip); if(!T) return;
-      const cur=(T.stops||[]).slice().sort((a,b)=>a.d.localeCompare(b.d)||(a.at||0)-(b.at||0)); const l=cur[cur.length-1]; if(l&&l.n===t.name&&!l.e) return;
+      const cur=mergeStays((T.stops||[]).map(x=>({...x})).sort((a,b)=>a.d.localeCompare(b.d)||(a.at||0)-(b.at||0))); const l=cur[cur.length-1]; if(l&&l.n===t.name&&!l.e) return;
       const today=todayStr();
       /* picking the place by hand (or asking the phone again after that) corrects today's place rather than adding another */
       if(l&&!l.m&&l.d===today&&!l.e&&(fix||l.h)){ cur.pop(); const p=cur[cur.length-1]; if(p&&p.e===today){ if(p.n===t.name){ p.e=null; T.stops=cur; added=true; return; } } }
@@ -1699,7 +1705,7 @@ function moveOldStops(){ if(!STOPS.length||!canWrite) return; const T=tripById(c
    pinched to zoom. It flies in from the whole earth to where you have been; the route is drawn between the stops. */
 let GLOBE=null, GLOBE_ME=null, worldP=null, RINGS=null;
 function loadWorld(){ if(window.WORLD) return Promise.resolve(); if(worldP) return worldP;
-  worldP=new Promise(res=>{ const s=document.createElement("script"); s.src="world.js?v=1"; s.onload=res; s.onerror=res; document.head.appendChild(s); }); return worldP; }
+  worldP=new Promise(res=>{ const s=document.createElement("script"); s.src="world.js?v=2"; s.onload=res; s.onerror=res; document.head.appendChild(s); }); return worldP; }
 function worldRings(){
   if(RINGS) return RINGS; const Q=window.WORLD_Q||20, out=[];
   for(const part of String(window.WORLD||"").split(";")){ const n=part.split(",").map(Number); let x=0,y=0; const lon=new Float32Array(n.length/2), lat=new Float32Array(n.length/2);
@@ -1713,6 +1719,13 @@ function worldRings(){
   if(out.length>1) RINGS=out; return out;
 }
 const D2R=Math.PI/180;
+/* country borders (lines between neighbours) and where each country's name goes */
+let BLINES=null;
+function borderLines(){ if(BLINES) return BLINES; const Q=window.WORLD_Q||20, out=[];
+  for(const part of String(window.BORDERS||"").split(";")){ if(!part) continue; const n=part.split(",").map(Number); let x=0,y=0; const lon=new Float32Array(n.length/2), lat=new Float32Array(n.length/2); let sx=0,sy=0;
+    for(let i=0;i<n.length;i+=2){ x+=n[i]; y+=n[i+1]; lon[i/2]=x/Q; lat[i/2]=y/Q; sx+=x/Q; sy+=y/Q; }
+    const c=[sx/lon.length,sy/lon.length]; let r=0; for(let i=0;i<lon.length;i++) r=Math.max(r,Math.hypot(lon[i]-c[0],lat[i]-c[1])); out.push({lon,lat,c,r}); }
+  if(out.length) BLINES=out; return out; }
 function gproj(g,lon,lat){ const l=(lon-g.lon)*D2R, p=lat*D2R, p0=g.lat*D2R, cp=Math.cos(p);
   const cosc=Math.sin(p0)*Math.sin(p)+Math.cos(p0)*cp*Math.cos(l);
   let x=cp*Math.sin(l), y=Math.cos(p0)*Math.sin(p)-Math.sin(p0)*cp*Math.cos(l);
@@ -1808,6 +1821,26 @@ function pickOnGlobe(name,at,cb){ const g=GLOBE; if(!g){ toast("🌍 הגלוב�
   g.pin=[at[1],at[0]]; flyGlobe({lon:at[1],lat:at[0],R:Math.min(9000,Math.min(g.W,g.H)*.36/Math.sin(5*D2R))},g);
   g.pick=(lon,lat)=>{ g.pick=null; g.pin=[lon,lat]; g.pinShow=true; setTimeout(()=>{ g.pinShow=false; drawGlobe(g); },4000); drawGlobe(g); cb(Math.round(lat*100)/100,Math.round(lon*100)/100); toast("📍 "+name+" סומנה · לא לשכוח \"שמירה\""); };
   g.cv.parentNode.classList.add("picking"); toast("👆 נוגעים בגלובוס במקום של "+name+" (אפשר לסובב ולהגדיל קודם)"); }
+function drawCountryNames(g,c){ const W=g.W, H=g.H;
+  /* country names: the big ones first; a name shows only where its country is wide enough on screen */
+  if(window.CTRS){ c.textAlign="center";
+    /* room kept free: the town pins with their labels, the zoom buttons, the totals box */
+    const boxes=[{x0:0,x1:50,y0:0,y1:142},{x0:W*.44,x1:W,y0:0,y1:80}];
+    for(const h of g.hits||[]) boxes.push(h.r>=24&&h.t ? {x0:h.x-h.r,x1:h.x+h.r,y0:h.y-17,y1:h.y+17} : {x0:h.x-h.r,x1:h.x+h.r,y0:h.y-h.r,y1:h.y+h.r}); c.direction="rtl"; c.textBaseline="middle";
+    /* the countries of this trip come first and always get their name */
+    const been=new Set([...S.items,...P].map(it=>CTRY[locOf(it)]).filter(Boolean).map(v=>v.split(" ").slice(1).join(" ")).map(n=>n==="פיליפינים"?"הפיליפינים":n==="אמירויות"?"איחוד האמירויות":n==="קוריאה"?"דרום קוריאה":n));
+    const list=[...window.CTRS].sort((a,b)=>(been.has(b[0])?1:0)-(been.has(a[0])?1:0));
+    for(const [nm,lo,la,ar] of list){ const [x,y,v]=gproj(g,lo,la); if(!v||x<0||x>W||y<0||y>H) continue; const mine=been.has(nm);
+      const span=Math.sqrt(ar)*D2R*g.R*.75; const fs=Math.max(mine?11:9.5,Math.min(15,span/7)); c.font="700 "+fs.toFixed(1)+"px Assistant, system-ui, sans-serif";
+      const w=c.measureText(nm).width; if(!mine&&span<w*.9) continue;
+      /* a country of the trip may move a little to get out from under a pin */
+      const tries= mine ? [[0,0],[0,22],[0,-22],[w*.6+16,0],[-w*.6-16,0],[0,40]] : [[0,0]];
+      for(const [dx,dy] of tries){ const X=x+dx, Y=y+dy, bx={x0:X-w/2-3,x1:X+w/2+3,y0:Y-fs/2-2,y1:Y+fs/2+2};
+        if(bx.x0<2||bx.x1>W-2||bx.y0<2||bx.y1>H-2||Math.hypot(Math.max(Math.abs(bx.x0-g.cx),Math.abs(bx.x1-g.cx)),Math.abs(Y-g.cy))>g.R*.97) continue;
+        if(boxes.some(o=>!(bx.x1<o.x0||bx.x0>o.x1||bx.y1<o.y0||bx.y0>o.y1))) continue; boxes.push(bx);
+        c.lineWidth=3; c.strokeStyle="rgba(235,255,245,.75)"; c.strokeText(nm,X,Y); c.fillStyle= mine ? "rgba(120,20,70,.8)" : "rgba(25,55,85,.72)"; c.fillText(nm,X,Y); break; } }
+    c.textBaseline="alphabetic"; }
+}
 function drawGlobe(g){
   g=g||GLOBE; if(!g||!g.cv.isConnected) return; const c=g.ctx, W=g.W, H=g.H; c.clearRect(0,0,W,H);
   const hot=g.mode==="mine"?"#14C9A5":"#FF4D8D", gold="#FFC93C";
@@ -1826,6 +1859,11 @@ function drawGlobe(g){
   c.fillStyle=land; c.strokeStyle="rgba(255,255,255,.45)"; c.lineWidth=.8;
   for(const r of g.rings){ if(angDist(g.lon,g.lat,r.c[0],r.c[1])-r.r>view) continue;
     c.beginPath(); if(landPath(c,g,r)){ c.fill(); c.stroke(); } }
+  /* borders: thin lines between countries */
+  c.strokeStyle="rgba(40,70,110,.42)"; c.lineWidth=g.R>2000?1.1:.8; c.setLineDash(g.R>1500?[]:[3,2]); c.beginPath();
+  for(const b of borderLines()){ if(angDist(g.lon,g.lat,b.c[0],b.c[1])-b.r>view) continue; let on=false;
+    for(let i=0;i<b.lon.length;i++){ const [x,y,v]=gproj(g,b.lon[i],b.lat[i]); if(v){ on?c.lineTo(x,y):c.moveTo(x,y); on=true; } else on=false; } }
+  c.stroke(); c.setLineDash([]);
   nightShade(g,c);
   const sh=c.createRadialGradient(g.cx-g.R*.45,g.cy-g.R*.5,g.R*.05,g.cx,g.cy,g.R*1.02); sh.addColorStop(0,"rgba(255,255,255,.22)"); sh.addColorStop(.65,"rgba(255,255,255,0)"); sh.addColorStop(1,"rgba(5,0,40,.45)");
   c.fillStyle=sh; c.fillRect(0,0,W,H); c.restore();
@@ -1852,6 +1890,7 @@ function drawGlobe(g){
       c.fillStyle="#1E1640"; c.font="800 12.5px Assistant, system-ui, sans-serif"; c.fillText(t.name,lx,ly+14);
       c.fillStyle=g.mode==="mine"?"#0E9F7E":hot; c.font="800 11.5px Assistant, system-ui, sans-serif"; c.fillText(amt,lx,ly+27);
       g.hits.push({x:lx,y:ly+16,r:Math.max(24,w/2),t}); break; } }
+  c.save(); c.beginPath(); c.arc(g.cx,g.cy,g.R,0,7); c.clip(); drawCountryNames(g,c); c.restore();
   if(g.pin&&(g.pick||g.pinShow)){ const [x,y,v]=gproj(g,g.pin[0],g.pin[1]); if(v){ c.strokeStyle="#FFC93C"; c.lineWidth=2.5; c.beginPath(); c.arc(x,y,11,0,7); c.moveTo(x-17,y); c.lineTo(x+17,y); c.moveTo(x,y-17); c.lineTo(x,y+17); c.stroke(); } }
 }
 /* both globes: the couple's (graphs) and mine (personal) */
