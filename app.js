@@ -1332,7 +1332,13 @@ function renderSofar(){
   seg($("sfSeg"),tabs,v=>v===scope,v=>{ sfScope=v; try{ localStorage.setItem("trip-sf",v); }catch(e){} renderSofar(); });
   const stT=tripStart();
   const PC=placeCtx();
-  const inPlace=it=> place==="town" ? (it.town ? it.town===town : PC.stays.some((x,i)=>x.n===town&&PC.inStay(it,i))) : (!stT||(it.date||"")>=stT)&&PC.effLoc(it)===ctry;
+  /* the town is always taken out of its country's expenses, so it can never cost more than the country */
+  const kNow=PC.own.get(td), townCtry=(kNow!=null&&PC.major[kNow])||ctry;
+  const inCtry=(it,c)=> (!stT||(it.date||"")>=stT)&&PC.effLoc(it)===c;
+  const onTownDays=it=> it.town ? it.town===town : PC.stays.some((x,i)=>x.n===town&&PC.stayOf(it)===i);
+  const inPlace=it=> place==="town" ? onTownDays(it)&&(!townCtry||inCtry(it,townCtry)) : inCtry(it,ctry);
+  /* what happened on the town's days but is not counted there (marked another country, or before the trip) */
+  const leftOut= scope==="town"&&place==="town" ? [...S.items.filter(it=>it.kind!=="transfer"),...(personal?P:[])].filter(it=>onTownDays(it)&&!inPlace(it)) : [];
   { const ps=$("sfPlace"); ps.hidden= scope!=="town"; if(scope==="town") seg(ps,[...(town?[["town","🏙️ "+town]]:[]),...(ctry?[["country",CTRY[ctry]]]:[])],v=>v===place,v=>{ store("trip-sf-place",v); renderSofar(); }); }
   const inScope=it=> scope==="trip" ? true : scope==="town" ? inPlace(it) : scope==="month" ? monthOf(it)===ym : it.date===td;
   const V=it=>conv(+it.amount||0,it.cur,showCur);
@@ -1411,6 +1417,11 @@ function renderSofar(){
     cell(own,"לבד","#14B8A6"); cell(tog,"ביחד","linear-gradient(135deg,#6C4BFF,#FF4D8D)");
     avgCell(all,f=>P.filter(f).reduce((a,it)=>a+V(it),0)+myShareItems().filter(f).reduce((a,it)=>a+V(it),0));
   }
+  /* a tap on the note lists what was left out and why, so a gap is never a mystery */
+  { const sub=$("sfSub"); let n=sub.parentNode.querySelector(".sf-left"); if(!leftOut.length){ if(n) n.remove(); }
+    else { if(!n){ n=document.createElement("button"); n.type="button"; n.className="sf-left"; sub.after(n); }
+      n.textContent="ⓘ "+(leftOut.length===1?"הוצאה אחת":leftOut.length+" הוצאות")+" מהימים האלה לא נספרות כאן";
+      n.onclick=()=>{ buzz(5); toast(leftOut.slice(0,6).map(it=>(it.desc||"הוצאה")+" "+fmt(V(it),showCur)+" · מסומנת "+locName(PC.effLoc(it))).join(" • ")+(leftOut.length>6?" • …":"")+" — אפשר לשנות מדינה בעריכת ההוצאה",null,null,9000); }; } }
   { const bb=$("sfBud"), r= personal ? budgetCalc() : null; bb.hidden=!r;
     if(r){ bb.querySelector(".t").textContent= r.left<0 ? "עברת את התקציב ב-"+fmt(-r.left,r.cur) : "נשארו "+fmt(r.left,r.cur)+" מהתקציב";
       { const W=worthCalc(r); bb.querySelector(".w").textContent= W.cash.length ? "· עם המזומן "+fmt(W.total,W.cur) : ""; }
