@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261118195133"></script>
+<script src="theme.js?v=20261119053720"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -948,6 +948,48 @@ html.theming-slow,html.theming-slow *{transition-duration:1.5s!important}
 
 /* while a sheet is open (adding, account…) notes appear at the top, never over the save button or its message */
 body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 12px)}
+
+/* 1. amount keypad */
+.kpad{margin:-2px 0 2px;display:flex;flex-direction:column;gap:8px;animation:kpIn .26s cubic-bezier(.2,.9,.3,1.1)}
+@keyframes kpIn{from{opacity:0;transform:translateY(-8px)}}
+.kp-quick{display:flex;gap:6px;align-items:center}
+.kp-q{font:inherit;font-weight:700;font-size:.9rem;padding:8px 12px;min-height:40px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink)}
+.kp-next{font:inherit;font-weight:700;margin-inline-start:auto;padding:8px 14px;min-height:40px;border-radius:999px;border:0;background:var(--ink);color:var(--surface)}
+.kp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;direction:ltr}
+.kp-k{font:600 1.55rem var(--display,inherit);min-height:54px;border-radius:16px;border:0;background:var(--surface-2);color:var(--ink);transition:transform .1s ease,background-color .15s}
+.kp-k:active{transform:scale(.93);background:color-mix(in srgb,var(--brand) 18%,var(--surface-2))}
+.kp-del{font-size:1.2rem}
+@media (prefers-reduced-motion:reduce){.kpad{animation:none}}
+
+/* 5. long press menu */
+.row.pressing{transition:transform .4s ease;transform:scale(.97)}
+.peek{position:fixed;inset:0;z-index:92;background:rgba(14,10,42,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:pkIn .2s ease both}
+.peek.out{animation:pkOut .2s ease both}
+@keyframes pkIn{from{opacity:0}} @keyframes pkOut{to{opacity:0}}
+.peek-row{position:fixed;margin:0;box-shadow:0 24px 50px -14px rgba(20,10,80,.55);pointer-events:none}
+.peek-menu{position:fixed;inset-inline-end:16px;width:min(250px,70vw);background:var(--surface);border-radius:16px;overflow:hidden;box-shadow:0 18px 40px -12px rgba(20,10,80,.45);transform-origin:top right}
+.peek-i{font:inherit;width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 16px;min-height:48px;border:0;background:none;color:var(--ink);font-weight:600;border-bottom:1px solid var(--line)}
+.peek-i:last-child{border-bottom:0}.peek-i.danger{color:var(--bad)}
+.peek-i:active{background:var(--surface-2)}
+
+/* 3. voice */
+.amount .mic{font-size:1.25rem;width:44px;height:44px;border-radius:50%;border:0;background:var(--surface);flex-shrink:0;box-shadow:0 2px 8px -4px rgba(30,22,64,.35)}
+.amount .mic.on{background:var(--bad,#E5484D);animation:micp 1s ease-in-out infinite}
+@keyframes micp{50%{box-shadow:0 0 0 8px color-mix(in srgb,var(--bad,#E5484D) 25%,transparent)}}
+/* 10. split by dishes */
+.dish-open{align-self:flex-start;margin-top:4px}
+.dish{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:16px;background:var(--surface-2);margin-top:6px}
+.dish-h{font-weight:700;font-size:.92rem}
+.dish-list{display:flex;flex-direction:column;gap:6px}
+.dish-r{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.dish-r input{width:92px;min-height:42px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);padding:6px 10px;font-size:1rem}
+.dish-w{flex:1;min-width:0}.dish-w button{padding:6px 10px;font-size:.85rem}
+.dish-x{border:0;background:none;color:var(--muted);font-size:1rem;min-width:36px;min-height:40px}
+.dish-f{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dish-ex{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted)}
+.dish-ex input{width:64px;min-height:40px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);padding:4px 8px}
+.dish-sum{font-weight:700;font-size:.9rem}
+.dish-close{align-self:center}
 </style>
 </head>
 <body>
@@ -1325,6 +1367,7 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
   <div id="viewStats" class="stack" style="gap:18px" hidden>
     <div class="actions"><button class="btn small" id="statsBack" type="button">→ חזרה</button><div class="seg" id="stScope"></div></div>
     <section class="card journey" id="journey" aria-labelledby="jTitle"><div class="card-head"><h2 id="jTitle">🧭 המסע שלנו</h2><span class="hint" id="jNote"></span></div><div class="jmap" id="jMap"></div></section>
+    <button class="btn small" id="weekBtn" type="button" style="align-self:flex-start">🗓️ השבוע שלנו בסטורי</button>
     <button class="recapcta" id="recapBtn" type="button"><span>🎬</span><span><b>הטיול שלנו בסיכום</b><small>סטוריז עם כל המספרים הכי מעניינים · לחיצה על מדינה למטה תיתן סיכום שלה</small></span></button>
     <section class="ticket stats-ticket">
       <div class="top">
@@ -1509,6 +1552,7 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
     <div class="sec">
       <h3>עיצוב</h3>
       <div class="seg" id="themeSeg"></div>
+      <div class="seg" id="soundSeg" style="margin-top:8px"></div>
     </div>
 
     <div class="sec">
@@ -1599,11 +1643,11 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261118195133">
-<script src="config.js?v=20261118195133"></script>
-<script src="motion.js?v=20261118195133"></script>
-<script src="fx.js?v=20261118195133"></script>
-<script src="cinema.js?v=20261118195133"></script>
-<script src="app.js?v=20261118195133"></script>
+<meta name="app-v" content="20261119053720">
+<script src="config.js?v=20261119053720"></script>
+<script src="motion.js?v=20261119053720"></script>
+<script src="fx.js?v=20261119053720"></script>
+<script src="cinema.js?v=20261119053720"></script>
+<script src="app.js?v=20261119053720"></script>
 </body>
 </html>

@@ -11,6 +11,7 @@ const buzz=ms=>{ try{
   if(!hapticEl){ const l=document.createElement("label"); l.setAttribute("aria-hidden","true"); l.style.cssText="position:fixed;left:-200px;top:0;opacity:0;pointer-events:none"; const i=document.createElement("input"); i.type="checkbox"; i.setAttribute("switch",""); i.tabIndex=-1; l.appendChild(i); document.body.appendChild(l); hapticEl=l; }
   hapticEl.click();
 }catch(e){} };
+let lastUndo=null;   /* the last action that can be undone (toast "ביטול"), for shake-to-undo */
 const MONEY=new Map();   /* last shown value per number, to count from it */
 function money(el,v,cur,key){
   if(!el) return; key=key||el.id||""; const prev=MONEY.get(key); MONEY.set(key,{v,cur});
@@ -36,7 +37,7 @@ function kissFx(a,b){
   H.animate([{transform:"translate(-50%,-50%) scale(0)",opacity:0},{transform:"translate(-50%,-50%) scale(0)",opacity:0,offset:.55},{transform:"translate(-50%,-120%) scale(1.6)",opacity:1,offset:.8},{transform:"translate(-50%,-220%) scale(1.2)",opacity:0}],{duration:1700,easing:"ease-out",fill:"forwards"});
   sh.animate([{transform:"translateX(120%) skewX(-18deg)"},{transform:"translateX(-120%) skewX(-18deg)"}],{duration:1100,delay:500,easing:"ease-in-out",fill:"both"});
   box.animate([{opacity:1},{opacity:1,offset:.8},{opacity:0}],{duration:2200,fill:"forwards"}).finished.then(()=>box.remove());
-  buzz([10,40,10,40,30]);
+  buzz([10,40,10,40,30]); sound("chime");
 }
 function confetti(){
   if(calm()) return;
@@ -214,6 +215,7 @@ function applyTheme(t){
   if(t==="auto"){ store("trip-theme",""); window.FX&&FX.autoTheme(true); }
   else { document.documentElement.dataset.theme=t; store("trip-theme",t); }
   $("themeBtn").setAttribute("aria-checked",String(isDark()));
+  if($("soundSeg")) seg($("soundSeg"),[["on","🔔 צלילים"],["off","🔕 בלי"]],v=>v===(load("trip-sound")==="off"?"off":"on"),v=>{ store("trip-sound",v); applyTheme(themePref()); if(v==="on") sound("coin"); });
   if($("themeSeg")) seg($("themeSeg"),[["auto","🌅 אוטומטי"],["light","☀️ בהיר"],["dark","🌙 כהה"]],v=>v===themePref(),v=>applyTheme(v));
 }
 $("themeBtn").onclick=()=>{ const r=document.documentElement; if(!calm()){ r.classList.add("theming"); setTimeout(()=>r.classList.remove("theming"),500); } buzz(6); applyTheme(isDark()?"light":"dark"); };
@@ -280,7 +282,7 @@ function flyToTotal(from,label){
     const a2=chip.animate([{transform:"translate(0,0) scale(1) rotate(0)",opacity:1,borderRadius:"999px"},
         {transform:`translate(${mx}px,${my}px) scale(.8) rotate(-8deg)`,opacity:1,offset:.45},
         {transform:`translate(${dx}px,${dy}px) scale(${ok?.32:.6}) rotate(6deg)`,opacity:ok?.95:0}],{duration:720,easing:"cubic-bezier(.45,.05,.3,1)",fill:"forwards"});
-    a2.finished.then(()=>{ chip.remove(); if(ok){ M.pop(t); hitFx(r); buzz([8,30,14]); } }).catch(()=>chip.remove());
+    a2.finished.then(()=>{ chip.remove(); if(ok){ M.pop(t); hitFx(r); buzz([8,30,14]); } sound("coin"); }).catch(()=>chip.remove());
   },260);
 }
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(!$("curSheet").hidden) closeSheet("curSheet"); else { closeSheet("setSheet"); closeSheet("addSheet"); } } });
@@ -938,7 +940,7 @@ function swipeWrap(r,it,personal,o){
         const bin=w.querySelector(".sw-del"); w.classList.add("gulp");
         r.animate([{transform:from,opacity:1},{transform:"translateX(-62%) scale(.55) rotate(-6deg)",opacity:.9,offset:.55},{transform:"translateX(-78%) scale(.05) rotate(-18deg)",opacity:0}],{duration:520,easing:"cubic-bezier(.5,0,.75,0)",fill:"forwards"});
         /* the delete runs on a timer, not on the animation: a re-draw in the middle must not lose it */
-        setTimeout(()=>{ if(bin) bin.animate([{transform:"scale(1.18)"},{transform:"scale(1.5) rotate(-10deg)"},{transform:"scale(1)"}],{duration:380,easing:"cubic-bezier(.3,1.6,.5,1)"}); buzz([6,24,12]); },520);
+        setTimeout(()=>{ if(bin) bin.animate([{transform:"scale(1.18)"},{transform:"scale(1.5) rotate(-10deg)"},{transform:"scale(1)"}],{duration:380,easing:"cubic-bezier(.3,1.6,.5,1)"}); buzz([6,24,12]); sound("swoosh"); },520);
         setTimeout(()=>{ w.classList.remove("armed","to-again","to-del","gulp"); doDel(); },680); return; }
       M.animate(r,[{transform:from},{transform:"none"}],{spring:"bouncy"}).then(()=>w.classList.remove("armed","to-again","to-del"));
       if(act>0&&canAgain){ M.pop(r); doAgain(); } return; }
@@ -1015,15 +1017,16 @@ function coins(from){
   window.addEventListener("touchmove",e=>{ if(y0==null) return; pull=Math.max(0,e.touches[0].clientY-y0); if(pull<=0) return;
     const d=Math.min(110,pull*.5); P.style.transform="translate(-50%,"+(d-50)+"px) rotate("+(Math.sin(d/9)*12)+"deg) scale("+(0.7+d/220)+")"; P.style.opacity=String(Math.min(1,d/60)); P.classList.toggle("ready",d>=70); },{passive:true});
   window.addEventListener("touchend",async()=>{ if(y0==null) return; const go=P.classList.contains("ready"); y0=null;
-    if(go){ P.classList.add("spin"); buzz(12); coins(P); await refreshRates(); checkUpdate&&checkUpdate(); setTimeout(()=>{ P.classList.remove("spin","ready"); P.style.transform=""; P.style.opacity="0"; toast("✈️ רוענן: שער עדכני "+new Date().toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})); },600); }
+    if(go){ P.classList.add("spin"); buzz(12); coins(P); sound("coins"); await refreshRates(); checkUpdate&&checkUpdate(); setTimeout(()=>{ P.classList.remove("spin","ready"); P.style.transform=""; P.style.opacity="0"; toast("✈️ רוענן: שער עדכני "+new Date().toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})); },600); }
     else { P.classList.remove("ready"); P.style.transform=""; P.style.opacity="0"; } },{passive:true});
 })();
 
 
 /* ================= "the trip in review": story slides ================= */
 let RC=null;
-function recapData(loc){
-  const inLoc=it=> loc ? locOf(it)===loc : locOf(it)!=="prep";
+function recapData(loc,range){
+  const inLoc0=it=> loc ? locOf(it)===loc : locOf(it)!=="prep";
+  const inLoc=it=> inLoc0(it)&&(!range||(it.date>=range.from&&it.date<=range.to));
   const items=S.items.filter(it=>it.kind!=="transfer"&&inLoc(it));
   const V=it=>conv(+it.amount||0,it.cur,"ILS");
   const total=items.reduce((s,it)=>s+V(it),0);
@@ -1039,16 +1042,16 @@ function recapData(loc){
   const share=me? myShareItems().filter(inLoc).reduce((s,it)=>s+conv(it.amount,it.cur,"ILS"),0) : 0;
   const alone=me&&acct&&acctFor===me ? P.filter(inLoc).reduce((s,it)=>s+V(it),0) : null;
   const transfers=S.items.filter(it=>it.kind==="transfer"&&inLoc(it)).length;
-  return {loc,items,total,dates,days,countries,topCat,cats,bigDay,bigOne,paid,share,alone,transfers,avg: days? total/days : 0};
+  return {loc,week:range||null,items,total,dates,days:range?7:days,countries,topCat,cats,bigDay,bigOne,paid,share,alone,transfers,avg: (range?7:days)? total/(range?7:days) : 0};
 }
 function recapSlides(d){
-  const title= d.loc ? locName(d.loc) : (S.trip||"הטיול שלנו");
+  const title= d.week ? "השבוע שלנו" : d.loc ? locName(d.loc) : (S.trip||"הטיול שלנו");
   const sd=s=>{ const [y,m,dd]=s.split("-").map(Number); return dd+"."+m; };
-  const range= d.dates.length ? "מ-"+sd(d.dates[0])+" עד "+sd(d.dates[d.dates.length-1]) : "";
+  const range= d.week ? "מ-"+sd(d.week.from)+" עד "+sd(d.week.to) : d.dates.length ? "מ-"+sd(d.dates[0])+" עד "+sd(d.dates[d.dates.length-1]) : "";
   if(d.items.length<3) return [{bg:"g1",big:"⏳",h:"עוד קצת סבלנות",p:"הסיכום נבנה מההוצאות שלכם. אחרי כמה ימי טיול יהיה פה סיפור שלם."}];
   const S2=[];
-  S2.push({bg:"g1",kick:d.loc?"הסיכום של":"הטיול שלנו בסיכום",h:title,p:range,big:"🎬"});
-  S2.push({bg:"g2",kick:"יצאנו לדרך",num:d.days,unit:d.days===1?"יום":"ימים",p:d.countries.length>1?d.countries.length+" מדינות: "+d.countries.map(c=>CTRY[c].split(" ")[0]).join(" "):(d.countries[0]?CTRY[d.countries[0]]:"")});
+  S2.push({bg:"g1",kick:d.week?"שבוע שעבר בסיכום":d.loc?"הסיכום של":"הטיול שלנו בסיכום",h:title,p:range,big:"🎬"});
+  if(!d.week) S2.push({bg:"g2",kick:"יצאנו לדרך",num:d.days,unit:d.days===1?"יום":"ימים",p:d.countries.length>1?d.countries.length+" מדינות: "+d.countries.map(c=>CTRY[c].split(" ")[0]).join(" "):(d.countries[0]?CTRY[d.countries[0]]:"")});
   S2.push({bg:"g3",kick:"הוצאנו ביחד",money:d.total,p:"בממוצע "+fmt(d.avg,"ILS")+" ליום · "+d.items.length+" הוצאות"});
   if(d.topCat) S2.push({bg:"g4",kick:"הכי הרבה הלך על",big:catName(d.topCat[0]).split(" ")[0],h:catName(d.topCat[0]).split(" ").slice(1).join(" "),p:Math.round(d.topCat[1]/d.total*100)+"% מכל ההוצאות · "+fmt(d.topCat[1],"ILS")});
   if(d.bigDay) S2.push({bg:"g5",kick:"היום הכי יקר",h:dayLabel(d.bigDay[0]),money:d.bigDay[1],p:d.bigDay[2].slice().sort((x,y)=>conv(+y.amount,y.cur,"ILS")-conv(+x.amount,x.cur,"ILS")).slice(0,3).map(it=>it.desc).join(" · ")});
@@ -1057,12 +1060,12 @@ function recapSlides(d){
   if(pe.length>1) S2.push({bg:"g2",kick:"מי פתח יותר את הארנק",bars:pe.map(([id,v])=>[nm(id),Math.round(v/d.total*100)]),p:nm(pe[0][0])+" "+g.paid(pe[0][0])+" "+Math.round(pe[0][1]/d.total*100)+"% מההוצאות"});
   if(me) S2.push({bg:"g3",kick:fem(me)?"ואת?":"ואתה?",money:d.share+(d.alone||0),p:(d.alone!=null?"🙋 לבד "+fmt(d.alone,"ILS")+" · ":"")+"👫 ביחד "+fmt(d.share,"ILS")});
   S2.push({bg:"g4",kick:"בשורה התחתונה",h:d.items.length+" הוצאות · "+d.transfers+" העברות",p:"🔥 הרצף הכי ארוך שלכם: "+bestStreak(d)+" ימים של רישום"});
-  S2.push({bg:"g1",end:true,kick:"היה שווה כל שקל 💜",h:title,p:"שתפו את הסיכום"});
+  S2.push({bg:"g1",end:true,kick:d.week?"שבוע טוב 💜":"היה שווה כל שקל 💜",h:title,p:"שתפו את הסיכום"});
   return S2;
 }
 function bestStreak(d){ let best=0,run=0,prev=null; for(const x of d.dates){ run= prev&&daysBetween(prev,x)===1? run+1 : 1; best=Math.max(best,run); prev=x; } return best; }
-function openRecap(loc){
-  const d=recapData(loc||null); const slides=recapSlides(d); RC={d,slides,i:0,timer:null};
+function openRecap(loc,range){
+  const d=recapData(loc||null,range||null); const slides=recapSlides(d); RC={d,slides,i:0,timer:null};
   const R=$("recap"); R.hidden=false; document.body.style.overflow="hidden"; buzz(10);
   const bars=$("rcBars"); bars.innerHTML=""; slides.forEach(()=>{ const b=document.createElement("span"); b.innerHTML="<i></i>"; bars.appendChild(b); });
   showSlide(0);
@@ -1089,6 +1092,7 @@ $("rcClose").onclick=e=>{ e.stopPropagation(); closeRecap(); };
 $("recap").addEventListener("click",e=>{ if(!RC||e.target.closest("button")) return; const x=e.clientX/innerWidth; buzz(6); showSlide(RC.i+(x>.66?-1:1)); });
 document.addEventListener("keydown",e=>{ if(!RC) return; if(e.key==="Escape") closeRecap(); if(e.key==="ArrowLeft") showSlide(RC.i+1); if(e.key==="ArrowRight") showSlide(RC.i-1); });
 $("recapBtn").onclick=()=>openRecap(null);
+$("weekBtn").onclick=()=>weekly(true);
 async function shareRecap(){
   if(!RC) return; const d=RC.d; const W=1080,H=1350; const c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d");
   try{ await document.fonts.ready; }catch(e){}
@@ -1320,7 +1324,7 @@ function renderSofar(){
   const sh=$("sfShow"); sh.hidden=!personal; if(personal) showinRow(sh);
 }
 function renderAll(){
-  syncCardFees(); applyG(); if(loaded&&!window.__mornT){ window.__mornT=setTimeout(()=>{ window.__mornT=0; morning(); checkMedals(); },900); } renderHero(); renderInsight(); renderSofar();
+  syncCardFees(); applyG(); if(loaded&&!window.__mornT){ window.__mornT=setTimeout(()=>{ window.__mornT=0; morning(); checkMedals(); setTimeout(()=>weekly(false),document.querySelector(".morning")?3600:200); },900); } renderHero(); renderInsight(); renderSofar();
   { const arch=loaded&&curTrip!==activeTrip(); $("tripNote").hidden=!arch; if(arch) $("tripNoteTxt").textContent="🗂️ אתם צופים בטיול "+(S.trip||"קודם")+" מהארכיון"; }
   requestAnimationFrame(()=>{ watchReveal(); renderMini(); onScroll(); });
   renderHeader();
@@ -1463,6 +1467,7 @@ async function addTransfer(from,to,amt,pm,tc){
 }
 let toastTimer=null;
 function toast(msg,actLabel,act,ms){
+  if(actLabel==="ביטול"&&act) lastUndo={msg,act,until:Date.now()+(ms||10000)+20000};
   const T=$("toast"); T.innerHTML=""; const s=document.createElement("span"); s.textContent=msg; T.appendChild(s);
   const life=ms||(actLabel?10000:3000);
   const hide=()=>{ if(calm()){ T.hidden=true; return; } T.classList.add("out"); setTimeout(()=>{ T.hidden=true; T.classList.remove("out"); },200); };
@@ -1686,7 +1691,7 @@ function showMedal(){
   medalBusy=true; const o=document.createElement("div"); o.className="medal-o"; o.setAttribute("role","dialog"); o.setAttribute("aria-label","מדליה חדשה: "+m[2]);
   o.innerHTML='<div class="medal"><div class="medal-f"><span></span></div><div class="medal-b"></div></div><div class="medal-t"><small>מדליה חדשה</small><b></b><span></span></div>';
   o.querySelector(".medal-f span").textContent=m[1]; o.querySelector(".medal-t b").textContent=m[2]; o.querySelector(".medal-t span").textContent=m[3];
-  document.body.appendChild(o); buzz([10,40,10,40,24]); setTimeout(confetti,700);
+  document.body.appendChild(o); buzz([10,40,10,40,24]); sound("chime"); setTimeout(confetti,700);
   const bye=()=>{ if(!o.isConnected) return; o.classList.add("out"); setTimeout(()=>{ o.remove(); medalBusy=false; setTimeout(showMedal,300); },450); };
   o.addEventListener("click",bye); setTimeout(bye,3600);
 }
@@ -1811,6 +1816,218 @@ function liveGroup(el){
   });
 }
 for(const id of ["fAmt","pAmt","cA","cB","cwAmt","cwFee","caAmt","cxAmt","cxGot","budAmt","budSAmt"]) liveGroup($(id));
+/* ================= sound: tiny sounds made on the fly (no files), with a switch in settings =================
+   On iPhone the "ambient" audio session means the silent switch also silences these. */
+const SND={ctx:null,on:()=>load("trip-sound")!=="off"};
+function sndCtx(){ if(SND.ctx) return SND.ctx; try{ try{ if(navigator.audioSession) navigator.audioSession.type="ambient"; }catch(e){}
+  const C=window.AudioContext||window.webkitAudioContext; if(!C) return null; SND.ctx=new C(); }catch(e){ return null; } return SND.ctx; }
+document.addEventListener("pointerdown",()=>{ const c=SND.ctx; if(c&&c.state==="suspended") c.resume().catch(()=>{}); },{passive:true});
+function tone(c,f,t0,dur,vol,type,glide){ const o=c.createOscillator(), g=c.createGain(); o.type=type||"sine"; o.frequency.setValueAtTime(f,t0); if(glide) o.frequency.exponentialRampToValueAtTime(glide,t0+dur);
+  g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(vol,t0+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur); o.connect(g).connect(c.destination); o.start(t0); o.stop(t0+dur+0.02); }
+function sound(kind){
+  if(!SND.on()||calm()) return; const c=sndCtx(); if(!c) return; if(c.state==="suspended") c.resume().catch(()=>{});
+  const t=c.currentTime+0.01;
+  if(kind==="coin"){ tone(c,1568,t,.16,.07,"triangle"); tone(c,2093,t+.07,.28,.06,"triangle"); }
+  else if(kind==="tick"){ tone(c,900,t,.035,.025,"square"); }
+  else if(kind==="swoosh"){ tone(c,620,t,.22,.045,"sine",160); }
+  else if(kind==="chime"){ [1046,1318,1568,2093].forEach((f,i)=>tone(c,f,t+i*.09,.5,.045,"sine")); }
+  else if(kind==="coins"){ for(let i=0;i<5;i++) tone(c,1500+Math.random()*700,t+i*.06,.12,.035,"triangle"); }
+}
+
+/* ================= our own amount keypad (phones): big keys, a tap of haptics, quick amounts ================= */
+const touchy=(()=>{ try{ return matchMedia("(pointer:coarse)").matches; }catch(e){ return false; } })();
+function niceAmt(v){ if(!(v>0)) return 0; const p=Math.pow(10,Math.floor(Math.log10(v))), m=v/p; return (m<1.5?1:m<3.5?2:m<7.5?5:10)*p; }
+function keypad(inputId,curOf,nextId){
+  const inp=$(inputId); if(!inp||!touchy) return;
+  inp.setAttribute("inputmode","none");   /* our keys instead of the phone keyboard */
+  const box=document.createElement("div"); box.className="kpad"; box.hidden=true; box.setAttribute("role","group"); box.setAttribute("aria-label","מקשי סכום");
+  const quick=document.createElement("div"); quick.className="kp-quick"; box.appendChild(quick);
+  const grid=document.createElement("div"); grid.className="kp-grid"; box.appendChild(grid);
+  const keys=["1","2","3","4","5","6","7","8","9",".","0","⌫"];
+  const set=v=>{ inp.value=v; inp.dispatchEvent(new Event("input",{bubbles:true})); };
+  const raw=()=>String(inp.value||"").replace(/,/g,"");
+  for(const k of keys){ const b=document.createElement("button"); b.type="button"; b.className="kp-k"+(k==="⌫"?" kp-del":""); b.textContent=k; if(k==="⌫") b.setAttribute("aria-label","מחיקה");
+    b.addEventListener("pointerdown",e=>{ e.preventDefault(); });   /* keep the caret in the amount */
+    b.onclick=()=>{ buzz(5); let r=raw();
+      if(k==="⌫") r=r.slice(0,-1); else if(k==="."){ if(!r.includes(".")) r=(r||"0")+"."; } else { if(r==="0") r=""; if(/\.\d\d$/.test(r)) return; if(r.replace(".","").length>=9) return; r+=k; }
+      set(r); };
+    grid.appendChild(b); }
+  const paintQuick=()=>{ quick.innerHTML=""; const c=curOf();
+    for(const ils of [10,30,100]){ const v=niceAmt(conv(ils,"ILS",c)); const b=document.createElement("button"); b.type="button"; b.className="kp-q"; b.dir="ltr"; b.textContent="+"+fmt(v,c);
+      b.addEventListener("pointerdown",e=>e.preventDefault());
+      b.onclick=()=>{ buzz(6); const n=(parseFloat(raw())||0)+v; set(String(Math.round(n*100)/100)); if(window.Motion) Motion.pop(inp); }; quick.appendChild(b); }
+    const nx=document.createElement("button"); nx.type="button"; nx.className="kp-next"; nx.textContent="שם ←"; nx.onclick=()=>{ buzz(5); box.hidden=true; try{ $(nextId).focus(); }catch(e){} }; quick.appendChild(nx); };
+  inp.closest(".amount").after(box);
+  inp.addEventListener("focus",()=>{ paintQuick(); box.hidden=false; });
+  inp.addEventListener("blur",()=>{ setTimeout(()=>{ if(document.activeElement!==inp) box.hidden=true; },120); });
+}
+keypad("fAmt",()=>cur.fCur||S.localCur,"fDesc");
+keypad("pAmt",()=>cur.pCur||S.localCur,"pDesc");
+
+/* ================= long press on an expense: a menu over a blurred page, like the iPhone ================= */
+(()=>{
+  let timer=0, x0=0, y0=0, row=null, fired=false;
+  const cancel=()=>{ clearTimeout(timer); timer=0; if(row) row.classList.remove("pressing"); row=null; };
+  document.addEventListener("pointerdown",e=>{
+    const r=e.target.closest("#ledger .row[data-id], #pLedger .row[data-id]"); if(!r||e.target.closest("button")||!canWrite) return;
+    row=r; x0=e.clientX; y0=e.clientY; fired=false; r.classList.add("pressing");
+    timer=setTimeout(()=>{ timer=0; if(!row) return; fired=true; const rr=row; cancel(); peek(rr); },430);
+  },{passive:true});
+  document.addEventListener("pointermove",e=>{ if(timer&&(Math.abs(e.clientX-x0)>8||Math.abs(e.clientY-y0)>8)) cancel(); },{passive:true});
+  document.addEventListener("pointerup",cancel,{passive:true}); document.addEventListener("pointercancel",cancel,{passive:true});
+  document.addEventListener("scroll",cancel,{passive:true});
+  /* the click that ends a long press must not also open the row */
+  document.addEventListener("click",e=>{ if(fired){ fired=false; e.stopPropagation(); e.preventDefault(); } },true);
+  document.addEventListener("contextmenu",e=>{ if(e.target.closest("#ledger .row, #pLedger .row")) e.preventDefault(); });
+})();
+function peek(r){
+  const id=r.dataset.id, personal=!!r.closest("#pLedger"); const it=(personal?P:S.items).find(x=>x.id===id); if(!it||it._fee) return;
+  buzz([8,20,10]); sound("tick");
+  const o=document.createElement("div"); o.className="peek"; o.setAttribute("role","dialog"); o.setAttribute("aria-label","פעולות על "+(it.desc||"הוצאה"));
+  const rect=r.getBoundingClientRect(); const card=r.cloneNode(true); card.classList.remove("open","pressing","enter","fresh"); card.classList.add("peek-row");
+  card.querySelectorAll(".acts").forEach(a=>a.remove());
+  const menu=document.createElement("div"); menu.className="peek-menu";
+  const close=()=>{ o.classList.add("out"); setTimeout(()=>o.remove(),220); };
+  const item=(ic,label,fn,danger)=>{ const b=document.createElement("button"); b.type="button"; b.className="peek-i"+(danger?" danger":""); const t=document.createElement("span"); t.textContent=label; const i=document.createElement("span"); i.textContent=ic; b.append(t,i); b.onclick=()=>{ close(); setTimeout(fn,120); }; menu.appendChild(b); };
+  if(it.kind!=="transfer"){ item("✏️","עריכה",()=>personal?pStartEdit(it):startEdit(it)); item("🔁","שוב להיום",()=>again(it,personal)); }
+  item("📤","שיתוף",()=>{ const txt=(it.kind==="transfer"?"💸 "+nm(it.payer)+" ← "+nm(it.to):catEmoji(it)+" "+(it.desc||"הוצאה"))+" · "+fmt(+it.amount,it.cur)+" · "+dayLabel(it.date); if(navigator.share) navigator.share({text:txt}).catch(()=>{}); else { try{ navigator.clipboard.writeText(txt); toast("📋 הועתק"); }catch(e){} } });
+  item("🗑","מחיקה",()=>delItem(it,personal),true);
+  o.append(card,menu); document.body.appendChild(o);
+  /* the row lifts from where it was; the menu opens under it (or above, if there is no room) */
+  const top=Math.min(Math.max(rect.top,70),innerHeight-rect.height-250);
+  card.style.top=top+"px"; card.style.left=rect.left+"px"; card.style.width=rect.width+"px";
+  menu.style.top=(top+rect.height+10)+"px";
+  if(!calm()){ card.animate([{transform:`translateY(${rect.top-top}px) scale(1)`},{transform:"scale(1.03)"}],{duration:380,easing:"cubic-bezier(.2,.9,.3,1.25)",fill:"forwards"});
+    menu.animate([{opacity:0,transform:"scale(.85) translateY(-10px)"},{opacity:1,transform:"none"}],{duration:300,delay:60,easing:"cubic-bezier(.2,.9,.3,1.2)",fill:"backwards"}); }
+  o.addEventListener("click",e=>{ if(e.target===o) close(); });
+}
+
+/* ================= swipe between screens: shared ↔ personal ↔ graphs ================= */
+(()=>{
+  const ORDER=["shared","personal","stats"];
+  let x0=0,y0=0,t0=0,ok=false;
+  document.addEventListener("touchstart",e=>{
+    const t=e.touches[0]; ok=false; if(e.touches.length!==1) return;
+    if(!loaded||!me||document.querySelector(".sheet-bg:not([hidden]), .peek, .recap:not([hidden]), .morning, .medal-o")) return;
+    /* not from the screen edges (the phone's own back gesture), not on things that swipe or scroll sideways */
+    if(t.clientX<24||t.clientX>innerWidth-24) return;
+    if(e.target.closest(".swipe, .row, .seg, .showin, input, textarea, .kpad, .recent, .jmap, .tablewrap, #tabbar, .ticket")) return;
+    x0=t.clientX; y0=t.clientY; t0=Date.now(); ok=true;
+  },{passive:true});
+  document.addEventListener("touchend",e=>{
+    if(!ok) return; ok=false; const t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0, dt=Date.now()-t0;
+    if(Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*2.2||dt>650) return;
+    const i=ORDER.indexOf(view); if(i<0) return;
+    /* right-to-left: a swipe to the left moves on to the next tab (they sit from right to left) */
+    const j= dx<0 ? i+1 : i-1; if(j<0||j>=ORDER.length) { if(window.Motion&&!calm()) document.getElementById("app").animate([{transform:"translateX(0)"},{transform:`translateX(${dx<0?-14:14}px)`},{transform:"none"}],{duration:300,easing:"ease-out"}); return; }
+    buzz(6); lastTap={x:dx<0?innerWidth*0.15:innerWidth*0.85,y:innerHeight*0.5,t:Date.now()}; goView(ORDER[j]);
+  },{passive:true});
+})();
+
+/* ================= add by voice: "ארוחת ערב 450 באט, גלי שילמה בכרטיס" fills the form ================= */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+function voiceParse(text){
+  let t=" "+String(text||"").replace(/[,،]/g," ").replace(/\s+/g," ").trim()+" "; const out={};
+  const num=t.match(/(\d[\d.]*)/); if(num){ out.amount=parseFloat(num[1]); t=t.replace(num[1]," "); }
+  const curs=[[/\s(ב?בה?א?ט|באטים|baht|bht)\s/i,"THB"],[/\s(ש[״"]?ח|שקל(ים)?)\s/,"ILS"],[/\s(דולר(ים)?|\$)\s/,"USD"],[/\s(יורו|אירו)\s/,"EUR"],[/\s(דונג)\s/,"VND"],[/\s(קיפ)\s/,"LAK"],[/\s(רינגיט)\s/,"MYR"]];
+  for(const [re,c] of curs){ const m=t.match(re); if(m){ out.cur=c; t=t.replace(m[0]," "); break; } }
+  if(/\s(ש?ב?מזומן)\s/.test(t)){ out.pm="cash"; t=t.replace(/\s(ש?ב?מזומן)\s/," "); }
+  else if(/\s(ב?כרטיס|ב?אשראי|ב?ויזה)\s/.test(t)){ out.pm="card"; t=t.replace(/\s(ב?כרטיס|ב?אשראי|ב?ויזה)\s/," "); }
+  if(/\s(אני\s)?שילמתי\s/.test(t)){ out.payer=me; t=t.replace(/\s(אני\s)?שילמתי\s/," "); }
+  else for(const p of active()){ const re=new RegExp("\\s"+p.name+"\\s(שילמה|שילם)\\s"); if(re.test(t)){ out.payer=p.id; t=t.replace(re," "); break; } }
+  out.desc=t.replace(/\s(על|ב|של|ו)\s*$/,"").replace(/\s+/g," ").trim().replace(/^[\-–:.]+|[\-–:.]+$/g,"").trim();
+  return out;
+}
+function voiceFill(kind,text){
+  const v=voiceParse(text), f=kind==="me"?"p":"f";
+  if(v.cur) cur[f+"Cur"]=v.cur;
+  if(v.amount>0){ $(f+"Amt").value=String(v.amount); $(f+"Amt").dispatchEvent(new Event("input",{bubbles:true})); }
+  if(v.desc){ $(f+"Desc").value=v.desc; $(f+"Desc").dispatchEvent(new Event("input",{bubbles:true})); }
+  if(kind==="me"){ if(v.pm) pform.pm=v.pm; renderPForm(); }
+  else { if(v.payer) form.payer=v.payer; if(v.pm) form.pm=v.pm; renderForm(); }
+  toast("🎤 "+text); buzz([6,30,8]); sound("tick");
+  return v;
+}
+function micFor(kind){
+  const inp=$(kind==="me"?"pAmt":"fAmt"); if(!SR||!inp||inp.closest(".amount").querySelector(".mic")) return;
+  const b=document.createElement("button"); b.type="button"; b.className="mic"; b.textContent="🎤"; b.setAttribute("aria-label","רישום בקול");
+  b.addEventListener("pointerdown",e=>e.preventDefault());
+  b.onclick=()=>{
+    if(b.classList.contains("on")){ try{ b.__r&&b.__r.stop(); }catch(e){} return; }
+    let r; try{ r=new SR(); }catch(e){ toast("🎤 הטלפון לא מאפשר הקלטה כאן"); return; }
+    r.lang="he-IL"; r.interimResults=false; r.maxAlternatives=1; b.__r=r;
+    r.onresult=e=>{ const t=e.results[0]&&e.results[0][0]&&e.results[0][0].transcript; if(t) voiceFill(kind,t); };
+    r.onerror=e=>{ if(e.error==="not-allowed"||e.error==="service-not-allowed") toast("🎤 צריך לאשר מיקרופון וזיהוי דיבור בהגדרות ספארי"); else if(e.error!=="no-speech"&&e.error!=="aborted") toast("🎤 לא הצלחתי לשמוע. נסו שוב"); };
+    r.onend=()=>b.classList.remove("on");
+    try{ r.start(); b.classList.add("on"); buzz(8); toast("🎤 מדברים: למשל \"ארוחת ערב 450 באט, גלי שילמה בכרטיס\""); }catch(e){ b.classList.remove("on"); }
+  };
+  inp.closest(".amount").appendChild(b);
+}
+micFor("shared"); micFor("me");
+
+/* ================= split a restaurant bill by dishes ================= */
+let DISH=null;
+function dishOpen(){
+  const ppl=active(); DISH=DISH||{rows:[{a:"",w:"all"},{a:"",w:"all"}],extra:""};
+  let box=$("fDish"); if(!box){ box=document.createElement("div"); box.id="fDish"; box.className="dish"; $("fPcts").after(box); }
+  box.hidden=false; box.innerHTML="";
+  const h=document.createElement("div"); h.className="dish-h"; h.textContent="🧾 מכניסים כל מנה ומסמנים של מי היא"; box.appendChild(h);
+  const list=document.createElement("div"); list.className="dish-list"; box.appendChild(list);
+  const sum=document.createElement("div"); sum.className="dish-sum"; 
+  const calc=()=>{ const base={}; let tot=0; for(const p of ppl) base[p.id]=0;
+    for(const r of DISH.rows){ const a=parseFloat(String(r.a).replace(/,/g,""))||0; if(!a) continue; tot+=a; if(r.w==="all") for(const p of ppl) base[p.id]+=a/ppl.length; else base[r.w]=(base[r.w]||0)+a; }
+    const x=1+(parseFloat(DISH.extra)||0)/100; return {tot:tot*x,each:Object.fromEntries(Object.entries(base).map(([k,v])=>[k,v*x]))}; };
+  const paint=()=>{ const c=calc(), cu=cur.fCur||S.localCur; sum.textContent= c.tot>0 ? "סה״כ "+fmt(c.tot,cu)+" · "+ppl.map(p=>p.name+" "+fmt(c.each[p.id]||0,cu)).join(" · ") : "עוד אין מנות"; };
+  DISH.rows.forEach((r,i)=>{ const row=document.createElement("div"); row.className="dish-r";
+    const a=document.createElement("input"); a.className="num"; a.inputMode="decimal"; a.placeholder="מחיר"; a.value=r.a; a.setAttribute("aria-label","מחיר מנה "+(i+1)); a.oninput=()=>{ r.a=a.value; paint(); };
+    const s=document.createElement("div"); s.className="seg dish-w"; row.append(a,s); list.appendChild(row);
+    seg(s,[...ppl.map(p=>[p.id,p.name]),["all","ביחד"]],v=>v===r.w,v=>{ r.w=v; dishOpen(); });
+    if(DISH.rows.length>1){ const x=document.createElement("button"); x.type="button"; x.className="dish-x"; x.textContent="✕"; x.setAttribute("aria-label","הסרת מנה"); x.onclick=()=>{ DISH.rows.splice(i,1); dishOpen(); }; row.appendChild(x); } });
+  const add=document.createElement("button"); add.type="button"; add.className="btn small"; add.textContent="➕ עוד מנה"; add.onclick=()=>{ DISH.rows.push({a:"",w:"all"}); dishOpen(); setTimeout(()=>{ const ins=box.querySelectorAll(".dish-r input"); ins[ins.length-1]&&ins[ins.length-1].focus(); },50); };
+  const ex=document.createElement("label"); ex.className="dish-ex"; ex.textContent="טיפ / שירות / מס %"; const ei=document.createElement("input"); ei.className="num"; ei.inputMode="decimal"; ei.placeholder="0"; ei.value=DISH.extra; ei.oninput=()=>{ DISH.extra=ei.value; paint(); }; ex.appendChild(ei);
+  const go=document.createElement("button"); go.type="button"; go.className="btn primary"; go.textContent="✓ להחיל על ההוצאה";
+  go.onclick=()=>{ const c=calc(); if(!(c.tot>0)){ toast("קודם מכניסים מחיר למנה"); return; }
+    const ids=ppl.map(p=>p.id).filter(id=>(c.each[id]||0)>0); let pc={}, acc=0;
+    ids.forEach((id,i)=>{ const v= i===ids.length-1 ? Math.round((100-acc)*100)/100 : Math.round(c.each[id]/c.tot*10000)/100; pc[id]=v; acc+=v; });
+    $("fAmt").value=String(Math.round(c.tot*100)/100); $("fAmt").dispatchEvent(new Event("input",{bubbles:true}));
+    form.among=ids; form.mode=ids.length>1?"pct":"equal"; form.pcts=pc; box.hidden=true; DISH=null; renderForm(); buzz(10); sound("coin");
+    toast("🧾 חולק לפי מנות: "+ids.map(id=>nm(id)+" "+pc[id]+"%").join(" · ")); };
+  const foot=document.createElement("div"); foot.className="dish-f"; foot.append(add,ex); box.append(foot,sum,go);
+  const cl=document.createElement("button"); cl.type="button"; cl.className="link dish-close"; cl.textContent="סגירה"; cl.onclick=()=>{ box.hidden=true; }; box.appendChild(cl);
+  paint();
+}
+(()=>{ const m=$("fMode"); if(!m) return; const b=document.createElement("button"); b.type="button"; b.className="btn small dish-open"; b.id="fDishBtn"; b.textContent="🧾 לפי מנות (מסעדה)"; b.onclick=()=>{ buzz(6); dishOpen(); }; $("fPcts").after(b); })();
+
+/* ================= the week that was: a short story on Sunday ================= */
+function weekRange(){ const d=new Date(); const end=new Date(d.getFullYear(),d.getMonth(),d.getDate()-1), st=new Date(end); st.setDate(end.getDate()-6);
+  const f=x=>x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0"); return {from:f(st),to:f(end)}; }
+function weekly(force){
+  if(!loaded||!me) return; const w=weekRange(), k="trip-week-"+me;
+  if(!force&&(new Date().getDay()!==0||load(k)===w.to)) return;
+  const n=S.items.filter(it=>it.kind!=="transfer"&&it.date>=w.from&&it.date<=w.to).length; if(!force&&n<3) return;
+  store(k,w.to); if(force) return openRecap(null,w);
+  setTimeout(()=>{ if(sheetOpen()||document.querySelector(".morning,.medal-o")) return toast("🎬 השבוע שלכם מוכן","לצפייה",()=>openRecap(null,w),10000); openRecap(null,w); },600);
+}
+
+/* ================= shake to undo ================= */
+(()=>{
+  let peaks=[], asked=false;
+  /* iPhone asks once for the motion sensor; the first tap anywhere is a good moment */
+  document.addEventListener("pointerdown",()=>{ if(asked) return; asked=true;
+    for(const E of [window.DeviceMotionEvent,window.DeviceOrientationEvent]) if(E&&typeof E.requestPermission==="function") E.requestPermission().catch(()=>{}); },{passive:true});
+  addEventListener("devicemotion",e=>{ const a=e.accelerationIncludingGravity||e.acceleration; if(!a) return;
+    const m=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2); const now=Date.now();
+    if(m<24) return; peaks=peaks.filter(t=>now-t<900); if(peaks.length&&now-peaks[peaks.length-1]<120) return; peaks.push(now);
+    if(peaks.length>=3){ peaks=[]; shook(); } },{passive:true});
+})();
+function shook(){
+  if(document.querySelector(".shake-ask")) return;
+  const u=lastUndo&&Date.now()<lastUndo.until?lastUndo:null; buzz([12,40,12]);
+  if(!u){ toast("🤷 אין כרגע משהו לבטל"); return; }
+  toast("↩️ לבטל את הפעולה האחרונה? "+u.msg.replace(/^\S+\s/,""),"כן, לבטל",()=>{ lastUndo=null; u.act(); sound("swoosh"); },8000);
+  const T=$("toast"); T.classList.add("shake-ask"); setTimeout(()=>T.classList.remove("shake-ask"),8000);
+}
+
 
 /* ---- floating buttons: back to top, quick add ---- */
 let addHome=null;
