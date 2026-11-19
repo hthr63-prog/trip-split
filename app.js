@@ -325,6 +325,7 @@ function renderLocList(q,L){
 function renderCurList(){
   const q=norm($("curSearch").value); const L=$("curList"); L.innerHTML="";
   if(sheetMode==="loc") return renderLocList(q,L);
+  if(sheetMode==="town") return renderTownList(q,L);
   const item=c=>{ const i=CUR[c]; const b=document.createElement("button"); b.type="button"; b.className="curitem"; b.setAttribute("aria-selected",String(c===sheetCur));
     const s=document.createElement("span"); s.className="sym"; s.textContent=i.sym||"·";
     const n=document.createElement("span"); n.textContent=i.name;
@@ -1146,6 +1147,33 @@ function applyTrip(){
 /* until the flight you're at home: shekels, Israel, and expenses count as "before the trip" */
 function homeMode(){ const st=tripStart(); S.home=!!(st&&todayStr()<st); S.localCur= S.home ? "ILS" : (S.dest||S.localCur); }
 function defLoc(){ return S.home ? "prep" : S.localCur; }
+/* the town an expense belongs to: picked by hand, or the place you were on that day (the journey), or where the phone is */
+function autoTown(date){ try{ const st=tripStops(); if(st.length){ const own=stayDays(st), k=own.get(date||todayStr()); if(k!=null) return st[k].n; }
+  return (date||todayStr())===todayStr() ? hereName() : ""; }catch(e){ return ""; } }
+function townOf(it){ return it.town || autoTown(it.date); }
+/* where a town is on the globe: a stop of ours, a town we know, or the main city of its country */
+function townLL(name,loc){ const s=tripStops().find(x=>x.n===name); if(s) return [s.lat,s.lng]; const t=TOWNS.find(x=>x[0]===name); if(t) return [t[1],t[2]];
+  const P=PLACE[loc]||PLACE[S.localCur]; return P?[P[0],P[1]]:null; }
+function townBtn(el,town,date){ el.innerHTML=""; const a=document.createElement("span"); a.textContent="🏙️ "+(town||autoTown(date)||"עיר"); el.appendChild(a);
+  if(!town){ const s=document.createElement("small"); s.textContent=" · אוטומטי"; el.appendChild(s); } }
+function openTownPicker(current,date,cb){
+  sheetMode="town"; sheetCb=cb; sheetCur=current||null; $("curSheetTitle").textContent="באיזו עיר? 🏙️"; $("curSearch").value="";
+  $("curSearch").placeholder="🔎 חיפוש עיר, או כותבים עיר חדשה"; sheetDate=date; openSheet("curSheet"); renderCurList(); }
+let sheetDate=null;
+function renderTownList(q,L){
+  const raw=$("curSearch").value.trim();
+  const item=(label,val,sub)=>{ const b=document.createElement("button"); b.type="button"; b.className="curitem"; b.setAttribute("aria-selected",String(val===sheetCur)); b.style.gridTemplateColumns="1fr auto";
+    const n=document.createElement("span"); n.textContent=label; b.appendChild(n); if(sub){ const s=document.createElement("small"); s.className="sub"; s.textContent=sub; b.appendChild(s); }
+    b.onclick=()=>{ const cb=sheetCb; closeSheet("curSheet"); sheetCb=null; if(cb) cb(val); }; return b; };
+  const group=(label,els)=>{ if(!els.length) return; const h=document.createElement("h3"); h.textContent=label; L.appendChild(h); els.forEach(e=>L.appendChild(e)); };
+  const auto=autoTown(sheetDate);
+  const ours=[...new Set(tripStops().map(x=>x.n))], rest=TOWNS.map(t=>t[0]).filter(n=>!ours.includes(n)).sort((a,b)=>a.localeCompare(b,"he"));
+  const f=n=>!q||norm(n).includes(q);
+  if(!q) group("אוטומטי",[item("📍 "+(auto||"לפי היעדים")+" · אוטומטי",null,"לפי היעד שלכם באותו יום")]);
+  group("היעדים שלנו",ours.filter(f).map(n=>item(n,n)));
+  group(q?"ערים":"עוד ערים",rest.filter(f).map(n=>item(n,n)));
+  if(raw&&![...ours,...rest].includes(raw)) group("עיר חדשה",[item("✏️ "+raw.slice(0,40),raw.slice(0,40),"על המיקום של המדינה שנבחרה")]);
+}
 function splitItems(){
   const live=ALL.filter(x=>!x.deleted&&tripOf(x)===curTrip), gone=ALL.filter(x=>x.deleted&&tripOf(x)===curTrip);
   S.items=live.filter(x=>x.kind!=="private"); RAW=ALL.filter(x=>!x.deleted&&x.kind==="private");
@@ -1459,7 +1487,7 @@ function showErr(id,msg,field){ const e=$(id); e.textContent=msg||""; e.hidden=!
     field.addEventListener("input",clear,{once:true}); field.addEventListener("click",clear,{once:true}); } }
 function dayWord(v){ const t=todayStr(); if(!v||v===t) return "היום"; const y=new Date(Date.now()-864e5), ys=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0"); if(v===ys) return "אתמול"; const a=v.split("-").map(Number); return a[2]+"."+a[1]; }
 /* the folded "date · place" line of both forms; it turns amber when the date is not today */
-function moreSum(){ for(const [k,f] of [["f",form],["p",pform]]){ const el=$(k+"MoreSum"); if(!el) continue; const v=$(k+"Date").value; el.textContent="📅 "+dayWord(v)+" · "+locName(f.loc||defLoc()); $(k+"More").classList.toggle("off",!!v&&v!==todayStr()); } }
+function moreSum(){ for(const [k,f] of [["f",form],["p",pform]]){ const el=$(k+"MoreSum"); if(!el) continue; const v=$(k+"Date").value; const tw=f.town||autoTown(v||todayStr()); if($(k+"Town")) townBtn($(k+"Town"),f.town,v||todayStr()); el.textContent="📅 "+dayWord(v)+" · "+locName(f.loc||defLoc())+(tw?" · "+tw:""); $(k+"More").classList.toggle("off",!!v&&v!==todayStr()); } }
 /* texts that speak to one person, in his or her gender */
 function applyG(){ if(!me) return; const f=fem(me); document.querySelectorAll("[data-gm]").forEach(e=>{ const t=f?e.dataset.gf:e.dataset.gm; if(e.textContent!==t) e.textContent=t; }); }
 function done(btn){ if(!btn) return; buzz(10); if(calm()) return; btn.classList.add("ok"); setTimeout(()=>btn.classList.remove("ok"),900); }
@@ -1468,7 +1496,7 @@ $("cFrom").onclick=()=>openCurPicker("יש לי…",cur.cFrom,c=>{ cur.cFrom=c; 
 $("cTo").onclick=()=>openCurPicker("מקבלים…",cur.cTo,c=>{ cur.cTo=c; window.__cPicked=true; renderConv(); });
 function startEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
-  editingId=it.id; editOrig=JSON.parse(JSON.stringify(it)); form.payer=it.payer; form.cat=it.cat||"other"; form.catSet=true; form.loc=locOf(it); form.pm=it.pm||"cash";
+  editingId=it.id; editOrig=JSON.parse(JSON.stringify(it)); form.payer=it.payer; form.cat=it.cat||"other"; form.catSet=true; form.loc=locOf(it); form.town=it.town||null; form.pm=it.pm||"cash";
   form.among=it.pcts?Object.keys(it.pcts):((it.among&&it.among.length)?[...it.among]:S.people.map(p=>p.id));
   form.mode=it.pcts?"pct":"equal"; form.pcts=it.pcts?{...it.pcts}:{};
   $("fDesc").value=it.desc||""; $("fCatLabel").value=it.catLabel||""; $("fAmt").value=group(String(it.amount)); $("fDate").value=it.date||todayStr(); cur.fCur=it.cur;
@@ -1477,7 +1505,7 @@ function startEdit(it){
   if(!$("addSlot").contains($("form"))) openAdd(); else $("form").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function resetForm(){ setTimeout(()=>fDateChips(),0);
-  editingId=null; form.cat=null; form.catSet=false; $("fDesc").value=""; $("fCatLabel").value=""; $("fAmt").value=""; form.mode="equal"; form.pcts={}; form.among=null; if(me) form.payer=me; cur.fCur=S.localCur; form.loc=null;
+  editingId=null; form.cat=null; form.catSet=false; $("fDesc").value=""; $("fCatLabel").value=""; $("fAmt").value=""; form.mode="equal"; form.pcts={}; form.among=null; if(me) form.payer=me; cur.fCur=S.localCur; form.loc=null; form.town=null;
   $("formTitle").textContent="➕ הוצאה משותפת"; $("saveBtn").textContent="הוספה"; $("cancelEdit").hidden=true; renderForm(); saveLabel();
 }
 async function save(){
@@ -1488,7 +1516,7 @@ async function save(){
   if(!form.among.length) return showErr("fErr","צריך לבחור לפחות אדם אחד שמתחלק בהוצאה",$("fAmong"));
   let pcts=null;
   if(form.mode==="pct"){ pcts={}; let sum=0; for(const id of form.among){ const v=+form.pcts[id]; if(!(v>=0)) return showErr("fErr","אחוז לא תקין אצל "+nm(id)); pcts[id]=v; sum+=v; } if(Math.abs(sum-100)>0.5) return showErr("fErr","האחוזים צריכים להסתכם ל-100 (כרגע "+sum+")"); }
-  const data={rIls:(editingId&&editOrig&&editOrig.cur===cur.fCur&&editOrig.rIls>0)?editOrig.rIls:rateNow(cur.fCur),kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat||"other",catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr()};
+  const data={rIls:(editingId&&editOrig&&editOrig.cur===cur.fCur&&editOrig.rIls>0)?editOrig.rIls:rateNow(cur.fCur),kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat||"other",catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr(),...((form.town||editingId)?{town:form.town||null}:{})};
   const id=editingId||uid("e");
   let patch=data;
   if(editingId&&editOrig){ patch={}; for(const k of Object.keys(data)){ if(JSON.stringify(data[k]??null)!==JSON.stringify(editOrig[k]??null)) patch[k]=data[k]; } }
@@ -1527,13 +1555,13 @@ function toast(msg,actLabel,act,ms){
 $("pCur").onclick=()=>openCurPicker("באיזה מטבע שילמת?",cur.pCur,c=>{ cur.pCur=c; renderPersonal(); });
 function pStartEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
-  pEditingId=it.id; pform.cat=it.cat||"other"; pform.catSet=true; pform.loc=locOf(it); pform.pm=it.pm||"cash"; cur.pCur=it.cur;
+  pEditingId=it.id; pform.cat=it.cat||"other"; pform.catSet=true; pform.loc=locOf(it); pform.town=it.town||null; pform.pm=it.pm||"cash"; cur.pCur=it.cur;
   $("pDesc").value=it.desc||""; $("pCatLabel").value=it.catLabel||""; $("pAmt").value=group(String(it.amount)); $("pDate").value=it.date||todayStr();
   $("pFormTitle").textContent="✏️ עריכת הוצאה אישית"; $("pSave").textContent="שמירת שינויים"; $("pCancel").hidden=false; saveLabel(); renderPersonal();
   if(!$("addSlot").contains($("pForm"))) openAdd(); else $("pForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function pReset(){
-  pEditingId=null; pform.cat=null; pform.catSet=false; $("pDesc").value=""; $("pCatLabel").value=""; $("pAmt").value=""; cur.pCur=S.localCur; pform.loc=null;
+  pEditingId=null; pform.cat=null; pform.catSet=false; $("pDesc").value=""; $("pCatLabel").value=""; $("pAmt").value=""; cur.pCur=S.localCur; pform.loc=null; pform.town=null;
   $("pFormTitle").textContent="➕ הוצאה אישית"; $("pSave").textContent="הוספה"; $("pCancel").hidden=true; renderPersonal(); saveLabel();
 }
 async function pSave(){
@@ -1542,7 +1570,7 @@ async function pSave(){
   if(!(amount>0)) return showErr("pErr","צריך להזין סכום גדול מאפס",$("pAmt"));
   if(!$("pDesc").value.trim()) return showErr("pErr","צריך לתת שם להוצאה, למשל: קפה",$("pDesc"));
   const c=await loadAcct(); if(!c) return showErr("pErr","צריך להיכנס לחשבון האישי קודם.");
-  const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat||"other",catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||defLoc(),pm:pform.pm||"cash",date:$("pDate").value||todayStr(),trip:curTrip};
+  const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat||"other",catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||defLoc(),pm:pform.pm||"cash",date:$("pDate").value||todayStr(),trip:curTrip,...(pform.town?{town:pform.town}:{})};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
   const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz()});
   const job=run(()=>EXP().doc(id).set(doc));
@@ -1554,6 +1582,8 @@ async function pSave(){
   if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
 $("fLoc").onclick=()=>openLocPicker(form.loc||defLoc(),k=>{ form.loc=k; renderForm(); });
+$("fTown").onclick=()=>openTownPicker(form.town,$("fDate").value||todayStr(),t=>{ form.town=t; renderForm(); });
+$("pTown").onclick=()=>openTownPicker(pform.town,$("pDate").value||todayStr(),t=>{ pform.town=t; renderPForm(); });
 $("pLoc").onclick=()=>openLocPicker(pform.loc||defLoc(),k=>{ pform.loc=k; renderPersonal(); });
 $("pSave").onclick=pSave; $("pCancel").onclick=pReset;
 $("pAmt").addEventListener("input",()=>convHint("pAmt",cur.pCur,"pConv"));
@@ -1622,16 +1652,25 @@ function dayItems(mode){
   return S.items.filter(it=>it.kind!=="transfer");
 }
 function journeyLegs(mode){
-  const stays=tripStops(), own=stayDays(stays), items=dayItems(mode), today=todayStr();
-  return stays.map((x,i)=>{ const days=[...own].filter(([,k])=>k===i).map(([d])=>d).sort();
-    const set=new Set(days), its=items.filter(it=>set.has(it.date));
+  const stays=tripStops(), own=stayDays(stays), all=dayItems(mode), today=todayStr();
+  /* an expense marked with a town goes to that town (a hotel in Pai booked from Chiang Mai is Pai's) */
+  const items=all.filter(it=>!it.town), tagged=all.filter(it=>it.town);
+  const legOf=it=>{ let k=-1; stays.forEach((x,i)=>{ if(x.n===it.town&&(k<0||x.d<=(it.date||""))) k=i; }); return k; };
+  const legs=stays.map((x,i)=>{ const days=[...own].filter(([,k])=>k===i).map(([d])=>d).sort();
+    const set=new Set(days), its=items.filter(it=>set.has(it.date)).concat(tagged.filter(it=>legOf(it)===i));
     return {name:x.n,lat:x.lat,lng:x.lng,from:x.d,to:x.e||(stays[i+1]?stays[i+1].d:null),left:x.e||null,last:i===stays.length-1&&!x.e,est:!!x.est,
       days:days.length,dates:days,items:its,spent:its.reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0),
       alone:its.filter(it=>it._alone).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0)}; });   /* a town passed through the same day stays on the route, with 0 days */
+  /* towns paid for but not (yet) on the route: on the globe with their money and no days */
+  const ex=new Map(); for(const it of tagged){ if(legOf(it)>=0) continue; const e=ex.get(it.town)||{name:it.town,items:[]}; e.items.push(it); ex.set(it.town,e); }
+  legs.extra=[...ex.values()].map(e=>{ const ll=townLL(e.name,locOf(e.items[0]))||[0,0]; const sum=f=>e.items.filter(f).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0);
+    return {name:e.name,lat:ll[0],lng:ll[1],items:e.items,spent:sum(()=>true),alone:sum(it=>it._alone),ahead:true}; });
+  return legs;
 }
 /* towns: going back to the same place adds to its days and money */
 function journeyTowns(legs){ const m=new Map();
-  for(const l of legs){ const t=m.get(l.name)||{name:l.name,lat:l.lat,lng:l.lng,days:0,spent:0,alone:0,visits:[],items:[]}; t.days+=l.days; t.spent+=l.spent; t.alone+=l.alone||0; t.visits.push([l.from,l.left||(l.last?null:l.to)]); if(l.est) t.est=true; t.items.push(...l.items); m.set(l.name,t); }
+  for(const e of legs.extra||[]) m.set(e.name,{name:e.name,lat:e.lat,lng:e.lng,days:0,spent:e.spent,alone:e.alone,visits:[],items:[...e.items],ahead:true});
+  for(const l of legs){ const t=m.get(l.name)||{name:l.name,lat:l.lat,lng:l.lng,days:0,spent:0,alone:0,visits:[],items:[]}; delete t.ahead; t.days+=l.days; t.spent+=l.spent; t.alone+=l.alone||0; t.visits.push([l.from,l.left||(l.last?null:l.to)]); if(l.est) t.est=true; t.items.push(...l.items); m.set(l.name,t); }
   return [...m.values()]; }
 let stopBusy=false;
 async function recordStop(lat,lng){ const t=nearTown(lat,lng); if(t) return recordTown(t); }
@@ -1761,6 +1800,14 @@ function landPath(c,g,r){
     c.closePath(); }
   return true;
 }
+/* marking a place with a finger: the globe flies to it, the next tap on it sets the spot */
+function gunproj(g,x,y){ const X=(x-g.cx)/g.R, Y=(g.cy-y)/g.R, rho=Math.hypot(X,Y); if(rho>1) return null; const c=Math.asin(rho), sc=Math.sin(c), cc=Math.cos(c), p0=g.lat*D2R;
+  const lat= rho<1e-9 ? g.lat : Math.asin(cc*Math.sin(p0)+Y*sc*Math.cos(p0)/rho)/D2R; let lon=g.lon+Math.atan2(X*sc,rho*cc*Math.cos(p0)-Y*sc*Math.sin(p0))/D2R; lon=((lon+540)%360)-180; return [lon,lat]; }
+function pickOnGlobe(name,at,cb){ const g=GLOBE; if(!g){ toast("🌍 הגלובוס עוד נטען, רגע"); return; }
+  townCard(null,g); g.cv.parentNode.scrollIntoView({behavior:calm()?"auto":"smooth",block:"center"});
+  g.pin=[at[1],at[0]]; flyGlobe({lon:at[1],lat:at[0],R:Math.min(9000,Math.min(g.W,g.H)*.36/Math.sin(5*D2R))},g);
+  g.pick=(lon,lat)=>{ g.pick=null; g.pin=[lon,lat]; g.pinShow=true; setTimeout(()=>{ g.pinShow=false; drawGlobe(g); },4000); drawGlobe(g); cb(Math.round(lat*100)/100,Math.round(lon*100)/100); toast("📍 "+name+" סומנה · לא לשכוח \"שמירה\""); };
+  g.cv.parentNode.classList.add("picking"); toast("👆 נוגעים בגלובוס במקום של "+name+" (אפשר לסובב ולהגדיל קודם)"); }
 function drawGlobe(g){
   g=g||GLOBE; if(!g||!g.cv.isConnected) return; const c=g.ctx, W=g.W, H=g.H; c.clearRect(0,0,W,H);
   const hot=g.mode==="mine"?"#14C9A5":"#FF4D8D", gold="#FFC93C";
@@ -1805,6 +1852,7 @@ function drawGlobe(g){
       c.fillStyle="#1E1640"; c.font="800 12.5px Assistant, system-ui, sans-serif"; c.fillText(t.name,lx,ly+14);
       c.fillStyle=g.mode==="mine"?"#0E9F7E":hot; c.font="800 11.5px Assistant, system-ui, sans-serif"; c.fillText(amt,lx,ly+27);
       g.hits.push({x:lx,y:ly+16,r:Math.max(24,w/2),t}); break; } }
+  if(g.pin&&(g.pick||g.pinShow)){ const [x,y,v]=gproj(g,g.pin[0],g.pin[1]); if(v){ c.strokeStyle="#FFC93C"; c.lineWidth=2.5; c.beginPath(); c.arc(x,y,11,0,7); c.moveTo(x-17,y); c.lineTo(x+17,y); c.moveTo(x,y-17); c.lineTo(x,y+17); c.stroke(); } }
 }
 /* both globes: the couple's (graphs) and mine (personal) */
 function renderJourneys(){ if(view==="stats") renderJourney("shared"); if(view==="personal") renderJourney("mine"); }
@@ -1814,7 +1862,7 @@ function renderJourney(mode){
   const note=$(mine?"jNoteMe":"jNote");
   if(mine&&!(acct&&acctFor===me)){ note.textContent="פותחים את האישי כדי לראות כמה הוצאת בכל יעד"; box.innerHTML=""; return; }
   const legs=journeyLegs(mode), towns=journeyTowns(legs);
-  const total=legs.reduce((a,l)=>a+l.spent,0), days=legs.reduce((a,l)=>a+l.days,0);
+  const total=[...legs,...(legs.extra||[])].reduce((a,l)=>a+l.spent,0), days=legs.reduce((a,l)=>a+l.days,0);
   note.textContent= !legs.length ? (mine?"היעדים משותפים · מוסיפים אותם במסך הגרפים":"עוד אין יעדים · \"📍 איפה אנחנו?\" או \"✏️ היעדים שלנו\"") : legs.some(l=>l.est) ? "היעד הראשון נספר מתחילת הטיול · ✏️ לתקן תאריכים" : mine ? "שלך: אישי + החלק שלך במשותף · נגיעה ביעד לפרטים" : "נגיעה ביעד לפרטים · מסובבים באצבע";
   loadWorld().then(()=>{
     let cv=box.querySelector("canvas.globe"), head=box.querySelector(".gl-head");
@@ -1826,7 +1874,7 @@ function renderJourney(mode){
         b.onclick=()=>{ const g=cv.__g; if(!g) return; if(!f){ const out=g.R>Math.min(g.W,g.H)*.6; flyGlobe(out?{lon:g.lon,lat:g.lat*.3,R:Math.min(g.W,g.H)*.4}:g.fit,g); } else flyGlobe({lon:g.lon,lat:g.lat,R:Math.max(Math.min(g.W,g.H)*.3,Math.min(12000,g.R*f))},g); }; z.appendChild(b); }
       box.appendChild(z); }
     head.innerHTML=""; if(legs.length){ const b=document.createElement("b"); b.className="num"; b.textContent=fmt(total,showCur); const sm=document.createElement("small"); sm.textContent=(days===1?"יום אחד":days+" ימים")+" · "+(towns.length===1?"יעד אחד":towns.length+" יעדים")+" · "+fmt(total/Math.max(1,days),showCur)+" ליום"; head.append(b,sm);
-      if(mine){ const al=legs.reduce((a,l)=>a+(l.alone||0),0), sp=document.createElement("div"); sp.className="gl-split"; const x1=document.createElement("span"); x1.textContent="🙋 אישי "+fmt(al,showCur); const x2=document.createElement("span"); x2.textContent="👫 משותף "+fmt(total-al,showCur); sp.append(x1,x2); head.appendChild(sp); } }
+      if(mine){ const al=[...legs,...(legs.extra||[])].reduce((a,l)=>a+(l.alone||0),0), sp=document.createElement("div"); sp.className="gl-split"; const x1=document.createElement("span"); x1.textContent="🙋 אישי "+fmt(al,showCur); const x2=document.createElement("span"); x2.textContent="👫 משותף "+fmt(total-al,showCur); sp.append(x1,x2); head.appendChild(sp); } }
     cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+"px"; cv.style.height=H+"px"; cv.setAttribute("aria-label",(mine?"הגלובוס שלי: ":"גלובוס המסע: ")+(towns.map(t=>t.name+" "+fmt(t.spent,showCur)).join(", ")||"עוד אין יעדים"));
     const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
     const fit=globeFit(legs,W,H), prev=cv.__g;
@@ -1844,11 +1892,11 @@ function townCard(t,g){
   const sd=s=>{ const [y,m,d]=s.split("-").map(Number); return d+"."+m; };
   const cats={}; for(const it of t.items){ const k=catKey(it); cats[k]=(cats[k]||0)+conv(+it.amount||0,it.cur,showCur); }
   const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  const rows=[["💰",g.mode==="mine"?"הוצאות":"הוצאנו",fmt(t.spent,showCur)],["📅","ימים",String(t.days)],["📊","ממוצע ליום",fmt(t.spent/Math.max(1,t.days),showCur)],["🧾","הוצאות",String(t.items.filter(i=>i.kind!=="transfer").length)]];
+  const rows=[["💰",g.mode==="mine"?"הוצאות":"הוצאנו",fmt(t.spent,showCur)],["📅","ימים",String(t.days)],["📊","ממוצע ליום",t.days?fmt(t.spent/t.days,showCur):"—"],["🧾","הוצאות",String(t.items.filter(i=>i.kind!=="transfer").length)]];
   const h=document.createElement("div"); h.className="glc-h"; const n=document.createElement("b"); n.textContent="📍 "+t.name; const x=document.createElement("button"); x.type="button"; x.className="glc-x"; x.textContent="✕"; x.setAttribute("aria-label","סגירה"); x.onclick=()=>townCard(null,g); h.append(n,x); o.appendChild(h);
   const gr=document.createElement("div"); gr.className="glc-g"; for(const [ic,l,v] of rows){ const d=document.createElement("div"); const s1=document.createElement("small"); s1.textContent=ic+" "+l; const s2=document.createElement("b"); s2.className="num"; s2.textContent=v; d.append(s2,s1); gr.appendChild(d); } o.appendChild(gr);
   if(g.mode==="mine"){ const sp=document.createElement("div"); sp.className="glc-split"; for(const [ic,l,v] of [["🙋","אישי",t.alone||0],["👫","משותף (החלק שלך)",t.spent-(t.alone||0)]]){ const d=document.createElement("div"); const a=document.createElement("b"); a.className="num"; a.textContent=fmt(v,showCur); const b=document.createElement("small"); b.textContent=ic+" "+l; d.append(a,b); sp.appendChild(d); } o.appendChild(sp); }
-  const vs=document.createElement("div"); vs.className="glc-v"; vs.textContent=(t.visits.length>1?"🔁 "+t.visits.length+" ביקורים: ":"🗓️ ")+t.visits.map(([a,b])=>sd(a)+(b?"–"+sd(b):" ← עכשיו")).join(" · ")+(t.est?" · ההגעה משוערת (מתחילת הטיול)":""); o.appendChild(vs);
+  const vs=document.createElement("div"); vs.className="glc-v"; vs.textContent= !t.visits.length ? "🧳 שולם מראש · עוד לא הגענו לכאן" : (t.visits.length>1?"🔁 "+t.visits.length+" ביקורים: ":"🗓️ ")+t.visits.map(([a,b])=>sd(a)+(b?"–"+sd(b):" ← עכשיו")).join(" · ")+(t.est?" · ההגעה משוערת (מתחילת הטיול)":""); o.appendChild(vs);
   if(top.length){ const c=document.createElement("div"); c.className="glc-c"; c.textContent=top.map(([k,v])=>catName(k).split(" ")[0]+" "+Math.round(v/Math.max(1,t.spent)*100)+"%").join("  "); o.appendChild(c); }
   box.appendChild(o); buzz(8); sound("tick");
   if(!calm()) o.animate([{opacity:0,transform:"translateY(14px) scale(.96)"},{opacity:1,transform:"none"}],{duration:320,easing:"cubic-bezier(.2,.9,.3,1.2)"});
@@ -1865,7 +1913,7 @@ function renderStopsEditor(){
   ed.hidden=!stopsEdit; if(!stopsEdit){ ed.innerHTML=""; return; }
   ed.innerHTML="";
   const st=tripStart()||todayStr(), today=todayStr();
-  const rows=tripStops().map(x=>({n:x.n,lat:x.lat,lng:x.lng,d:x.d0||x.d,e:x.e||"",at:x.at||0,by:x.by||null}));
+  const rows=tripStops().map(x=>({n:x.n,lat:x.lat,lng:x.lng,d:x.d0||x.d,e:x.e||"",at:x.at||0,by:x.by||null,pinned:!!x.pin,ctry:x.c||null}));
   /* first time with an automatic first stop: suggest the start of the trip as its arrival */
   if(rows.length&&rows[0].d>st&&!tripStops()[0].m) rows[0].d=st;
   const names=[...TOWNS.map(t=>t[0])].sort((a,b)=>a.localeCompare(b,"he"));
@@ -1882,11 +1930,22 @@ function renderStopsEditor(){
       if(!names.includes(r.n)){ const o=document.createElement("option"); o.value=r.n; o.textContent=r.n; o.selected=true; sel.prepend(o); }
       { const o=document.createElement("option"); o.value="__other"; o.textContent="✏️ עיר אחרת…"; sel.appendChild(o); }
       sel.onchange=()=>{ if(sel.value==="__other"){ const nm=(prompt("איך קוראים לעיר?","")||"").trim().slice(0,40); if(!nm){ sel.value=r.n; return; }
-          /* a city not in the list: at the place picked in "📍 איפה אנחנו" if it is the same name, else the country's main city */
-          const h=HERE&&HERE.name===nm?HERE:null, P=PLACE[S.localCur]||[r.lat,r.lng]; r.n=nm; r.lat=h?h.lat:P[0]; r.lng=h?h.lng:P[1]; draw(); return; }
+          /* a city not in the list: at the place picked in "📍 איפה אנחנו" if it is the same name, else the country's main city
+             until it is marked on the globe */
+          const h=HERE&&HERE.name===nm?HERE:null, P=PLACE[S.localCur]||[r.lat,r.lng]; r.n=nm; r.lat=h?h.lat:P[0]; r.lng=h?h.lng:P[1]; r.ctry=S.localCur; r.pinned=!!h; draw(); return; }
         r.n=sel.value; const t=TOWNS.find(x=>x[0]===sel.value); if(t){ r.lat=t[1]; r.lng=t[2]; } };
       const x=document.createElement("button"); x.type="button"; x.className="j-x"; x.textContent="✕"; x.setAttribute("aria-label","הסרת יעד"); x.onclick=()=>{ rows.splice(i,1); draw(); };
       top.append(num,sel,x); card.appendChild(top);
+      /* a city of our own: its country, and its exact spot marked with a finger on the globe */
+      if(!TOWNS.some(t=>t[0]===r.n)){ const row=document.createElement("div"); row.className="j-own";
+        const cs=document.createElement("select"); cs.setAttribute("aria-label","מדינה"); const near=Object.keys(PLACE).map(k=>[k,kmBetween(r.lat,r.lng,PLACE[k][0],PLACE[k][1])]).sort((a,b)=>a[1]-b[1])[0];
+        if(!r.ctry) r.ctry=near?near[0]:S.localCur;
+        for(const k of Object.keys(PLACE).filter(k=>CTRY[k]).sort((a,b)=>CTRY[a].split(" ").slice(1).join(" ").localeCompare(CTRY[b].split(" ").slice(1).join(" "),"he"))){ const o=document.createElement("option"); o.value=k; o.textContent=CTRY[k]; if(k===r.ctry) o.selected=true; cs.appendChild(o); }
+        cs.onchange=()=>{ r.ctry=cs.value; const P=PLACE[cs.value]; if(P&&!r.pinned){ r.lat=P[0]; r.lng=P[1]; } else if(P&&kmBetween(r.lat,r.lng,P[0],P[1])>2500){ r.lat=P[0]; r.lng=P[1]; r.pinned=false; } draw(); };
+        const pin=document.createElement("button"); pin.type="button"; pin.className="btn small j-pin"; pin.textContent= r.pinned ? "🎯 סומן · לסמן שוב" : "🎯 לסמן על הגלובוס";
+        pin.onclick=()=>pickOnGlobe(r.n,[r.lat,r.lng],(lat,lng)=>{ r.lat=lat; r.lng=lng; r.pinned=true; draw(); });
+        const st=document.createElement("small"); st.className="j-own-st"; st.textContent= r.pinned ? "📍 במקום שסימנתם" : "📍 בינתיים על העיר הראשית של המדינה";
+        row.append(cs,pin,st); card.appendChild(row); }
       const dates=document.createElement("div"); dates.className="j-dates";
       const lab=(t,inp)=>{ const l=document.createElement("label"); l.className="j-lab"; const s=document.createElement("span"); s.textContent=t; l.append(s,inp); return l; };
       const a=document.createElement("input"); a.type="date"; a.value=r.d; a.min=st; a.max=today; a.onchange=()=>{ r.d=a.value; draw(); };
@@ -1897,7 +1956,7 @@ function renderStopsEditor(){
         b.onclick=()=>{ const nx=rows[i+1]; r.e=nx?nx.d:today; draw(); }; l.append(s,b); dates.appendChild(l); }
       card.appendChild(dates);
       /* what these dates cover in the expenses (counted exactly as the globe will), so a wrong date shows at once */
-      const mine=[...own].filter(([,k])=>k===r).map(([d])=>d).sort(), set=new Set(mine), its=ex.filter(it=>set.has(it.date)), span=mine.length, sum=its.reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0);
+      const mine=[...own].filter(([,k])=>k===r).map(([d])=>d).sort(), set=new Set(mine), its=ex.filter(it=>it.town ? it.town===r.n&&rows.filter(q=>q.n===r.n).sort((a,b)=>a.d.localeCompare(b.d)).filter((q,j)=>j===0||q.d<=(it.date||"")).pop()===r : set.has(it.date)), span=mine.length, sum=its.reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0);
       const info=document.createElement("div"); info.className="j-info"; info.textContent= r.e&&r.e<r.d ? "⚠️ תאריך העזיבה לפני ההגעה" : span>0 ? "לפי ההוצאות: "+(span===1?"יום אחד":span+" ימים")+" ("+sd(mine[0])+(span>1?"–"+sd(mine[span-1]):"")+") · "+its.length+" הוצאות · "+fmt(sum,showCur) : "אין ימים ליעד הזה (יעד אחר מכסה את התאריכים)";
       card.appendChild(info);
       list.appendChild(card); }); };
@@ -1908,7 +1967,7 @@ function renderStopsEditor(){
     let d= !last ? st : last.e ? last.e : (ex.map(i=>i.date).filter(x=>x>last.d).sort()[0]||today); if(d>today) d=today;
     const t=TOWNS.find(x=>x[0]==="בנגקוק"); rows.push({n:t[0],lat:t[1],lng:t[2],d,e:"",at:Date.now(),by:me||null}); draw(); setTimeout(()=>{ const s=list.querySelectorAll("select"); s[s.length-1]&&s[s.length-1].focus(); },60); };
   const save=document.createElement("button"); save.type="button"; save.className="btn primary small"; save.textContent="שמירה";
-  save.onclick=async()=>{ const clean=rows.filter(r=>r.n&&/^\d{4}-\d{2}-\d{2}$/.test(r.d)).map(r=>({n:r.n,lat:r.lat,lng:r.lng,d:r.d,e:/^\d{4}-\d{2}-\d{2}$/.test(r.e)?r.e:null,m:1,at:r.at||Date.now(),by:r.by||me||null})).sort((a,b)=>a.d.localeCompare(b.d)||a.at-b.at);
+  save.onclick=async()=>{ const clean=rows.filter(r=>r.n&&/^\d{4}-\d{2}-\d{2}$/.test(r.d)).map(r=>({n:r.n,lat:r.lat,lng:r.lng,d:r.d,e:/^\d{4}-\d{2}-\d{2}$/.test(r.e)?r.e:null,m:1,at:r.at||Date.now(),by:r.by||me||null,...(r.pinned?{pin:1}:{}),...(r.ctry&&!TOWNS.some(t=>t[0]===r.n)?{c:r.ctry}:{})})).sort((a,b)=>a.d.localeCompare(b.d)||a.at-b.at);
     const ok=await patchTrip(curTrip,{stops:clean}); if(ok){ STOPS=[]; stopsEdit=false; const T=tripById(curTrip); if(T) T.stops=clean; for(const id of ["jMap","jMapMe"]){ const b=$(id); if(b) b.innerHTML=""; } GLOBE=null; GLOBE_ME=null; renderJourneys(); toast("🧭 היעדים עודכנו"); } };
   const f=document.createElement("div"); f.className="actions"; f.append(add,save); ed.appendChild(f);
 }
@@ -1934,6 +1993,7 @@ function globeInput(cv){
     if(pts.size===2){ const [a,b]=[...pts.values()]; const d=Math.hypot(a[0]-b[0],a[1]-b[1]); if(d0) g.R=Math.max(Math.min(g.W,g.H)*.3,Math.min(12000,R0*d/d0)); }
     if(!g.raf) g.raf=requestAnimationFrame(()=>{ g.raf=0; drawGlobe(g); }); });
   cv.addEventListener("pointerup",e=>{ const g=cv.__g; if(g&&tapAt&&Math.hypot(e.clientX-tapAt[0],e.clientY-tapAt[1])<8&&Date.now()-tapAt[2]<500){ const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+      if(g.pick){ const ll=gunproj(g,x,y); if(ll){ cv.parentNode.classList.remove("picking"); g.pick(ll[0],ll[1]); } tapAt=null; return; }
       const h=(g.hits||[]).map(h=>[h,Math.hypot(h.x-x,h.y-y)]).filter(([h,d])=>d<=h.r).sort((a,b)=>a[1]-b[1])[0]; townCard(h?h[0].t:null,g); } tapAt=null; });
   const up=e=>{ pts.delete(e.pointerId); if(pts.size<2) d0=0; if(!pts.size&&cv.__g) cv.__g.drag=false; };
   cv.addEventListener("pointerup",up); cv.addEventListener("pointercancel",up);

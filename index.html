@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261119102256"></script>
+<script src="theme.js?v=20261119105511"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -208,6 +208,13 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 @media (min-width:640px){.sheet-bg{align-items:center}.sheet{border-radius:26px}}
 .sheet-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .curlist{display:flex;flex-direction:column;gap:2px;min-height:200px}
+.locrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.locrow .curbtn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.curbtn.town small{opacity:.7;font-weight:500}
+.j-own{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+.j-own select{font:inherit;font-size:.9rem;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:6px 8px;max-width:48%}
+.j-own-st{flex-basis:100%;color:var(--muted);font-size:.78rem}
+.picking canvas.globe{outline:3px dashed #FFC93C;outline-offset:-3px}
 .curlist h3{font-size:.8rem;color:var(--muted);margin:10px 4px 4px;font-family:var(--body);font-weight:500}
 .curitem{font:inherit;text-align:right;display:grid;grid-template-columns:3em 1fr auto;gap:10px;align-items:center;background:none;border:none;border-radius:14px;padding:10px 8px;color:var(--ink);cursor:pointer}
 .curitem:hover{background:var(--surface-2)}
@@ -1266,7 +1273,7 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
       <div class="fieldset"><span class="hint">קטגוריה <span class="cat-auto" id="fCatAuto" hidden>🪄 לפי השם · אפשר לשנות</span></span><div class="seg" id="fCat"></div><input id="fCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
       <details class="more-f" id="fMore"><summary><span id="fMoreSum">📅 היום</span><em></em></summary>
         <div class="datefield"><span class="dlab" id="fDateLab">תאריך</span><div class="seg datechips" id="fDateChips" role="group" aria-labelledby="fDateLab"></div><span class="datebox"><input id="fDate" type="date" aria-labelledby="fDateLab"></span></div>
-        <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="fLoc" type="button"></button></div>
+        <div class="fieldset"><span class="hint">איפה?</span><div class="locrow"><button class="curbtn wide" id="fLoc" type="button"></button><button class="curbtn wide town" id="fTown" type="button" aria-label="עיר"></button></div></div>
       </details>
       <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="fPm"></div></div>
       <div class="fieldset"><span class="hint">מי שילם?</span><div class="seg" id="fPayer"></div></div>
@@ -1350,7 +1357,7 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
         <div class="fieldset"><span class="hint">קטגוריה <span class="cat-auto" id="pCatAuto" hidden>🪄 לפי השם · אפשר לשנות</span></span><div class="seg" id="pCat"></div><input id="pCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
         <details class="more-f" id="pMore"><summary><span id="pMoreSum">📅 היום</span><em></em></summary>
           <div class="datefield"><span class="dlab" id="pDateLab">תאריך</span><div class="seg datechips" id="pDateChips" role="group" aria-labelledby="pDateLab"></div><span class="datebox"><input id="pDate" type="date" aria-labelledby="pDateLab"></span></div>
-          <div class="fieldset"><span class="hint">איפה?</span><button class="curbtn wide" id="pLoc" type="button"></button></div>
+          <div class="fieldset"><span class="hint">איפה?</span><div class="locrow"><button class="curbtn wide" id="pLoc" type="button"></button><button class="curbtn wide town" id="pTown" type="button" aria-label="עיר"></button></div></div>
         </details>
         <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="pPm"></div></div>
         <div class="actions">
@@ -1733,11 +1740,11 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261119102256">
-<script src="config.js?v=20261119102256"></script>
-<script src="motion.js?v=20261119102256"></script>
-<script src="fx.js?v=20261119102256"></script>
-<script src="cinema.js?v=20261119102256"></script>
-<script src="app.js?v=20261119102256"></script>
+<meta name="app-v" content="20261119105511">
+<script src="config.js?v=20261119105511"></script>
+<script src="motion.js?v=20261119105511"></script>
+<script src="fx.js?v=20261119105511"></script>
+<script src="cinema.js?v=20261119105511"></script>
+<script src="app.js?v=20261119105511"></script>
 </body>
 </html>
