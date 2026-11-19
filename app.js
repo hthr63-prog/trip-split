@@ -1321,14 +1321,23 @@ function renderSofar(){
   const td=todayStr(), ym=thisMonth();
   /* the place you are in now: what it has cost so far, every visit (an expense marked with a town counts there) */
   const stays=tripStops(), ownD=stayDays(stays), townAt=d=>{ const k=ownD.get(d); return k!=null?stays[k].n:""; };
-  const here= tripStart()&&tripStart()<=td ? townAt(td) : "", townOfIt=it=>it.town||townAt(it.date||"");
-  const tabs=[["trip","הטיול"],...(here?[["town","היעד"]]:[]),["month","החודש"],["day","היום"]];
+  const onTripNow= tripStart()&&tripStart()<=td, town= onTripNow ? townAt(td) : "", townOfIt=it=>it.town||townAt(it.date||"");
+  /* the destination is two places, shown one at a time: the town you are in and the country it is in */
+  const ctry= onTripNow&&!S.home&&CTRY[S.localCur] ? S.localCur : "", ctryName= ctry ? CTRY[ctry].split(" ").slice(1).join(" ") : "";
+  let place=load("trip-sf-place")||"town"; if(place==="town"&&!town) place="country"; if(place==="country"&&!ctry) place="town";
+  const here= place==="town" ? town : ctryName;
+  const tabs=[["trip","הטיול"],...(town||ctry?[["town","היעד"]]:[]),["month","החודש"],["day","היום"]];
   /* the saved choice stays; until the places have loaded the card shows the trip */
   const scope= sfScope==="town"&&!here ? "trip" : sfScope;
   seg($("sfSeg"),tabs,v=>v===scope,v=>{ sfScope=v; try{ localStorage.setItem("trip-sf",v); }catch(e){} renderSofar(); });
-  const inScope=it=> scope==="trip" ? true : scope==="town" ? townOfIt(it)===here : scope==="month" ? monthOf(it)===ym : it.date===td;
+  const stT=tripStart();
+  const inPlace=it=> place==="town" ? townOfIt(it)===town : (!stT||(it.date||"")>=stT)&&locOf(it)===ctry;
+  { const ps=$("sfPlace"); ps.hidden= scope!=="town"; if(scope==="town") seg(ps,[...(town?[["town","🏙️ "+town]]:[]),...(ctry?[["country",CTRY[ctry]]]:[])],v=>v===place,v=>{ store("trip-sf-place",v); renderSofar(); }); }
+  const inScope=it=> scope==="trip" ? true : scope==="town" ? inPlace(it) : scope==="month" ? monthOf(it)===ym : it.date===td;
   const V=it=>conv(+it.amount||0,it.cur,showCur);
-  const townDays=[...ownD].filter(([,k])=>stays[k].n===here).length;
+  /* days in the place: the town's own days on the journey; for the country, every day from the first one there until today */
+  let townDays=0; if(place==="town") townDays=[...ownD].filter(([,k])=>stays[k].n===town).length;
+  else { const f=[...S.items,...(personal?P:[])].filter(it=>it.kind!=="transfer"&&inPlace(it)).map(it=>it.date).filter(Boolean).sort()[0]; townDays= f&&f<=td ? daysBetween(f,td)+1 : 0; }
   const days= scope==="town" ? townDays : sfDays(scope);
   const R=$("sfRow"); R.innerHTML="";
   /* money cells roll to their new value like the big number (also on a currency switch); counts are plain text */
@@ -1933,6 +1942,8 @@ function renderJourney(mode){
     /* the window changed size (full screen and back): the globe keeps its look, scaled to the new room */
     if(prev&&(prev.W!==W||prev.H!==H)){ prev.R*=Math.min(W,H)/Math.min(prev.W,prev.H); prev.stars=null; }
     const g={cv,ctx,W,H,cx:W/2,cy:H/2+12,legs,towns,mode,rings:worldRings(),lon:prev?prev.lon:fit.lon-70,lat:prev?prev.lat:fit.lat*0.3,R:prev?prev.R:Math.min(W,H)*.40,draw:prev?prev.draw:0,fit,flown:prev?prev.flown:false,stars:prev?prev.stars:null};
+    /* a fly-in cut short (full screen tapped while it flew) ends where it was going, with the route drawn */
+    if(prev&&prev.flown&&g.draw<1) Object.assign(g,{draw:1,lon:fit.lon,lat:fit.lat,R:Math.max(g.R,fit.R*Math.min(W,H)/Math.min(prev0.W,prev0.H))});
     cv.__g=g; if(mine) GLOBE_ME=g; else GLOBE=g;
     drawGlobe(g); globeInput(cv);
     if(!g.flown) globeWhenSeen(box,g);

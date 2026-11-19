@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261119124235"></script>
+<script src="theme.js?v=20261119131355"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -208,6 +208,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 @media (min-width:640px){.sheet-bg{align-items:center}.sheet{border-radius:26px}}
 .sheet-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .curlist{display:flex;flex-direction:column;gap:2px;min-height:200px}
+.sfplace{margin:2px 0 6px;align-self:flex-start;width:max-content;max-width:100%}
+.sfplace button{font-size:.85rem;padding:5px 12px}
 .locrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .locrow .curbtn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .curbtn.town small{opacity:.7;font-weight:500}
@@ -1219,6 +1221,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
   </section>
   <section class="sofar" id="sofar" hidden aria-labelledby="sfKick">
     <div class="sf-top"><span class="sf-k" id="sfKick">עד עכשיו</span><div class="seg sfseg" id="sfSeg"></div></div>
+    <div class="seg sfplace" id="sfPlace" hidden></div>
     <div class="sf-big"><b class="num" id="sfBig">—</b><span class="sf-sub" id="sfSub"></span></div>
     <div class="sf-bar" id="sfBar" hidden><i id="sfBarA"></i><i id="sfBarB"></i></div>
     <div class="sf-row" id="sfRow"></div>
@@ -1747,11 +1750,11 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261119124235">
-<script src="config.js?v=20261119124235"></script>
-<script src="motion.js?v=20261119124235"></script>
-<script src="fx.js?v=20261119124235"></script>
-<script src="cinema.js?v=20261119124235"></script>
-<script src="app.js?v=20261119124235"></script>
+<meta name="app-v" content="20261119131355">
+<script src="config.js?v=20261119131355"></script>
+<script src="motion.js?v=20261119131355"></script>
+<script src="fx.js?v=20261119131355"></script>
+<script src="cinema.js?v=20261119131355"></script>
+<script src="app.js?v=20261119131355"></script>
 </body>
 </html>
