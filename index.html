@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261119053720"></script>
+<script src="theme.js?v=20261119060539"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -990,6 +990,11 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 .dish-ex input{width:64px;min-height:40px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);padding:4px 8px}
 .dish-sum{font-weight:700;font-size:.9rem}
 .dish-close{align-self:center}
+
+/* 2. the journey globe */
+.jmap{background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--brand) 10%,var(--surface)),var(--surface)) !important}
+.jmap::before{display:none}
+.jmap canvas.globe{display:block;margin:0 auto;cursor:grab}
 </style>
 </head>
 <body>
@@ -1553,6 +1558,7 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
       <h3>עיצוב</h3>
       <div class="seg" id="themeSeg"></div>
       <div class="seg" id="soundSeg" style="margin-top:8px"></div>
+      <button class="btn small" id="motionBtn" type="button" style="margin-top:8px">🫨 הפעלת ניעור לביטול</button>
     </div>
 
     <div class="sec">
@@ -1643,11 +1649,11 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261119053720">
-<script src="config.js?v=20261119053720"></script>
-<script src="motion.js?v=20261119053720"></script>
-<script src="fx.js?v=20261119053720"></script>
-<script src="cinema.js?v=20261119053720"></script>
-<script src="app.js?v=20261119053720"></script>
+<meta name="app-v" content="20261119060539">
+<script src="config.js?v=20261119060539"></script>
+<script src="motion.js?v=20261119060539"></script>
+<script src="fx.js?v=20261119060539"></script>
+<script src="cinema.js?v=20261119060539"></script>
+<script src="app.js?v=20261119060539"></script>
 </body>
 </html>

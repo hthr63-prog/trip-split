@@ -5,8 +5,8 @@
    Each file of the site is kept once, under its address without the "?v=…" stamp, so the copy
    used offline is always the newest one that was downloaded. (Keeping one copy per version let
    an old app.js be served with a new index.html, which showed an old, half-working screen.) */
-const CACHE = "trip-split-v4";
-const CORE = ["./", "app.js", "fx.js", "motion.js", "cinema.js", "theme.js", "config.js", "manifest.json", "icon-192.png", "apple-touch-icon.png",
+const CACHE = "trip-split-v5";
+const CORE = ["./", "app.js", "fx.js", "motion.js", "cinema.js", "world.js", "theme.js", "config.js", "manifest.json", "icon-192.png", "apple-touch-icon.png",
   "vendor/firebase-app-compat-10.12.2.js", "vendor/firebase-firestore-compat-10.12.2.js"];
 
 const keyOf = req => {

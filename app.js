@@ -215,6 +215,7 @@ function applyTheme(t){
   if(t==="auto"){ store("trip-theme",""); window.FX&&FX.autoTheme(true); }
   else { document.documentElement.dataset.theme=t; store("trip-theme",t); }
   $("themeBtn").setAttribute("aria-checked",String(isDark()));
+  if($("motionBtn")) $("motionBtn").onclick=()=>window.askMotion&&window.askMotion(true);
   if($("soundSeg")) seg($("soundSeg"),[["on","🔔 צלילים"],["off","🔕 בלי"]],v=>v===(load("trip-sound")==="off"?"off":"on"),v=>{ store("trip-sound",v); applyTheme(themePref()); if(v==="on") sound("coin"); });
   if($("themeSeg")) seg($("themeSeg"),[["auto","🌅 אוטומטי"],["light","☀️ בהיר"],["dark","🌙 כהה"]],v=>v===themePref(),v=>applyTheme(v));
 }
@@ -1566,51 +1567,130 @@ function journeyLegs(){
   for(const l of legs) l.spent=mine.filter(it=>it.date>=l.from&&(it.date<l.to||(!legs[legs.indexOf(l)+1]&&it.date<=l.to))).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0);
   return legs;
 }
-function renderJourney(){
-  const box=$("jMap"); if(!box) return; const legs=journeyLegs(); const note=$("jNote");
-  box.innerHTML=""; if(!legs.length){ note.textContent= !(acct&&acctFor===me) ? "המסע נשמר באישי (מוצפן, רק אתה רואה). פותחים את האישי, ומאז כל עיר חדשה תיכנס למפה." : "המסע יתחיל להצטייר מהעיר הבאה. האפליקציה מזהה את העיר לפי מיקום הטלפון, בלי לשלוח אותו לשום מקום."; return; }
-  note.textContent=legs.length===1?"כאן זה מתחיל. כל עיר חדשה תתחבר לקו.":legs.length+" עצירות · "+legs.reduce((a,l)=>a+l.days,0)+" ימים";
-  const W=360, H=Math.max(220,Math.min(420,120+legs.length*40)), pad=46;
-  const lats=legs.map(l=>l.lat), lngs=legs.map(l=>l.lng), k=Math.cos((Math.max(...lats)+Math.min(...lats))/2*Math.PI/180);
-  let x0=Math.min(...lngs)*k, x1=Math.max(...lngs)*k, y0=Math.min(...lats), y1=Math.max(...lats);
-  const span=Math.max(x1-x0,y1-y0,0.6); const cx=(x0+x1)/2, cy=(y0+y1)/2; x0=cx-span/2; x1=cx+span/2; y0=cy-span/2; y1=cy+span/2;
-  const sc=Math.min((W-pad*2)/(x1-x0),(H-pad*2)/(y1-y0));
-  const P2=l=>[W/2-(l.lng*k-cx)*sc*-1, H/2-(l.lat-cy)*sc];
-  const ns="http://www.w3.org/2000/svg", svg=document.createElementNS(ns,"svg"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`); svg.setAttribute("class","jsvg"); svg.setAttribute("direction","ltr"); svg.style.direction="ltr";   /* text-anchor start/end as on paper */ svg.setAttribute("role","img"); svg.setAttribute("aria-label","מפת המסע: "+legs.map(l=>l.name).join(", "));
-  const pts=legs.map(P2);
-  /* a soft curve through the stops */
-  let d="M"+pts[0][0].toFixed(1)+" "+pts[0][1].toFixed(1);
-  for(let i=1;i<pts.length;i++){ const [a,b]=pts[i-1],[c,e]=pts[i], mx=(a+c)/2, my=(b+e)/2-Math.abs(c-a)*.25-14; d+=` Q${mx.toFixed(1)} ${my.toFixed(1)} ${c.toFixed(1)} ${e.toFixed(1)}`; }
-  const path=document.createElementNS(ns,"path"); path.setAttribute("d",d); path.setAttribute("class","jline"); svg.appendChild(path);
-  /* labels: each town takes the first free spot around its pin (above, below, right, left) so close towns do not overlap */
-  const taken=pts.map(([x,y])=>({x0:x-10,x1:x+10,y0:y-10,y1:y+10}));
-  const hit=b=>taken.some(o=>!(b.x1<o.x0||b.x0>o.x1||b.y1<o.y0||b.y0>o.y1));
-  pts.forEach(([x,y],i)=>{ const l=legs[i], g=document.createElementNS(ns,"g"); g.setAttribute("class","jpin"+(i===pts.length-1?" now":"")); g.style.setProperty("--i",i);
-    const c=document.createElementNS(ns,"circle"); c.setAttribute("cx",x); c.setAttribute("cy",y); c.setAttribute("r",i===pts.length-1?9:7); g.appendChild(c);
-    const sub=(l.days===1?"יום":l.days+" ימים")+(l.spent>0?" · "+fmt(l.spent,showCur):"");
-    const w=Math.max(l.name.length*7.2,sub.length*5.6)+8, hgt=30;
-    const spots=[[x,y-14,"middle",-1],[x,y+20,"middle",1],[x+14,y+4,"start",0],[x-14,y+4,"end",0]];
-    let pick=null; for(const [lx,ly,an,dir] of spots){ const x0=an==="middle"?lx-w/2:an==="start"?lx:lx-w, y0=dir<0?ly-hgt+12:dir>0?ly-12:ly-15;
-      const box={x0,x1:x0+w,y0,y1:y0+hgt}; if(box.x0<2||box.x1>W-2||box.y0<2||box.y1>H-2) continue; if(!hit(box)){ pick=[lx,ly,an,dir,box]; break; } }
-    if(!pick){ const [lx,ly,an,dir]=spots[i%2]; pick=[lx,ly,an,dir,null]; }
-    const [lx,ly,an,dir,box]=pick; if(box) taken.push(box);
-    const nameY= dir<0 ? ly-12 : ly, subY= dir<0 ? ly : ly+13;
-    const t=document.createElementNS(ns,"text"); t.setAttribute("x",lx); t.setAttribute("y",nameY); t.setAttribute("text-anchor",an); t.textContent=l.name; g.appendChild(t);
-    const st=document.createElementNS(ns,"text"); st.setAttribute("x",lx); st.setAttribute("y",subY); st.setAttribute("text-anchor",an); st.setAttribute("class","jsub"); st.textContent=sub; g.appendChild(st);
-    svg.appendChild(g); });
-  box.appendChild(svg);
-  try{ const L=path.getTotalLength(); path.style.strokeDasharray=L; path.style.strokeDashoffset=L; box.style.setProperty("--jl",L); }catch(e){}
-  drawJourney();
+/* ================= the journey as a globe =================
+   A real globe (land from world.js, loaded only when the graphs screen opens), turned with a finger,
+   pinched to zoom. It flies in from the whole earth to where you have been; the route is drawn between the stops. */
+let GLOBE=null, worldP=null;
+function loadWorld(){ if(window.WORLD) return Promise.resolve(); if(worldP) return worldP;
+  worldP=new Promise(res=>{ const s=document.createElement("script"); s.src="world.js?v=1"; s.onload=res; s.onerror=res; document.head.appendChild(s); }); return worldP; }
+function worldRings(){
+  if(GLOBE&&GLOBE.rings) return GLOBE.rings; const Q=window.WORLD_Q||20, out=[];
+  for(const part of String(window.WORLD||"").split(";")){ const n=part.split(",").map(Number); let x=0,y=0; const lon=new Float32Array(n.length/2), lat=new Float32Array(n.length/2);
+    let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
+    for(let i=0;i<n.length;i+=2){ x+=n[i]; y+=n[i+1]; const a=x/Q,b=y/Q; lon[i/2]=a; lat[i/2]=b; if(a<mnx)mnx=a; if(a>mxx)mxx=a; if(b<mny)mny=b; if(b>mxy)mxy=b; }
+    const cl=(mnx+mxx)/2, cb=(mny+mxy)/2; out.push({lon,lat,c:[cl,cb],r:Math.max(mxx-mnx,mxy-mny)*0.75}); }
+  return out;
 }
-/* the line draws itself once, when the map comes into view */
-let jIO=null;
-function drawJourney(){ const box=$("jMap"), path=box&&box.querySelector(".jline"); if(!path) return; const L=+box.style.getPropertyValue("--jl")||0;
-  if(L<1||calm()||!("IntersectionObserver" in window)){ path.style.strokeDashoffset=0; box.classList.add("drawn"); return; }
-  if(jIO) jIO.disconnect();
-  jIO=new IntersectionObserver(es=>{ if(!es.some(e=>e.isIntersecting)) return; jIO.disconnect();
-    path.animate([{strokeDashoffset:L},{strokeDashoffset:0}],{duration:1500,easing:"cubic-bezier(.45,.05,.25,1)",fill:"forwards"}).finished.then(()=>{ path.style.strokeDashoffset=0; });
-    setTimeout(()=>box.classList.add("drawn"),700); },{threshold:.35});
-  jIO.observe(box); }
+const D2R=Math.PI/180;
+function gproj(g,lon,lat){ const l=(lon-g.lon)*D2R, p=lat*D2R, p0=g.lat*D2R, cp=Math.cos(p);
+  const cosc=Math.sin(p0)*Math.sin(p)+Math.cos(p0)*cp*Math.cos(l);
+  let x=cp*Math.sin(l), y=Math.cos(p0)*Math.sin(p)-Math.sin(p0)*cp*Math.cos(l);
+  if(cosc<0){ const m=Math.hypot(x,y)||1; x/=m; y/=m; }   /* behind the earth: pinned to the rim */
+  return [g.cx+x*g.R, g.cy-y*g.R, cosc>=0]; }
+function angDist(a,b,c,d){ return Math.acos(Math.min(1,Math.sin(b*D2R)*Math.sin(d*D2R)+Math.cos(b*D2R)*Math.cos(d*D2R)*Math.cos((a-c)*D2R)))/D2R; }
+function drawGlobe(){
+  const g=GLOBE; if(!g||!g.cv.isConnected) return; const c=g.ctx, W=g.W, H=g.H; c.clearRect(0,0,W,H);
+  const dark=document.documentElement.dataset.theme==="dark", cs=getComputedStyle(document.documentElement);
+  const brand=cs.getPropertyValue("--brand").trim()||"#6C4BFF", hot=cs.getPropertyValue("--hot").trim()||"#FF4D8D", ink=cs.getPropertyValue("--ink").trim()||"#1E1640";
+  /* glow + ocean */
+  const glow=c.createRadialGradient(g.cx,g.cy,g.R*.92,g.cx,g.cy,g.R*1.12); glow.addColorStop(0,dark?"rgba(140,110,255,.45)":"rgba(108,75,255,.25)"); glow.addColorStop(1,"rgba(108,75,255,0)");
+  c.fillStyle=glow; c.beginPath(); c.arc(g.cx,g.cy,g.R*1.12,0,7); c.fill();
+  const sea=c.createRadialGradient(g.cx-g.R*.35,g.cy-g.R*.4,g.R*.1,g.cx,g.cy,g.R); sea.addColorStop(0,dark?"#2B3F86":"#BFD8FF"); sea.addColorStop(1,dark?"#121A45":"#6E97E8");
+  c.save(); c.beginPath(); c.arc(g.cx,g.cy,g.R,0,7); c.fillStyle=sea; c.fill(); c.clip();
+  /* graticule */
+  c.strokeStyle=dark?"rgba(255,255,255,.08)":"rgba(255,255,255,.35)"; c.lineWidth=1;
+  const step=g.R>2500?2:g.R>900?5:15;
+  for(let lon=-180;lon<180;lon+=step){ c.beginPath(); let on=false; for(let lat=-85;lat<=85;lat+=2.5){ const [x,y,v]=gproj(g,lon,lat); if(v){ on?c.lineTo(x,y):c.moveTo(x,y); on=true; } else on=false; } c.stroke(); }
+  for(let lat=-75;lat<=75;lat+=step){ c.beginPath(); let on=false; for(let lon=-180;lon<=180;lon+=2.5){ const [x,y,v]=gproj(g,lon,lat); if(v){ on?c.lineTo(x,y):c.moveTo(x,y); on=true; } else on=false; } c.stroke(); }
+  /* land: only rings near the visible side */
+  const view=Math.min(90,Math.asin(Math.min(1,Math.hypot(W,H)/2/g.R))/D2R+2);
+  c.fillStyle=dark?"#5B6FB0":"#F6F3E9"; c.strokeStyle=dark?"rgba(255,255,255,.25)":"rgba(80,90,140,.35)"; c.lineWidth=.8;
+  for(const r of g.rings){ if(angDist(g.lon,g.lat,r.c[0],r.c[1])-r.r>view) continue;
+    c.beginPath(); let any=false; const n=r.lon.length, stp=g.R<500&&n>60?2:1;
+    for(let i=0;i<n;i+=stp){ const [x,y,v]=gproj(g,r.lon[i],r.lat[i]); if(v) any=true; i?c.lineTo(x,y):c.moveTo(x,y); }
+    if(!any) continue; c.closePath(); c.fill(); c.stroke(); }
+  /* shading for roundness */
+  const sh=c.createRadialGradient(g.cx-g.R*.4,g.cy-g.R*.45,g.R*.05,g.cx,g.cy,g.R*1.02); sh.addColorStop(0,"rgba(255,255,255,.18)"); sh.addColorStop(.7,"rgba(255,255,255,0)"); sh.addColorStop(1,"rgba(10,5,40,.28)");
+  c.fillStyle=sh; c.fillRect(0,0,W,H); c.restore();
+  /* the route: great-circle arcs, drawn up to g.draw (0..1) */
+  const L=g.legs; if(!L.length) return;
+  const seg=[]; for(let i=1;i<L.length;i++){ const a=L[i-1], b=L[i]; const pts=[]; for(let k=0;k<=24;k++){ const t=k/24; pts.push(gc(a,b,t)); } seg.push(pts); }
+  const total=seg.length; let drawn=g.draw*total;
+  c.lineCap="round"; c.lineJoin="round";
+  for(let s=0;s<seg.length&&drawn>0;s++,drawn--){ const part=Math.min(1,drawn), pts=seg[s], m=Math.max(1,Math.round(part*24));
+    const A0=gproj(g,pts[0][0],pts[0][1]), B0=gproj(g,pts[24][0],pts[24][1]), hmax=Math.min(26,Math.hypot(A0[0]-B0[0],A0[1]-B0[1])*.16);   /* a gentle arch, lower for short hops */
+    c.beginPath(); for(let k=0;k<=m;k++){ const [x,y,v]=gproj(g,pts[k][0],pts[k][1]); const lift=Math.sin(k/24*Math.PI)*hmax; k?c.lineTo(x,y-lift):c.moveTo(x,y-lift); }
+    c.strokeStyle=hot; c.lineWidth=3.2; c.shadowColor="rgba(255,77,141,.5)"; c.shadowBlur=8; c.stroke(); c.shadowBlur=0; }
+  /* pins first, then labels: each label takes the first free spot that covers no pin and no other label;
+     where there is no room (towns close together, whole-earth view) only the latest place keeps its label */
+  const P2=[]; L.forEach((l,i)=>{ const [x,y,v]=gproj(g,l.lng,l.lat); if(!v) return; if(g.draw<i/Math.max(1,L.length-1)-0.001) return; P2.push({l,i,x,y,now:i===L.length-1}); });
+  for(const p of P2){ c.beginPath(); c.arc(p.x,p.y,p.now?7.5:5.5,0,7); c.fillStyle=p.now?hot:"#fff"; c.fill(); c.lineWidth=3; c.strokeStyle=p.now?"#fff":hot; c.stroke(); }
+  const taken=P2.map(p=>({x0:p.x-10,x1:p.x+10,y0:p.y-10,y1:p.y+10})); c.textAlign="center"; c.direction="rtl";
+  for(const p of [...P2].sort((a,b)=>b.i-a.i)){ const l=p.l, x=p.x, y=p.y;
+    const sub=(l.days===1?"יום":l.days+" ימים")+(l.spent>0?" · "+fmt(l.spent,showCur):"");
+    c.font="700 12px Assistant, system-ui, sans-serif"; const w=Math.max(c.measureText(l.name).width,c.measureText(sub).width*0.9)+14;
+    for(const [lx,ly] of [[x,y-42],[x,y+14],[x+w/2+12,y-15],[x-w/2-12,y-15]]){ const b={x0:lx-w/2,x1:lx+w/2,y0:ly,y1:ly+30};
+      if(b.x0<2||b.x1>W-2||b.y0<2||b.y1>H-2||taken.some(o=>!(b.x1<o.x0||b.x0>o.x1||b.y1<o.y0||b.y0>o.y1))) continue; taken.push(b);
+      c.fillStyle=dark?"rgba(20,14,50,.82)":"rgba(255,255,255,.92)"; roundRect(c,b.x0,b.y0,w,30,9); c.fill();
+      c.fillStyle=dark?"#fff":ink; c.font="700 12px Assistant, system-ui, sans-serif"; c.fillText(l.name,lx,ly+13);
+      c.fillStyle=dark?"rgba(255,255,255,.7)":"rgba(40,30,80,.7)"; c.font="500 10.5px Assistant, system-ui, sans-serif"; c.fillText(sub,lx,ly+26); break; } }
+}
+function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+/* a point a share t of the way along the great circle from a to b */
+function gc(a,b,t){ const f1=a.lat*D2R,l1=a.lng*D2R,f2=b.lat*D2R,l2=b.lng*D2R; const d=angDist(a.lng,a.lat,b.lng,b.lat)*D2R; if(d<1e-6) return [a.lng,a.lat];
+  const A=Math.sin((1-t)*d)/Math.sin(d), B=Math.sin(t*d)/Math.sin(d); const x=A*Math.cos(f1)*Math.cos(l1)+B*Math.cos(f2)*Math.cos(l2), y=A*Math.cos(f1)*Math.sin(l1)+B*Math.cos(f2)*Math.sin(l2), z=A*Math.sin(f1)+B*Math.sin(f2);
+  return [Math.atan2(y,x)/D2R, Math.atan2(z,Math.hypot(x,y))/D2R]; }
+function globeFit(legs,W,H){
+  if(!legs.length){ const h=hereNow&&hereNow(); return {lon:h?h.lng:100.5,lat:h?h.lat:13.7,R:Math.min(W,H)*.42}; }
+  const mean=legs.reduce((a,l)=>[a[0]+l.lng,a[1]+l.lat],[0,0]).map(v=>v/legs.length);
+  const span=Math.max(1.2,...legs.map(l=>angDist(mean[0],mean[1],l.lng,l.lat)));
+  return {lon:mean[0],lat:mean[1],R:Math.min(9000,Math.max(Math.min(W,H)*.42,Math.min(W,H)*.36/Math.sin(Math.min(80,span)*D2R)))};
+}
+function renderJourney(){
+  const box=$("jMap"); if(!box) return; const legs=journeyLegs(), note=$("jNote");
+  note.textContent= !legs.length ? (!(acct&&acctFor===me) ? "המסע נשמר באישי (מוצפן, רק אתה רואה). פותחים את האישי, ומאז כל עיר חדשה תיכנס לגלובוס." : "כל עיר חדשה תיכנס לגלובוס. מזהים אותה בטלפון עצמו.")
+    : legs.length===1 ? "כאן זה מתחיל · מסובבים באצבע, צובטים לזום" : legs.length+" עצירות · "+legs.reduce((a,l)=>a+l.days,0)+" ימים · מסובבים באצבע";
+  loadWorld().then(()=>{
+    let cv=box.querySelector("canvas.globe");
+    const W=box.clientWidth||340, H=Math.round(Math.min(420,Math.max(300,W*0.95))), dpr=Math.min(3,window.devicePixelRatio||1);
+    if(!cv){ box.innerHTML=""; cv=document.createElement("canvas"); cv.className="globe"; cv.setAttribute("role","img"); box.appendChild(cv); }
+    cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+"px"; cv.style.height=H+"px"; cv.setAttribute("aria-label","גלובוס המסע: "+(legs.map(l=>l.name).join(", ")||"עוד אין עצירות"));
+    const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+    const fit=globeFit(legs,W,H), prev=GLOBE&&GLOBE.cv===cv?GLOBE:null;
+    GLOBE={cv,ctx,W,H,cx:W/2,cy:H/2,legs,rings:prev?prev.rings:null,lon:prev?prev.lon:fit.lon-70,lat:prev?prev.lat:fit.lat*0.3,R:prev?prev.R:Math.min(W,H)*.42,draw:prev?prev.draw:0,fit,flown:prev?prev.flown:false};
+    GLOBE.rings=worldRings(); drawGlobe(); globeInput(cv);
+    if(!GLOBE.flown) globeWhenSeen(box);
+  });
+}
+/* when it first comes into view: from the whole earth to where you have been, then the route draws itself */
+let gIO=null;
+function globeWhenSeen(box){ if(gIO) gIO.disconnect(); if(!("IntersectionObserver" in window)||calm()){ const g=GLOBE; Object.assign(g,{lon:g.fit.lon,lat:g.fit.lat,R:g.fit.R,draw:1,flown:true}); drawGlobe(); return; }
+  gIO=new IntersectionObserver(es=>{ if(!es.some(e=>e.isIntersecting)) return; gIO.disconnect(); const g=GLOBE; if(!g) return; g.flown=true;
+    const from={lon:g.lon,lat:g.lat,R:g.R}, to=g.fit, t0=performance.now(), T1=1900, T2=1300;
+    const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+    const step=n=>{ if(!GLOBE||GLOBE!==g) return; const t=Math.min(1,(n-t0)/T1), e=ease(t);
+      g.lon=from.lon+(to.lon-from.lon)*e; g.lat=from.lat+(to.lat-from.lat)*e; g.R=Math.exp(Math.log(from.R)+(Math.log(to.R)-Math.log(from.R))*Math.min(1,e*1.15));
+      g.draw=Math.max(0,Math.min(1,(n-t0-T1*0.75)/T2)); drawGlobe(); if(n-t0<T1+T2) requestAnimationFrame(step); else { g.draw=1; drawGlobe(); } };
+    requestAnimationFrame(step); },{threshold:.4}); gIO.observe(box); }
+/* one finger turns the globe, two fingers zoom, a double tap flies out to the whole earth and back */
+function globeInput(cv){
+  if(cv.__wired) return; cv.__wired=true; const pts=new Map(); let lastTap=0, d0=0, R0=0;
+  cv.style.touchAction="none";
+  cv.addEventListener("pointerdown",e=>{ cv.setPointerCapture(e.pointerId); pts.set(e.pointerId,[e.clientX,e.clientY]); const g=GLOBE; if(!g) return; g.drag=true;
+    if(pts.size===2){ const [a,b]=[...pts.values()]; d0=Math.hypot(a[0]-b[0],a[1]-b[1]); R0=g.R; }
+    const now=Date.now(); if(pts.size===1&&now-lastTap<300){ const out=g.R>Math.min(g.W,g.H)*.6; const to=out?{lon:g.lon,lat:g.lat*.3,R:Math.min(g.W,g.H)*.42}:g.fit; flyGlobe(to); } lastTap=now; });
+  cv.addEventListener("pointermove",e=>{ const p=pts.get(e.pointerId); if(!p) return; const g=GLOBE; if(!g) return;
+    if(pts.size===1){ const k=57.3/g.R; g.lon-=(e.clientX-p[0])*k*(document.dir==="rtl"?1:1); g.lat=Math.max(-80,Math.min(80,g.lat+(e.clientY-p[1])*k)); }
+    pts.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pts.size===2){ const [a,b]=[...pts.values()]; const d=Math.hypot(a[0]-b[0],a[1]-b[1]); if(d0) g.R=Math.max(Math.min(g.W,g.H)*.3,Math.min(12000,R0*d/d0)); }
+    if(!g.raf) g.raf=requestAnimationFrame(()=>{ g.raf=0; drawGlobe(); }); });
+  const up=e=>{ pts.delete(e.pointerId); if(pts.size<2) d0=0; if(!pts.size&&GLOBE) GLOBE.drag=false; };
+  cv.addEventListener("pointerup",up); cv.addEventListener("pointercancel",up);
+}
+function flyGlobe(to){ const g=GLOBE; if(!g) return; const from={lon:g.lon,lat:g.lat,R:g.R}, t0=performance.now(), T=1100; buzz(6);
+  const step=n=>{ const t=Math.min(1,(n-t0)/T), e=1-Math.pow(1-t,3); g.lon=from.lon+(to.lon-from.lon)*e; g.lat=from.lat+(to.lat-from.lat)*e; g.R=Math.exp(Math.log(from.R)+(Math.log(to.R)-Math.log(from.R))*e); drawGlobe(); if(t<1) requestAnimationFrame(step); };
+  requestAnimationFrame(step); }
+function drawJourney(){}
 
 /* ================= good morning: a short card the first time the app opens each day ================= */
 /* celebrations wait while a sheet is open (adding an expense, the account…) so they never cover what you are doing */
@@ -1858,8 +1938,11 @@ function keypad(inputId,curOf,nextId){
       b.onclick=()=>{ buzz(6); const n=(parseFloat(raw())||0)+v; set(String(Math.round(n*100)/100)); if(window.Motion) Motion.pop(inp); }; quick.appendChild(b); }
     const nx=document.createElement("button"); nx.type="button"; nx.className="kp-next"; nx.textContent="שם ←"; nx.onclick=()=>{ buzz(5); box.hidden=true; try{ $(nextId).focus(); }catch(e){} }; quick.appendChild(nx); };
   inp.closest(".amount").after(box);
-  inp.addEventListener("focus",()=>{ paintQuick(); box.hidden=false; });
-  inp.addEventListener("blur",()=>{ setTimeout(()=>{ if(document.activeElement!==inp) box.hidden=true; },120); });
+  /* iPhone takes the focus away from the field on every key tap, so the keys do NOT follow focus:
+     they open when the amount is tapped and close only when another field is chosen (or "שם ←"). */
+  const show=()=>{ if(box.hidden){ paintQuick(); box.hidden=false; } };
+  inp.addEventListener("focus",show); inp.addEventListener("click",show);
+  document.addEventListener("focusin",e=>{ if(box.hidden) return; const t=e.target; if(t===inp||box.contains(t)) return; if(t.matches&&t.matches("input,textarea,select")) box.hidden=true; });
 }
 keypad("fAmt",()=>cur.fCur||S.localCur,"fDesc");
 keypad("pAmt",()=>cur.pCur||S.localCur,"pDesc");
@@ -2011,13 +2094,17 @@ function weekly(force){
 
 /* ================= shake to undo ================= */
 (()=>{
-  let peaks=[], asked=false;
-  /* iPhone asks once for the motion sensor; the first tap anywhere is a good moment */
-  document.addEventListener("pointerdown",()=>{ if(asked) return; asked=true;
-    for(const E of [window.DeviceMotionEvent,window.DeviceOrientationEvent]) if(E&&typeof E.requestPermission==="function") E.requestPermission().catch(()=>{}); },{passive:true});
+  let peaks=[];
+  /* iPhone allows the motion sensor only from a finished tap (click), not from the start of a touch.
+     Ask on a tap until it is allowed; remember the answer. */
+  const need=()=>window.DeviceMotionEvent&&typeof DeviceMotionEvent.requestPermission==="function";
+  window.askMotion=async(loud)=>{ if(!need()){ if(loud) toast(window.DeviceMotionEvent?"🫨 ניעור לביטול פעיל":"🫨 הטלפון הזה לא מאפשר ניעור"); return true; }
+    try{ const r=await DeviceMotionEvent.requestPermission(); try{ await DeviceOrientationEvent.requestPermission(); }catch(e){}
+      store("trip-motion",r); if(loud) toast(r==="granted"?"🫨 ניעור לביטול פעיל":"🫨 לא אושר. אפשר לאשר בהגדרות ספארי: תנועה וכיוון"); return r==="granted"; }catch(e){ return false; } };
+  document.addEventListener("click",()=>{ if(need()&&load("trip-motion")!=="granted"&&load("trip-motion")!=="denied") window.askMotion(false); },{capture:true,passive:true});
   addEventListener("devicemotion",e=>{ const a=e.accelerationIncludingGravity||e.acceleration; if(!a) return;
     const m=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2); const now=Date.now();
-    if(m<24) return; peaks=peaks.filter(t=>now-t<900); if(peaks.length&&now-peaks[peaks.length-1]<120) return; peaks.push(now);
+    if(m<17) return; peaks=peaks.filter(t=>now-t<1100); if(peaks.length&&now-peaks[peaks.length-1]<120) return; peaks.push(now);
     if(peaks.length>=3){ peaks=[]; shook(); } },{passive:true});
 })();
 function shook(){
