@@ -1331,7 +1331,8 @@ function renderSofar(){
   const scope= sfScope==="town"&&!here ? "trip" : sfScope;
   seg($("sfSeg"),tabs,v=>v===scope,v=>{ sfScope=v; try{ localStorage.setItem("trip-sf",v); }catch(e){} renderSofar(); });
   const stT=tripStart();
-  const inPlace=it=> place==="town" ? townOfIt(it)===town : (!stT||(it.date||"")>=stT)&&locOf(it)===ctry;
+  const PC=placeCtx();
+  const inPlace=it=> place==="town" ? (it.town ? it.town===town : PC.stays.some((x,i)=>x.n===town&&PC.inStay(it,i))) : (!stT||(it.date||"")>=stT)&&PC.effLoc(it)===ctry;
   { const ps=$("sfPlace"); ps.hidden= scope!=="town"; if(scope==="town") seg(ps,[...(town?[["town","🏙️ "+town]]:[]),...(ctry?[["country",CTRY[ctry]]]:[])],v=>v===place,v=>{ store("trip-sf-place",v); renderSofar(); }); }
   const inScope=it=> scope==="trip" ? true : scope==="town" ? inPlace(it) : scope==="month" ? monthOf(it)===ym : it.date===td;
   const V=it=>conv(+it.amount||0,it.cur,showCur);
@@ -1677,13 +1678,30 @@ function dayItems(mode){
   if(mode==="mine") return [...(acct&&acctFor===me?P:[]).map(it=>({...it,_alone:true})), ...myShareItems()];
   return S.items.filter(it=>it.kind!=="transfer");
 }
+/* where an expense really was, one rule for the town, the country and the globe:
+   each stay has a country (the one most of its expenses are marked with); an expense of unknown place
+   (paid in shekels or dollars, no country set) belongs to the country of the stay it happened in;
+   an expense marked with another country, or as "before the trip", is not part of the town */
+function placeCtx(){
+  const stays=tripStops(), own=stayDays(stays), cnt=stays.map(()=>({}));
+  for(const it of [...S.items,...(acct&&acctFor===me?P:[])]){ if(it.kind==="transfer") continue; const k=it.town ? stays.findIndex(s=>s.n===it.town) : own.get(it.date||""); if(k==null||k<0) continue;
+    const l=locOf(it); if(l==="prep"||l==="?") continue; cnt[k][l]=(cnt[k][l]||0)+1; }
+  const major=cnt.map(c=>(Object.entries(c).sort((a,b)=>b[1]-a[1])[0]||[null])[0]);
+  const stayOf=it=> it.town ? (()=>{ let k=-1; stays.forEach((x,i)=>{ if(x.n===it.town&&(k<0||x.d<=(it.date||""))) k=i; }); return k; })() : (own.has(it.date||"")?own.get(it.date):-1);
+  const st=tripStart();
+  const effLoc=it=>{ if(st&&(it.date||"")<st) return "prep"; const l=locOf(it); if(l!=="?") return l; const k=stayOf(it); return (k>=0&&major[k])||l; };
+  /* part of stay k: by its date (or its town), and in the stay's country */
+  const inStay=(it,k)=> stayOf(it)===k && (!!it.town || !major[k] || effLoc(it)===major[k]);
+  return {stays,own,major,effLoc,inStay,stayOf};
+}
 function journeyLegs(mode){
   const stays=tripStops(), own=stayDays(stays), all=dayItems(mode), today=todayStr();
   /* an expense marked with a town goes to that town (a hotel in Pai booked from Chiang Mai is Pai's) */
   const items=all.filter(it=>!it.town), tagged=all.filter(it=>it.town);
   const legOf=it=>{ let k=-1; stays.forEach((x,i)=>{ if(x.n===it.town&&(k<0||x.d<=(it.date||""))) k=i; }); return k; };
+  const PC=placeCtx();
   const legs=stays.map((x,i)=>{ const days=[...own].filter(([,k])=>k===i).map(([d])=>d).sort();
-    const set=new Set(days), its=items.filter(it=>set.has(it.date)).concat(tagged.filter(it=>legOf(it)===i));
+    const its=items.filter(it=>PC.inStay(it,i)).concat(tagged.filter(it=>legOf(it)===i));
     return {name:x.n,lat:x.lat,lng:x.lng,from:x.d,to:x.e||(stays[i+1]?stays[i+1].d:null),left:x.e||null,last:i===stays.length-1&&!x.e,est:!!x.est,
       days:days.length,dates:days,items:its,spent:its.reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0),
       alone:its.filter(it=>it._alone).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0)}; });   /* a town passed through the same day stays on the route, with 0 days */
@@ -2241,7 +2259,7 @@ function renderStats(){
   /* one rule everywhere: anything dated before the trip started counts as "before the trip", and a country's days are
      the calendar days from the first to the last day there (days without expenses count too, as in the daily average) */
   const stC=tripStart(), tdC=todayStr();
-  const byC={}; for(const it of locItems){ const k= stC&&(it.date||"")<stC ? "prep" : locOf(it); const o=byC[k]||(byC[k]={v:0,days:new Set(),min:null,max:null}); o.v+=conv(+it.amount||0,it.cur,showCur); if(it.date){ o.days.add(it.date); if(!o.min||it.date<o.min) o.min=it.date; if(!o.max||it.date>o.max) o.max=it.date; } }
+  const PCc=placeCtx(); const byC={}; for(const it of locItems){ const k= stC&&(it.date||"")<stC ? "prep" : PCc.effLoc(it); const o=byC[k]||(byC[k]={v:0,days:new Set(),min:null,max:null}); o.v+=conv(+it.amount||0,it.cur,showCur); if(it.date){ o.days.add(it.date); if(!o.min||it.date<o.min) o.min=it.date; if(!o.max||it.date>o.max) o.max=it.date; } }
   for(const [k,o] of Object.entries(byC)){ if(k==="prep"||k==="?"||!o.min) continue; const end= k===S.localCur&&!S.home ? tdC : o.max; o.span=daysBetween(o.min,end)+1; }
   const ce=Object.entries(byC).sort((x,y)=>y[1].v-x[1].v); const cm=ce[0]?.[1].v||1; const CC=$("stCountries"); CC.innerHTML="";
   if(!ce.length) CC.innerHTML='<div class="hint">עוד אין הוצאות.</div>';
