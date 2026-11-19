@@ -835,7 +835,7 @@ function renderPForm(){
   $("pCatLabel").hidden=pform.cat!=="other";
   convHint("pAmt",cur.pCur,"pConv"); saveLabel();
 }
-function renderPersonal(){ renderPForm(); return flipList($("pLedger"),renderPersonal_); }
+function renderPersonal(){ renderPForm(); const out=flipList($("pLedger"),renderPersonal_); try{ if(view==="personal") renderJourney("mine"); }catch(e){} return out; }
 function renderPersonal_(){
   if(view!=="personal"||!me) return;
   const locked=!(acct&&acctFor===me);
@@ -1555,57 +1555,74 @@ function nearTown(lat,lng){ let best=null, km=1e9; for(const t of TOWNS){ const 
 let STOPS=[];   /* old personal stops (before the journey became shared); merged in and moved over once */
 /* The journey is shared by the trip: a list of {n: town, lat, lng, d: arrival date}. Either phone adds a stop when
    it finds itself in a new town; stops can also be added or fixed by hand. Only the town (its centre) is kept. */
+/* ================= the journey: places you stayed =================
+   A stay is {n: town, lat, lng (the town centre), d: arrival, e: departure (empty = still there)}. Shared by the trip.
+   Every day of the trip belongs to the stay that covers it; that is how days, money and per-day averages are counted. */
 function tripStops(){ const T=tripById(curTrip)||{}; const sh=(T.stops||[]).map(x=>({...x}));
   for(const x of STOPS){ if(!sh.some(y=>y.n===x.name&&y.d===x.date)) sh.push({n:x.name,lat:x.lat,lng:x.lng,d:x.date,at:x.createdAt||0,old:true}); }
   return sh.filter(x=>x&&x.n&&x.d).sort((a,b)=>a.d.localeCompare(b.d)||(a.at||0)-(b.at||0)); }
-let stopBusy=false;
-async function recordStop(lat,lng){
-  if(!loaded||!canWrite||stopBusy||navigator.onLine===false) return; const t=nearTown(lat,lng); if(!t) return;
-  const all=tripStops(), last=all[all.length-1]; if(last&&last.n===t.name) return;   /* still in the same town */
-  const st=tripStart(); if(st&&todayStr()<st) return;   /* not before the flight */
-  stopBusy=true;
-  /* through updateTrips: it also builds the trip list for older spaces that never had one */
-  let added=false;
-  try{ await updateTrips(list=>{ const T=list.find(x=>x.id===curTrip); if(!T) return;
-      const cur=(T.stops||[]).slice().sort((a,b)=>a.d.localeCompare(b.d)||(a.at||0)-(b.at||0)); const l=cur[cur.length-1]; if(l&&l.n===t.name) return;
-      T.stops=[...cur,{n:t.name,lat:t.lat,lng:t.lng,d:todayStr(),at:Date.now(),by:me||null}]; added=true; });
-    if(!added) return;
-    toast("📍 עצירה חדשה במסע: "+t.name); if(view==="stats") renderJourney(); }catch(e){} finally{ stopBusy=false; }
+const dayAdd=(s,n)=>{ const [y,m,d]=s.split("-").map(Number); const t=new Date(y,m-1,d+n); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); };
+/* which stay each day belongs to: the latest arrival on or before it, unless that stay had already been left */
+function stayDays(stays){
+  const st=tripStart(), today=todayStr(); if(!stays.length) return new Map();
+  /* a stay picked up automatically (never set by hand) that starts after the trip did: it counts from the start */
+  const first=stays[0]; if(st&&first.d>st&&!first.m) { first.d0=first.d; first.d=st; first.est=true; }
+  const own=new Map(); const from=st&&st<first.d?st:first.d;
+  for(let day=from; day<=today; day=dayAdd(day,1)){
+    let k=-1; for(let i=0;i<stays.length;i++){ if(stays[i].d<=day) k=i; }
+    if(k<0) continue; const x=stays[k]; if(x.e&&day>x.e) continue;
+    /* the day you leave belongs to the next place if you arrive there that day */
+    if(x.e&&day===x.e&&stays[k+1]&&stays[k+1].d===day) continue;
+    own.set(day,k);
+  }
+  return own;
 }
-/* old personal stops move into the shared journey once */
-function moveOldStops(){ if(!STOPS.length||!canWrite) return; const T=tripById(curTrip)||{}; const have=T.stops||[];
-  const add=STOPS.filter(x=>!have.some(y=>y.n===x.name&&y.d===x.date)); if(!add.length) return;
-  patchTrip(curTrip,{stops:[...have,...add.map(x=>({n:x.name,lat:x.lat,lng:x.lng,d:x.date,at:x.createdAt||0,by:me||null}))].sort((a,b)=>a.d.localeCompare(b.d))}).catch(()=>{}); }
-/* legs: a stay in one town until the next stop; the last runs until today */
-function journeyLegs(){
-  const s=tripStops(), legs=[];
-  for(const x of s){ const l=legs[legs.length-1]; if(l&&l.name===x.n) continue; legs.push({name:x.n,lat:x.lat,lng:x.lng,from:x.d}); }
-  /* the first stop was often noticed days after arriving: until it is fixed by hand it counts from the start of the trip */
-  const st0=tripStart(); if(legs.length&&st0&&legs[0].from>st0){ legs[0].from=st0; legs[0].est=true; }
-  const today=todayStr(), ex=S.items.filter(it=>it.kind!=="transfer");
-  legs.forEach((l,i)=>{ const nx=legs[i+1]; l.to= nx ? nx.from : today; l.last=!nx;
-    l.days=Math.max(1,daysBetween(l.from,l.to)+(nx?0:1));
-    l.items=ex.filter(it=>it.date>=l.from&&(nx?it.date<l.to:it.date<=l.to));
-    l.spent=l.items.reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0); });
-  return legs;
+/* the money of a day, for the couple (shared) or for me (mine alone + my share of the shared) */
+function dayItems(mode){
+  if(mode==="mine") return [...(acct&&acctFor===me?P:[]), ...myShareItems()];
+  return S.items.filter(it=>it.kind!=="transfer");
+}
+function journeyLegs(mode){
+  const stays=tripStops(), own=stayDays(stays), items=dayItems(mode), today=todayStr();
+  return stays.map((x,i)=>{ const days=[...own].filter(([,k])=>k===i).map(([d])=>d).sort();
+    const set=new Set(days), its=items.filter(it=>set.has(it.date));
+    return {name:x.n,lat:x.lat,lng:x.lng,from:x.d,to:x.e||(stays[i+1]?stays[i+1].d:null),left:x.e||null,last:i===stays.length-1&&!x.e,est:!!x.est,
+      days:days.length,dates:days,items:its,spent:its.reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0)}; });   /* a town passed through the same day stays on the route, with 0 days */
 }
 /* towns: going back to the same place adds to its days and money */
 function journeyTowns(legs){ const m=new Map();
-  for(const l of legs){ const t=m.get(l.name)||{name:l.name,lat:l.lat,lng:l.lng,days:0,spent:0,visits:[],items:[]}; t.days+=l.days; t.spent+=l.spent; t.visits.push([l.from,l.last?null:l.to]); if(l.est) t.est=true; t.items.push(...l.items); m.set(l.name,t); }
+  for(const l of legs){ const t=m.get(l.name)||{name:l.name,lat:l.lat,lng:l.lng,days:0,spent:0,visits:[],items:[]}; t.days+=l.days; t.spent+=l.spent; t.visits.push([l.from,l.left||(l.last?null:l.to)]); if(l.est) t.est=true; t.items.push(...l.items); m.set(l.name,t); }
   return [...m.values()]; }
+let stopBusy=false;
+async function recordStop(lat,lng){
+  if(!loaded||!canWrite||stopBusy||navigator.onLine===false) return; const t=nearTown(lat,lng); if(!t) return;
+  const all=tripStops(), last=all[all.length-1]; if(last&&last.n===t.name&&!last.e) return;   /* still in the same town */
+  const st=tripStart(); if(st&&todayStr()<st) return;   /* not before the flight */
+  stopBusy=true; let added=false;
+  /* through updateTrips: it also builds the trip list for older spaces that never had one */
+  try{ await updateTrips(list=>{ const T=list.find(x=>x.id===curTrip); if(!T) return;
+      const cur=(T.stops||[]).slice().sort((a,b)=>a.d.localeCompare(b.d)||(a.at||0)-(b.at||0)); const l=cur[cur.length-1]; if(l&&l.n===t.name&&!l.e) return;
+      if(l&&!l.e) l.e=todayStr();   /* the last place was left today */
+      T.stops=[...cur,{n:t.name,lat:t.lat,lng:t.lng,d:todayStr(),e:null,at:Date.now(),by:me||null}]; added=true; });
+    if(!added) return;
+    toast("📍 יעד חדש במסע: "+t.name); renderJourneys(); }catch(e){} finally{ stopBusy=false; }
+}
+function moveOldStops(){ if(!STOPS.length||!canWrite) return; const T=tripById(curTrip)||{}; const have=T.stops||[];
+  const add=STOPS.filter(x=>!have.some(y=>y.n===x.name&&y.d===x.date)); if(!add.length) return;
+  patchTrip(curTrip,{stops:[...have,...add.map(x=>({n:x.name,lat:x.lat,lng:x.lng,d:x.date,e:null,at:x.createdAt||0,by:me||null}))].sort((a,b)=>a.d.localeCompare(b.d))}).catch(()=>{}); }
 /* ================= the journey as a globe =================
    A real globe (land from world.js, loaded only when the graphs screen opens), turned with a finger,
    pinched to zoom. It flies in from the whole earth to where you have been; the route is drawn between the stops. */
-let GLOBE=null, worldP=null;
+let GLOBE=null, GLOBE_ME=null, worldP=null, RINGS=null;
 function loadWorld(){ if(window.WORLD) return Promise.resolve(); if(worldP) return worldP;
   worldP=new Promise(res=>{ const s=document.createElement("script"); s.src="world.js?v=1"; s.onload=res; s.onerror=res; document.head.appendChild(s); }); return worldP; }
 function worldRings(){
-  if(GLOBE&&GLOBE.rings) return GLOBE.rings; const Q=window.WORLD_Q||20, out=[];
+  if(RINGS) return RINGS; const Q=window.WORLD_Q||20, out=[];
   for(const part of String(window.WORLD||"").split(";")){ const n=part.split(",").map(Number); let x=0,y=0; const lon=new Float32Array(n.length/2), lat=new Float32Array(n.length/2);
     let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
     for(let i=0;i<n.length;i+=2){ x+=n[i]; y+=n[i+1]; const a=x/Q,b=y/Q; lon[i/2]=a; lat[i/2]=b; if(a<mnx)mnx=a; if(a>mxx)mxx=a; if(b<mny)mny=b; if(b>mxy)mxy=b; }
     const cl=(mnx+mxx)/2, cb=(mny+mxy)/2; out.push({lon,lat,c:[cl,cb],r:Math.max(mxx-mnx,mxy-mny)*0.75}); }
-  return out;
+  if(out.length>1) RINGS=out; return out;
 }
 const D2R=Math.PI/180;
 function gproj(g,lon,lat){ const l=(lon-g.lon)*D2R, p=lat*D2R, p0=g.lat*D2R, cp=Math.cos(p);
@@ -1622,20 +1639,18 @@ function gc(a,b,t){ const f1=a.lat*D2R,l1=a.lng*D2R,f2=b.lat*D2R,l2=b.lng*D2R; c
 function globeFit(legs,W,H){
   if(!legs.length){ const h=hereNow&&hereNow(); return {lon:h?h.lng:100.5,lat:h?h.lat:13.7,R:Math.min(W,H)*.42}; }
   const mean=legs.reduce((a,l)=>[a[0]+l.lng,a[1]+l.lat],[0,0]).map(v=>v/legs.length);
-  const span=Math.max(1.2,...legs.map(l=>angDist(mean[0],mean[1],l.lng,l.lat)))*1.7;   /* room around the towns for their labels */
+  /* room around the towns for their labels; never closer than ~7 degrees, so one town still shows its country and coast */
+  const span=Math.max(7,Math.max(1.2,...legs.map(l=>angDist(mean[0],mean[1],l.lng,l.lat)))*1.7);
   return {lon:mean[0],lat:mean[1],R:Math.min(9000,Math.max(Math.min(W,H)*.42,Math.min(W,H)*.36/Math.sin(Math.min(80,span)*D2R)))};
 }
-function drawGlobe(){
-  const g=GLOBE; if(!g||!g.cv.isConnected) return; const c=g.ctx, W=g.W, H=g.H; c.clearRect(0,0,W,H);
-  const hot="#FF4D8D", gold="#FFC93C";
-  /* deep night sky with a few stars, fixed so they do not move with the globe */
+function drawGlobe(g){
+  g=g||GLOBE; if(!g||!g.cv.isConnected) return; const c=g.ctx, W=g.W, H=g.H; c.clearRect(0,0,W,H);
+  const hot=g.mode==="mine"?"#14C9A5":"#FF4D8D", gold="#FFC93C";
   const bg=c.createLinearGradient(0,0,0,H); bg.addColorStop(0,"#120B33"); bg.addColorStop(1,"#241455"); c.fillStyle=bg; c.fillRect(0,0,W,H);
   if(!g.stars){ g.stars=[]; for(let i=0;i<70;i++) g.stars.push([Math.random()*W,Math.random()*H,Math.random()*1.3+.2,Math.random()*.6+.2]); }
   for(const [x,y,r,a] of g.stars){ c.globalAlpha=a; c.fillStyle="#fff"; c.beginPath(); c.arc(x,y,r,0,7); c.fill(); } c.globalAlpha=1;
-  /* atmosphere */
   const glow=c.createRadialGradient(g.cx,g.cy,g.R*.95,g.cx,g.cy,g.R*1.16); glow.addColorStop(0,"rgba(120,160,255,.55)"); glow.addColorStop(1,"rgba(120,160,255,0)");
   c.fillStyle=glow; c.beginPath(); c.arc(g.cx,g.cy,Math.min(g.R*1.16,Math.hypot(W,H)),0,7); c.fill();
-  /* ocean */
   const sea=c.createRadialGradient(g.cx-g.R*.35,g.cy-g.R*.45,g.R*.05,g.cx,g.cy,g.R); sea.addColorStop(0,"#3E7BE0"); sea.addColorStop(.6,"#1F4FB8"); sea.addColorStop(1,"#122E7A");
   c.save(); c.beginPath(); c.arc(g.cx,g.cy,g.R,0,7); c.fillStyle=sea; c.fill(); c.clip();
   c.strokeStyle="rgba(255,255,255,.10)"; c.lineWidth=1; const step=g.R>2500?2:g.R>900?5:15;
@@ -1650,16 +1665,15 @@ function drawGlobe(){
     if(!any) continue; c.closePath(); c.fill(); c.stroke(); }
   const sh=c.createRadialGradient(g.cx-g.R*.45,g.cy-g.R*.5,g.R*.05,g.cx,g.cy,g.R*1.02); sh.addColorStop(0,"rgba(255,255,255,.22)"); sh.addColorStop(.65,"rgba(255,255,255,0)"); sh.addColorStop(1,"rgba(5,0,40,.45)");
   c.fillStyle=sh; c.fillRect(0,0,W,H); c.restore();
-  /* the route, as glowing arches */
   const L=g.legs; c.lineCap="round"; c.lineJoin="round";
   if(L.length>1){ let drawn=g.draw*(L.length-1);
     for(let i=1;i<L.length&&drawn>0;i++,drawn--){ const a=L[i-1], b=L[i], part=Math.min(1,drawn), pts=[]; for(let k=0;k<=24;k++) pts.push(gc({lat:a.lat,lng:a.lng},{lat:b.lat,lng:b.lng},k/24));
       const A0=gproj(g,pts[0][0],pts[0][1]), B0=gproj(g,pts[24][0],pts[24][1]), hmax=Math.min(30,Math.hypot(A0[0]-B0[0],A0[1]-B0[1])*.2), m=Math.max(1,Math.round(part*24));
       c.beginPath(); for(let k=0;k<=m;k++){ const [x,y]=gproj(g,pts[k][0],pts[k][1]); const lift=Math.sin(k/24*Math.PI)*hmax; k?c.lineTo(x,y-lift):c.moveTo(x,y-lift); }
-      c.strokeStyle="rgba(255,77,141,.35)"; c.lineWidth=9; c.stroke(); c.strokeStyle=hot; c.lineWidth=3; c.stroke(); } }
-  /* towns: a bubble that grows with what you spent there, its name and the amount */
+      c.strokeStyle=g.mode==="mine"?"rgba(20,201,165,.35)":"rgba(255,77,141,.35)"; c.lineWidth=9; c.stroke(); c.strokeStyle=hot; c.lineWidth=3; c.stroke(); } }
   const T=g.towns, maxS=Math.max(1,...T.map(t=>t.spent)); g.hits=[];
-  const P2=[]; for(const t of T){ const [x,y,v]=gproj(g,t.lng,t.lat); if(!v) continue; P2.push({t,x,y,r:7+Math.sqrt(t.spent/maxS)*9,now:t.name===(L[L.length-1]||{}).name}); }
+  const nowName=(L.find(l=>l.last)||{}).name;
+  const P2=[]; for(const t of T){ const [x,y,v]=gproj(g,t.lng,t.lat); if(!v) continue; P2.push({t,x,y,r:7+Math.sqrt(t.spent/maxS)*9,now:t.name===nowName}); }
   if(g.draw<1) P2.forEach(p=>{ const i=L.findIndex(l=>l.name===p.t.name); if(i>0&&g.draw<i/(L.length-1)-0.001) p.hide=true; });
   for(const p of P2){ if(p.hide) continue; const pulse=c.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*2.2); pulse.addColorStop(0,p.now?"rgba(255,201,60,.55)":"rgba(255,77,141,.45)"); pulse.addColorStop(1,"rgba(255,77,141,0)");
     c.fillStyle=pulse; c.beginPath(); c.arc(p.x,p.y,p.r*2.2,0,7); c.fill();
@@ -1672,13 +1686,19 @@ function drawGlobe(){
       if(b.x0<2||b.x1>W-2||b.y0<44||b.y1>H-2||taken.some(o=>!(b.x1<o.x0||b.x0>o.x1||b.y1<o.y0||b.y0>o.y1))) continue; taken.push(b);
       c.fillStyle="rgba(255,255,255,.95)"; roundRect(c,b.x0,b.y0,w,32,11); c.fill();
       c.fillStyle="#1E1640"; c.font="800 12.5px Assistant, system-ui, sans-serif"; c.fillText(t.name,lx,ly+14);
-      c.fillStyle=hot; c.font="800 11.5px Assistant, system-ui, sans-serif"; c.fillText(amt,lx,ly+27);
+      c.fillStyle=g.mode==="mine"?"#0E9F7E":hot; c.font="800 11.5px Assistant, system-ui, sans-serif"; c.fillText(amt,lx,ly+27);
       g.hits.push({x:lx,y:ly+16,r:Math.max(24,w/2),t}); break; } }
 }
-function renderJourney(){
-  const box=$("jMap"); if(!box) return; const legs=journeyLegs(), towns=journeyTowns(legs), note=$("jNote");
+/* both globes: the couple's (graphs) and mine (personal) */
+function renderJourneys(){ if(view==="stats") renderJourney("shared"); if(view==="personal") renderJourney("mine"); }
+function renderJourney(mode){
+  mode=mode||"shared"; const mine=mode==="mine";
+  const box=$(mine?"jMapMe":"jMap"); if(!box||!box.offsetParent&&box.closest("[hidden]")) { if(!mine) renderStopsEditor(); return; }
+  const note=$(mine?"jNoteMe":"jNote");
+  if(mine&&!(acct&&acctFor===me)){ note.textContent="פותחים את האישי כדי לראות כמה הוצאת בכל יעד"; box.innerHTML=""; return; }
+  const legs=journeyLegs(mode), towns=journeyTowns(legs);
   const total=legs.reduce((a,l)=>a+l.spent,0), days=legs.reduce((a,l)=>a+l.days,0);
-  note.textContent= !legs.length ? "עוד אין עצירות · \"📍 איפה אנחנו?\" או \"✏️ עריכה\"" : legs[0].est ? "העצירה הראשונה נספרת מתחילת הטיול · ✏️ לתקן תאריכים" : "נגיעה בעיר לפרטים · מסובבים באצבע";
+  note.textContent= !legs.length ? (mine?"היעדים משותפים · מוסיפים אותם במסך הגרפים":"עוד אין יעדים · \"📍 איפה אנחנו?\" או \"✏️ היעדים שלנו\"") : legs.some(l=>l.est) ? "היעד הראשון נספר מתחילת הטיול · ✏️ לתקן תאריכים" : mine ? "שלך: אישי + החלק שלך במשותף · נגיעה ביעד לפרטים" : "נגיעה ביעד לפרטים · מסובבים באצבע";
   loadWorld().then(()=>{
     let cv=box.querySelector("canvas.globe"), head=box.querySelector(".gl-head");
     const W=box.clientWidth||340, H=Math.round(Math.min(440,Math.max(320,W*1.02))), dpr=Math.min(3,window.devicePixelRatio||1);
@@ -1686,93 +1706,117 @@ function renderJourney(){
       head=document.createElement("div"); head.className="gl-head"; box.appendChild(head); }
     if(!box.querySelector(".gl-zoom")){ const z=document.createElement("div"); z.className="gl-zoom";
       for(const [t,l,f] of [["＋","קירוב",1.6],["－","התרחקות",1/1.6],["🌍","כל כדור הארץ",0]]){ const b=document.createElement("button"); b.type="button"; b.textContent=t; b.setAttribute("aria-label",l);
-        b.onclick=()=>{ const g=GLOBE; if(!g) return; if(!f){ const out=g.R>Math.min(g.W,g.H)*.6; flyGlobe(out?{lon:g.lon,lat:g.lat*.3,R:Math.min(g.W,g.H)*.4}:g.fit); } else flyGlobe({lon:g.lon,lat:g.lat,R:Math.max(Math.min(g.W,g.H)*.3,Math.min(12000,g.R*f))}); }; z.appendChild(b); }
+        b.onclick=()=>{ const g=cv.__g; if(!g) return; if(!f){ const out=g.R>Math.min(g.W,g.H)*.6; flyGlobe(out?{lon:g.lon,lat:g.lat*.3,R:Math.min(g.W,g.H)*.4}:g.fit,g); } else flyGlobe({lon:g.lon,lat:g.lat,R:Math.max(Math.min(g.W,g.H)*.3,Math.min(12000,g.R*f))},g); }; z.appendChild(b); }
       box.appendChild(z); }
-    head.innerHTML=""; if(legs.length){ const b=document.createElement("b"); b.className="num"; b.textContent=fmt(total,showCur); const sm=document.createElement("small"); sm.textContent=(days===1?"יום אחד":days+" ימים")+" · "+(towns.length===1?"עיר אחת":towns.length+" ערים"); head.append(b,sm); }
-    cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+"px"; cv.style.height=H+"px"; cv.setAttribute("aria-label","גלובוס המסע: "+(towns.map(t=>t.name+" "+fmt(t.spent,showCur)).join(", ")||"עוד אין עצירות"));
+    head.innerHTML=""; if(legs.length){ const b=document.createElement("b"); b.className="num"; b.textContent=fmt(total,showCur); const sm=document.createElement("small"); sm.textContent=(mine?"שלך · ":"")+(days===1?"יום אחד":days+" ימים")+" · "+(towns.length===1?"יעד אחד":towns.length+" יעדים")+" · "+fmt(total/Math.max(1,days),showCur)+" ליום"; head.append(b,sm); }
+    cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+"px"; cv.style.height=H+"px"; cv.setAttribute("aria-label",(mine?"הגלובוס שלי: ":"גלובוס המסע: ")+(towns.map(t=>t.name+" "+fmt(t.spent,showCur)).join(", ")||"עוד אין יעדים"));
     const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
-    const fit=globeFit(legs,W,H), prev=GLOBE&&GLOBE.cv===cv?GLOBE:null;
-    GLOBE={cv,ctx,W,H,cx:W/2,cy:H/2+12,legs,towns,rings:prev?prev.rings:null,lon:prev?prev.lon:fit.lon-70,lat:prev?prev.lat:fit.lat*0.3,R:prev?prev.R:Math.min(W,H)*.40,draw:prev?prev.draw:0,fit,flown:prev?prev.flown:false};
-    GLOBE.rings=worldRings(); drawGlobe(); globeInput(cv);
-    if(!GLOBE.flown) globeWhenSeen(box);
+    const fit=globeFit(legs,W,H), prev=cv.__g;
+    const g={cv,ctx,W,H,cx:W/2,cy:H/2+12,legs,towns,mode,rings:worldRings(),lon:prev?prev.lon:fit.lon-70,lat:prev?prev.lat:fit.lat*0.3,R:prev?prev.R:Math.min(W,H)*.40,draw:prev?prev.draw:0,fit,flown:prev?prev.flown:false,stars:prev?prev.stars:null};
+    cv.__g=g; if(mine) GLOBE_ME=g; else GLOBE=g;
+    drawGlobe(g); globeInput(cv);
+    if(!g.flown) globeWhenSeen(box,g);
   });
-  renderStopsEditor();
+  if(!mine) renderStopsEditor();
 }
-/* a card for one town: total, days, per day, the visits, what the money went on */
-function townCard(t){
-  const box=$("jMap"); let o=box.querySelector(".gl-card"); if(o) o.remove(); if(!t) return;
+/* a card for one place: total, days, per day, the visits, what the money went on */
+function townCard(t,g){
+  g=g||GLOBE; const box=g&&g.cv.parentNode; if(!box) return; let o=box.querySelector(".gl-card"); if(o) o.remove(); if(!t) return;
   o=document.createElement("div"); o.className="gl-card"; o.setAttribute("role","dialog"); o.setAttribute("aria-label",t.name);
   const sd=s=>{ const [y,m,d]=s.split("-").map(Number); return d+"."+m; };
   const cats={}; for(const it of t.items){ const k=catKey(it); cats[k]=(cats[k]||0)+conv(+it.amount||0,it.cur,showCur); }
   const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  const rows=[["💰","הוצאנו",fmt(t.spent,showCur)],["📅","ימים",String(t.days)],["📊","ממוצע ליום",fmt(t.spent/Math.max(1,t.days),showCur)],["🧾","הוצאות",String(t.items.filter(i=>i.kind!=="transfer").length)]];
-  const h=document.createElement("div"); h.className="glc-h"; const n=document.createElement("b"); n.textContent="📍 "+t.name; const x=document.createElement("button"); x.type="button"; x.className="glc-x"; x.textContent="✕"; x.setAttribute("aria-label","סגירה"); x.onclick=()=>townCard(null); h.append(n,x); o.appendChild(h);
-  const g=document.createElement("div"); g.className="glc-g"; for(const [ic,l,v] of rows){ const d=document.createElement("div"); const s1=document.createElement("small"); s1.textContent=ic+" "+l; const s2=document.createElement("b"); s2.className="num"; s2.textContent=v; d.append(s2,s1); g.appendChild(d); } o.appendChild(g);
-  const vs=document.createElement("div"); vs.className="glc-v"; vs.textContent=(t.visits.length>1?"🔁 "+t.visits.length+" ביקורים: ":"🗓️ ")+t.visits.map(([a,b])=>sd(a)+(b?"–"+sd(b):" ← עכשיו")).join(" · ")+(t.est?" · ההגעה משוערת (מתחילת הטיול), אפשר לתקן ב\"✏️ עריכת המסע\"":""); o.appendChild(vs);
+  const rows=[["💰",g.mode==="mine"?"הוצאת":"הוצאנו",fmt(t.spent,showCur)],["📅","ימים",String(t.days)],["📊","ממוצע ליום",fmt(t.spent/Math.max(1,t.days),showCur)],["🧾","הוצאות",String(t.items.filter(i=>i.kind!=="transfer").length)]];
+  const h=document.createElement("div"); h.className="glc-h"; const n=document.createElement("b"); n.textContent="📍 "+t.name; const x=document.createElement("button"); x.type="button"; x.className="glc-x"; x.textContent="✕"; x.setAttribute("aria-label","סגירה"); x.onclick=()=>townCard(null,g); h.append(n,x); o.appendChild(h);
+  const gr=document.createElement("div"); gr.className="glc-g"; for(const [ic,l,v] of rows){ const d=document.createElement("div"); const s1=document.createElement("small"); s1.textContent=ic+" "+l; const s2=document.createElement("b"); s2.className="num"; s2.textContent=v; d.append(s2,s1); gr.appendChild(d); } o.appendChild(gr);
+  const vs=document.createElement("div"); vs.className="glc-v"; vs.textContent=(t.visits.length>1?"🔁 "+t.visits.length+" ביקורים: ":"🗓️ ")+t.visits.map(([a,b])=>sd(a)+(b?"–"+sd(b):" ← עכשיו")).join(" · ")+(t.est?" · ההגעה משוערת (מתחילת הטיול)":""); o.appendChild(vs);
   if(top.length){ const c=document.createElement("div"); c.className="glc-c"; c.textContent=top.map(([k,v])=>catName(k).split(" ")[0]+" "+Math.round(v/Math.max(1,t.spent)*100)+"%").join("  "); o.appendChild(c); }
   box.appendChild(o); buzz(8); sound("tick");
   if(!calm()) o.animate([{opacity:0,transform:"translateY(14px) scale(.96)"},{opacity:1,transform:"none"}],{duration:320,easing:"cubic-bezier(.2,.9,.3,1.2)"});
 }
-/* the journey by hand: add a past stop, fix a town or a date, remove a mistake */
+/* the places by hand: town, arrival, departure (or "still here"), and what that covers in the expenses */
 let stopsEdit=false;
 function renderStopsEditor(){
   const card=$("journey"); if(!card) return; let bar=$("jBar"), ed=$("jEdit");
   if(!bar){ bar=document.createElement("div"); bar.id="jBar"; bar.className="j-bar"; card.appendChild(bar); ed=document.createElement("div"); ed.id="jEdit"; ed.className="j-edit"; card.appendChild(ed); }
   bar.innerHTML="";
   const here=document.createElement("button"); here.type="button"; here.className="btn small"; here.textContent="📍 איפה אנחנו?"; here.onclick=()=>{ buzz(6); askHere(true); };
-  const edb=document.createElement("button"); edb.type="button"; edb.className="btn small"; edb.textContent=stopsEdit?"סגירת העריכה":"✏️ עריכת המסע"; edb.onclick=()=>{ stopsEdit=!stopsEdit; buzz(5); renderStopsEditor(); };
+  const edb=document.createElement("button"); edb.type="button"; edb.className="btn small"; edb.textContent=stopsEdit?"סגירה":"✏️ היעדים שלנו"; edb.onclick=()=>{ stopsEdit=!stopsEdit; buzz(5); renderStopsEditor(); };
   bar.append(here); if(canWrite) bar.append(edb);
   ed.hidden=!stopsEdit; if(!stopsEdit){ ed.innerHTML=""; return; }
-  const rows=tripStops().map(x=>({n:x.n,d:x.d,lat:x.lat,lng:x.lng,at:x.at||0,by:x.by||null})); ed.innerHTML="";
-  const hint=document.createElement("div"); hint.className="hint"; hint.textContent="כל שורה היא יום ההגעה לעיר. נשארים בה עד העצירה הבאה."; ed.appendChild(hint);
+  ed.innerHTML="";
+  const st=tripStart()||todayStr(), today=todayStr();
+  const rows=tripStops().map(x=>({n:x.n,lat:x.lat,lng:x.lng,d:x.d0||x.d,e:x.e||"",at:x.at||0,by:x.by||null}));
+  /* first time with an automatic first stop: suggest the start of the trip as its arrival */
+  if(rows.length&&rows[0].d>st&&!tripStops()[0].m) rows[0].d=st;
   const names=[...TOWNS.map(t=>t[0])].sort((a,b)=>a.localeCompare(b,"he"));
+  const ex=S.items.filter(it=>it.kind!=="transfer");
+  const sd=s=>{ const [y,m,d]=s.split("-").map(Number); return d+"."+m; };
   const list=document.createElement("div"); list.className="j-rows"; ed.appendChild(list);
-  const draw=()=>{ list.innerHTML=""; rows.forEach((r,i)=>{ const row=document.createElement("div"); row.className="j-row";
-      const d=document.createElement("input"); d.type="date"; d.value=r.d; d.setAttribute("aria-label","תאריך הגעה"); d.onchange=()=>{ r.d=d.value; };
-      const sel=document.createElement("select"); sel.setAttribute("aria-label","עיר"); for(const n of names){ const o=document.createElement("option"); o.value=n; o.textContent=n; if(n===r.n) o.selected=true; sel.appendChild(o); }
+  const draw=()=>{ list.innerHTML="";
+    /* the same day-by-day split the globe uses, on the rows as they are now */
+    const ord=rows.slice().sort((a,b)=>a.d.localeCompare(b.d)||a.at-b.at), own0=stayDays(ord.map(r=>({...r,e:r.e||null,m:1}))), own=new Map([...own0].map(([d,k])=>[d,ord[k]]));
+    rows.forEach((r,i)=>{ const card=document.createElement("div"); card.className="j-stay";
+      const top=document.createElement("div"); top.className="j-top";
+      const num=document.createElement("span"); num.className="j-num"; num.textContent=String(i+1);
+      const sel=document.createElement("select"); sel.setAttribute("aria-label","יעד"); for(const n of names){ const o=document.createElement("option"); o.value=n; o.textContent=n; if(n===r.n) o.selected=true; sel.appendChild(o); }
       if(!names.includes(r.n)){ const o=document.createElement("option"); o.value=r.n; o.textContent=r.n; o.selected=true; sel.prepend(o); }
       sel.onchange=()=>{ r.n=sel.value; const t=TOWNS.find(x=>x[0]===sel.value); if(t){ r.lat=t[1]; r.lng=t[2]; } };
-      const x=document.createElement("button"); x.type="button"; x.className="j-x"; x.textContent="✕"; x.setAttribute("aria-label","הסרת עצירה"); x.onclick=()=>{ rows.splice(i,1); draw(); };
-      row.append(d,sel,x); list.appendChild(row); }); };
+      const x=document.createElement("button"); x.type="button"; x.className="j-x"; x.textContent="✕"; x.setAttribute("aria-label","הסרת יעד"); x.onclick=()=>{ rows.splice(i,1); draw(); };
+      top.append(num,sel,x); card.appendChild(top);
+      const dates=document.createElement("div"); dates.className="j-dates";
+      const lab=(t,inp)=>{ const l=document.createElement("label"); l.className="j-lab"; const s=document.createElement("span"); s.textContent=t; l.append(s,inp); return l; };
+      const a=document.createElement("input"); a.type="date"; a.value=r.d; a.min=st; a.max=today; a.onchange=()=>{ r.d=a.value; draw(); };
+      dates.appendChild(lab("🛬 הגעה",a));
+      if(r.e){ const b=document.createElement("input"); b.type="date"; b.value=r.e; b.min=r.d; b.max=today; b.onchange=()=>{ r.e=b.value; draw(); };
+        const l=lab("🛫 עזיבה",b); const still=document.createElement("button"); still.type="button"; still.className="j-still"; still.textContent="עוד כאן"; still.onclick=()=>{ r.e=""; draw(); }; l.appendChild(still); dates.appendChild(l); }
+      else { const l=document.createElement("div"); l.className="j-lab"; const s=document.createElement("span"); s.textContent="🛫 עזיבה"; const b=document.createElement("button"); b.type="button"; b.className="j-here"; b.textContent="✓ עוד לא עזבנו · לחיצה כשעוזבים";
+        b.onclick=()=>{ const nx=rows[i+1]; r.e=nx?nx.d:today; draw(); }; l.append(s,b); dates.appendChild(l); }
+      card.appendChild(dates);
+      /* what these dates cover in the expenses (counted exactly as the globe will), so a wrong date shows at once */
+      const mine=[...own].filter(([,k])=>k===r).map(([d])=>d).sort(), set=new Set(mine), its=ex.filter(it=>set.has(it.date)), span=mine.length, sum=its.reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0);
+      const info=document.createElement("div"); info.className="j-info"; info.textContent= r.e&&r.e<r.d ? "⚠️ תאריך העזיבה לפני ההגעה" : span>0 ? "לפי ההוצאות: "+(span===1?"יום אחד":span+" ימים")+" ("+sd(mine[0])+(span>1?"–"+sd(mine[span-1]):"")+") · "+its.length+" הוצאות · "+fmt(sum,showCur) : "אין ימים ליעד הזה (יעד אחר מכסה את התאריכים)";
+      card.appendChild(info);
+      list.appendChild(card); }); };
   draw();
-  const add=document.createElement("button"); add.type="button"; add.className="btn small"; add.textContent="➕ הוספת עצירה";
-  add.onclick=()=>{ const last=rows[rows.length-1]; const t=TOWNS.find(x=>x[0]==="בנגקוק"); rows.push({n:last?last.n:t[0],lat:last?last.lat:t[1],lng:last?last.lng:t[2],d:todayStr(),at:Date.now(),by:me||null}); draw(); };
+  const add=document.createElement("button"); add.type="button"; add.className="btn small"; add.textContent="➕ יעד נוסף";
+  add.onclick=()=>{ const last=rows[rows.length-1];
+    /* arrival: the day the last place was left, or the next day with expenses after its arrival (dates can be changed) */
+    let d= !last ? st : last.e ? last.e : (ex.map(i=>i.date).filter(x=>x>last.d).sort()[0]||today); if(d>today) d=today;
+    const t=TOWNS.find(x=>x[0]==="בנגקוק"); rows.push({n:t[0],lat:t[1],lng:t[2],d,e:"",at:Date.now(),by:me||null}); draw(); setTimeout(()=>{ const s=list.querySelectorAll("select"); s[s.length-1]&&s[s.length-1].focus(); },60); };
   const save=document.createElement("button"); save.type="button"; save.className="btn primary small"; save.textContent="שמירה";
-  save.onclick=async()=>{ const clean=rows.filter(r=>r.n&&/^\d{4}-\d{2}-\d{2}$/.test(r.d)).map(r=>({n:r.n,lat:r.lat,lng:r.lng,d:r.d,at:r.at||Date.now(),by:r.by||me||null})).sort((a,b)=>a.d.localeCompare(b.d)||a.at-b.at);
-    const ok=await patchTrip(curTrip,{stops:clean}); if(ok){ STOPS=[]; stopsEdit=false; const T=tripById(curTrip); if(T) T.stops=clean; if(GLOBE) GLOBE.flown=false, GLOBE=null; const b=$("jMap"); if(b) b.innerHTML=""; renderJourney(); toast("🧭 המסע עודכן"); } };
+  save.onclick=async()=>{ const clean=rows.filter(r=>r.n&&/^\d{4}-\d{2}-\d{2}$/.test(r.d)).map(r=>({n:r.n,lat:r.lat,lng:r.lng,d:r.d,e:/^\d{4}-\d{2}-\d{2}$/.test(r.e)?r.e:null,m:1,at:r.at||Date.now(),by:r.by||me||null})).sort((a,b)=>a.d.localeCompare(b.d)||a.at-b.at);
+    const ok=await patchTrip(curTrip,{stops:clean}); if(ok){ STOPS=[]; stopsEdit=false; const T=tripById(curTrip); if(T) T.stops=clean; for(const id of ["jMap","jMapMe"]){ const b=$(id); if(b) b.innerHTML=""; } GLOBE=null; GLOBE_ME=null; renderJourneys(); toast("🧭 היעדים עודכנו"); } };
   const f=document.createElement("div"); f.className="actions"; f.append(add,save); ed.appendChild(f);
 }
-
 /* when it first comes into view: from the whole earth to where you have been, then the route draws itself */
-let gIO=null;
-function globeWhenSeen(box){ if(gIO) gIO.disconnect(); if(!("IntersectionObserver" in window)||calm()){ const g=GLOBE; Object.assign(g,{lon:g.fit.lon,lat:g.fit.lat,R:g.fit.R,draw:1,flown:true}); drawGlobe(); return; }
-  gIO=new IntersectionObserver(es=>{ if(!es.some(e=>e.isIntersecting)) return; gIO.disconnect(); const g=GLOBE; if(!g) return; g.flown=true;
+function globeWhenSeen(box,g){ if(box.__io) box.__io.disconnect(); if(!("IntersectionObserver" in window)||calm()){ Object.assign(g,{lon:g.fit.lon,lat:g.fit.lat,R:g.fit.R,draw:1,flown:true}); drawGlobe(g); return; }
+  const io=new IntersectionObserver(es=>{ if(!es.some(e=>e.isIntersecting)) return; io.disconnect(); g.flown=true;
     const from={lon:g.lon,lat:g.lat,R:g.R}, to=g.fit, t0=performance.now(), T1=1900, T2=1300;
     const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
-    const step=n=>{ if(!GLOBE||GLOBE!==g) return; const t=Math.min(1,(n-t0)/T1), e=ease(t);
+    const step=n=>{ if(g.cv.__g!==g) return; const t=Math.min(1,(n-t0)/T1), e=ease(t);
       g.lon=from.lon+(to.lon-from.lon)*e; g.lat=from.lat+(to.lat-from.lat)*e; g.R=Math.exp(Math.log(from.R)+(Math.log(to.R)-Math.log(from.R))*Math.min(1,e*1.15));
-      g.draw=Math.max(0,Math.min(1,(n-t0-T1*0.75)/T2)); drawGlobe(); if(n-t0<T1+T2) requestAnimationFrame(step); else { g.draw=1; drawGlobe(); } };
-    requestAnimationFrame(step); },{threshold:.4}); gIO.observe(box); }
-/* one finger turns the globe, two fingers zoom, a double tap flies out to the whole earth and back */
+      g.draw=Math.max(0,Math.min(1,(n-t0-T1*0.75)/T2)); drawGlobe(g); if(n-t0<T1+T2) requestAnimationFrame(step); else { g.draw=1; drawGlobe(g); } };
+    requestAnimationFrame(step); },{threshold:.4}); box.__io=io; io.observe(box); }
+/* sideways turns the globe (up/down still scrolls the page), a double tap flies out and back, a tap on a place opens its card */
 function globeInput(cv){
-  if(cv.__wired) return; cv.__wired=true; const pts=new Map(); let lastTap=0, d0=0, R0=0;
-  cv.style.touchAction="pan-y";   /* up/down still scrolls the page; sideways turns the globe */
-  cv.addEventListener("pointerdown",e=>{ cv.setPointerCapture(e.pointerId); pts.set(e.pointerId,[e.clientX,e.clientY]); const g=GLOBE; if(!g) return; g.drag=true;
+  if(cv.__wired) return; cv.__wired=true; const pts=new Map(); let lastTap=0, d0=0, R0=0, tapAt=null;
+  cv.style.touchAction="pan-y";
+  cv.addEventListener("pointerdown",e=>{ cv.setPointerCapture(e.pointerId); pts.set(e.pointerId,[e.clientX,e.clientY]); tapAt=[e.clientX,e.clientY,Date.now()]; const g=cv.__g; if(!g) return; g.drag=true;
     if(pts.size===2){ const [a,b]=[...pts.values()]; d0=Math.hypot(a[0]-b[0],a[1]-b[1]); R0=g.R; }
-    const now=Date.now(); if(pts.size===1&&now-lastTap<300){ const out=g.R>Math.min(g.W,g.H)*.6; const to=out?{lon:g.lon,lat:g.lat*.3,R:Math.min(g.W,g.H)*.42}:g.fit; flyGlobe(to); } lastTap=now; });
-  cv.addEventListener("pointermove",e=>{ const p=pts.get(e.pointerId); if(!p) return; const g=GLOBE; if(!g) return;
-    if(pts.size===1){ const k=57.3/g.R; g.lon-=(e.clientX-p[0])*k*(document.dir==="rtl"?1:1); g.lat=Math.max(-80,Math.min(80,g.lat+(e.clientY-p[1])*k)); }
+    const now=Date.now(); if(pts.size===1&&now-lastTap<300){ const out=g.R>Math.min(g.W,g.H)*.6; flyGlobe(out?{lon:g.lon,lat:g.lat*.3,R:Math.min(g.W,g.H)*.42}:g.fit,g); } lastTap=now; });
+  cv.addEventListener("pointermove",e=>{ const p=pts.get(e.pointerId); if(!p) return; const g=cv.__g; if(!g) return;
+    if(pts.size===1){ const k=57.3/g.R; g.lon-=(e.clientX-p[0])*k; g.lat=Math.max(-80,Math.min(80,g.lat+(e.clientY-p[1])*k)); }
     pts.set(e.pointerId,[e.clientX,e.clientY]);
     if(pts.size===2){ const [a,b]=[...pts.values()]; const d=Math.hypot(a[0]-b[0],a[1]-b[1]); if(d0) g.R=Math.max(Math.min(g.W,g.H)*.3,Math.min(12000,R0*d/d0)); }
-    if(!g.raf) g.raf=requestAnimationFrame(()=>{ g.raf=0; drawGlobe(); }); });
-  const up=e=>{ pts.delete(e.pointerId); if(pts.size<2) d0=0; if(!pts.size&&GLOBE) GLOBE.drag=false; };
-  let tapAt=null; cv.addEventListener("pointerdown",e=>{ tapAt=[e.clientX,e.clientY,Date.now()]; });
-  cv.addEventListener("pointerup",e=>{ const g=GLOBE; if(g&&tapAt&&Math.hypot(e.clientX-tapAt[0],e.clientY-tapAt[1])<8&&Date.now()-tapAt[2]<500){ const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
-      const h=(g.hits||[]).map(h=>[h,Math.hypot(h.x-x,h.y-y)]).filter(([h,d])=>d<=h.r).sort((a,b)=>a[1]-b[1])[0]; townCard(h?h[0].t:null); } tapAt=null; });
+    if(!g.raf) g.raf=requestAnimationFrame(()=>{ g.raf=0; drawGlobe(g); }); });
+  cv.addEventListener("pointerup",e=>{ const g=cv.__g; if(g&&tapAt&&Math.hypot(e.clientX-tapAt[0],e.clientY-tapAt[1])<8&&Date.now()-tapAt[2]<500){ const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+      const h=(g.hits||[]).map(h=>[h,Math.hypot(h.x-x,h.y-y)]).filter(([h,d])=>d<=h.r).sort((a,b)=>a[1]-b[1])[0]; townCard(h?h[0].t:null,g); } tapAt=null; });
+  const up=e=>{ pts.delete(e.pointerId); if(pts.size<2) d0=0; if(!pts.size&&cv.__g) cv.__g.drag=false; };
   cv.addEventListener("pointerup",up); cv.addEventListener("pointercancel",up);
 }
-function flyGlobe(to){ const g=GLOBE; if(!g) return; const from={lon:g.lon,lat:g.lat,R:g.R}, t0=performance.now(), T=1100; buzz(6);
-  const step=n=>{ const t=Math.min(1,(n-t0)/T), e=1-Math.pow(1-t,3); g.lon=from.lon+(to.lon-from.lon)*e; g.lat=from.lat+(to.lat-from.lat)*e; g.R=Math.exp(Math.log(from.R)+(Math.log(to.R)-Math.log(from.R))*e); drawGlobe(); if(t<1) requestAnimationFrame(step); };
+function flyGlobe(to,g){ g=g||GLOBE; if(!g) return; const from={lon:g.lon,lat:g.lat,R:g.R}, t0=performance.now(), T=1100; buzz(6);
+  const step=n=>{ const t=Math.min(1,(n-t0)/T), e=1-Math.pow(1-t,3); g.lon=from.lon+(to.lon-from.lon)*e; g.lat=from.lat+(to.lat-from.lat)*e; g.R=Math.exp(Math.log(from.R)+(Math.log(to.R)-Math.log(from.R))*e); drawGlobe(g); if(t<1) requestAnimationFrame(step); };
   requestAnimationFrame(step); }
 function drawJourney(){}
 
@@ -1870,7 +1914,7 @@ function renderMedals(){
 function renderStats(){
   const mineOk=!!me;
   if(!mineOk) stScope="trip";
-  try{ renderJourney(); }catch(e){}
+  try{ renderJourney("shared"); }catch(e){}
   seg($("stScope"),mineOk?[["trip","כל הטיול"],["mine","שלי"]]:[["trip","כל הטיול"]],v=>v===stScope,v=>{stScope=v;renderStats();});
   const items=statItems();
   const byMonth={}; let all=0;

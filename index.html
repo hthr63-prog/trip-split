@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261119074710"></script>
+<script src="theme.js?v=20261119081750"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -1019,6 +1019,18 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 .j-row input,.j-row select{font:inherit;min-height:42px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);padding:4px 8px}
 .j-row select{flex:1;min-width:0}
 .j-x{border:0;background:none;color:var(--muted);min-width:36px;min-height:40px}
+
+/* places editor */
+.j-stay{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:16px;background:var(--surface-2);border:1.5px solid var(--line)}
+.j-top{display:flex;gap:8px;align-items:center}
+.j-num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--brand);color:#fff;font-weight:800;font-size:.85rem;flex-shrink:0}
+.j-top select{flex:1;min-width:0;font:inherit;font-weight:700;min-height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);padding:4px 10px}
+.j-dates{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.j-lab{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted);font-weight:600}
+.j-lab input{font:inherit;min-height:42px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);padding:4px 8px;width:100%;min-width:0}
+.j-here{font:inherit;font-size:.8rem;font-weight:700;min-height:42px;border-radius:12px;border:1.5px dashed var(--brand);background:color-mix(in srgb,var(--brand) 8%,var(--surface));color:var(--brand);padding:4px 6px}
+.j-still{font:inherit;font-size:.75rem;border:0;background:none;color:var(--brand);text-decoration:underline;align-self:flex-start;padding:2px 0}
+.j-info{font-size:.82rem;color:var(--ink);font-weight:600;background:var(--surface);border-radius:10px;padding:6px 10px}
 </style>
 </head>
 <body>
@@ -1315,6 +1327,7 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
         </div>
       </section>
 
+      <section class="card journey" id="journeyMe" aria-labelledby="jTitleMe"><div class="card-head"><h2 id="jTitleMe">🧭 המסע שלי</h2><span class="hint" id="jNoteMe"></span></div><div class="jmap" id="jMapMe"></div></section>
       <div class="bighead" data-tone="sage"><small>יום אחרי יום</small><h2>לבד. ביחד.<br>משולב.</h2></div>
       <section class="card" id="dailyCard">
         <div class="card-head"><h2>📅 סיכום יומי</h2></div>
@@ -1673,11 +1686,11 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261119074710">
-<script src="config.js?v=20261119074710"></script>
-<script src="motion.js?v=20261119074710"></script>
-<script src="fx.js?v=20261119074710"></script>
-<script src="cinema.js?v=20261119074710"></script>
-<script src="app.js?v=20261119074710"></script>
+<meta name="app-v" content="20261119081750">
+<script src="config.js?v=20261119081750"></script>
+<script src="motion.js?v=20261119081750"></script>
+<script src="fx.js?v=20261119081750"></script>
+<script src="cinema.js?v=20261119081750"></script>
+<script src="app.js?v=20261119081750"></script>
 </body>
 </html>
