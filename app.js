@@ -1294,11 +1294,13 @@ function renderSofar(){
       if(pStart&&pStart<ms&&daily>0){ const rate=sumFor(it=>inScope(it)&&pFilter(it))/dd(from,td); const pct=Math.round((rate-daily)/daily*100);
         badge=[pct>0?"up":"down", pct===0?"החודש בדיוק בקצב":"החודש "+(pct>0?"▲ ":"▼ ")+Math.abs(pct)+"%"]; }
     } else if(sfScope==="day"&&pDays>=2&&daily>0){
-      const pct=Math.round((total-daily)/daily*100);
-      badge= total===0 ? ["","היום עוד כלום"] : [pct>0?"up":"down", pct===0?"היום בדיוק כמו הממוצע":"היום "+(pct>0?"▲ ":"▼ ")+Math.abs(pct)+"%"];
+      /* today: the daily average as it stands with today in it, and how much today moved it */
+      label="בקצב הזה, ממוצע ליום"+tail;
+      const prev=(sumFor(pFilter)-sumFor(it=>pFilter(it)&&inScope(it)))/(pDays-1), diff=daily-prev;
+      badge= total===0 ? ["","היום עוד כלום"] : Math.abs(diff)<0.5 ? ["","היום בדיוק בקצב"] : [diff>0?"up":"down","היום "+(diff>0?"העלה ":"הוריד ")+fmt(Math.max(1,Math.round(Math.abs(diff))),showCur)];
     }
     const d=document.createElement("div"); const bb=document.createElement("b"); bb.className="num"; money(bb,val,showCur,"sfc"+R.children.length);
-    const l=document.createElement("span"); l.textContent=label; d.append(bb,l);
+    const l=document.createElement("span"); l.textContent=label; if(label.length>14) l.className="wrap"; d.append(bb,l);
     if(badge){ const t=document.createElement("em"); t.className="sf-delta "+badge[0]; t.textContent=badge[1]; d.appendChild(t); }
     R.appendChild(d);
   };
