@@ -1318,11 +1318,18 @@ function renderSofar(){
   const locked= personal && !(acct&&acctFor===me);
   box.hidden= !loaded || view==="stats" || locked || !S.items.length&&!personal;
   if(box.hidden) return;
-  seg($("sfSeg"),[["trip","הטיול"],["month","החודש"],["day","היום"]],v=>v===sfScope,v=>{ sfScope=v; try{ localStorage.setItem("trip-sf",v); }catch(e){} renderSofar(); });
   const td=todayStr(), ym=thisMonth();
-  const inScope=it=> sfScope==="trip" ? true : sfScope==="month" ? monthOf(it)===ym : it.date===td;
+  /* the place you are in now: what it has cost so far, every visit (an expense marked with a town counts there) */
+  const stays=tripStops(), ownD=stayDays(stays), townAt=d=>{ const k=ownD.get(d); return k!=null?stays[k].n:""; };
+  const here= tripStart()&&tripStart()<=td ? townAt(td) : "", townOfIt=it=>it.town||townAt(it.date||"");
+  const tabs=[["trip","הטיול"],...(here?[["town","היעד"]]:[]),["month","החודש"],["day","היום"]];
+  /* the saved choice stays; until the places have loaded the card shows the trip */
+  const scope= sfScope==="town"&&!here ? "trip" : sfScope;
+  seg($("sfSeg"),tabs,v=>v===scope,v=>{ sfScope=v; try{ localStorage.setItem("trip-sf",v); }catch(e){} renderSofar(); });
+  const inScope=it=> scope==="trip" ? true : scope==="town" ? townOfIt(it)===here : scope==="month" ? monthOf(it)===ym : it.date===td;
   const V=it=>conv(+it.amount||0,it.cur,showCur);
-  const days=sfDays(sfScope);
+  const townDays=[...ownD].filter(([,k])=>stays[k].n===here).length;
+  const days= scope==="town" ? townDays : sfDays(scope);
   const R=$("sfRow"); R.innerHTML="";
   /* money cells roll to their new value like the big number (also on a currency switch); counts are plain text */
   const cell=(val,label,sw)=>{ const d=document.createElement("div"); const b=document.createElement("b"); b.className="num"; const key="sfc"+R.children.length;
@@ -1330,7 +1337,7 @@ function renderSofar(){
     if(sw){ const i=document.createElement("i"); i.className="sw"; i.style.background=sw; l.appendChild(i); } l.appendChild(document.createTextNode(label)); d.append(b,l); R.appendChild(d); };
   const st=tripStart();
   const daysCell=()=>{ if(st&&st>td){ cell(String(Math.round((new Date(st+"T12:00")-new Date(td+"T12:00"))/864e5)),"ימים לטיסה"); }
-    else if(days>0) cell(String(days),sfScope==="day"?"יום":(sfScope==="month"?"ימים החודש":"ימים בטיול"));
+    else if(days>0) cell(String(days),scope==="day"?"יום":scope==="town"?"ימים ב"+here:(scope==="month"?"ימים החודש":"ימים בטיול"));
     else if(false){ cell(String(Math.round((new Date(st+"T12:00")-new Date(td+"T12:00"))/864e5)),"ימים לטיסה"); }
     else cell("—","ימים"); };
   /* averages count only what was spent on the trip itself, not flights and insurance bought before it */
@@ -1347,12 +1354,16 @@ function renderSofar(){
     if(!pDays){ daysCell(); return; }
     const daily=sumFor(pFilter)/pDays, tail= preTrip ? " בהכנות" : "";
     let val=daily, label="ממוצע ליום"+tail, badge=null;
-    if(sfScope==="month"){
+    if(scope==="month"){
       val=daily*30.44; label=(pDays>=30?"ממוצע לחודש":"קצב לחודש")+tail;
       const ms=td.slice(0,7)+"-01", from= pStart&&pStart>ms ? pStart : ms;
       if(pStart&&pStart<ms&&daily>0){ const rate=sumFor(it=>inScope(it)&&pFilter(it))/dd(from,td); const pct=Math.round((rate-daily)/daily*100);
         badge=[pct>0?"up":"down", pct===0?"החודש בדיוק בקצב":"החודש "+(pct>0?"▲ ":"▼ ")+Math.abs(pct)+"%"]; }
-    } else if(sfScope==="day"&&pDays>=2&&daily>0){
+    } else if(scope==="town"){
+      /* per day in this place, against the trip's own average, in money */
+      const tDaily= days>0 ? total/days : 0; label="ממוצע ליום ב"+here; val=tDaily;
+      if(daily>0&&total>0&&pDays>days){ const diff=tDaily-daily; badge= Math.abs(diff)<0.5 ? ["","בדיוק כמו בטיול"] : [diff>0?"up":"down",(diff>0?"▲ ":"▼ ")+fmt(Math.max(1,Math.round(Math.abs(diff))),showCur)+" מהממוצע בטיול"]; }
+    } else if(scope==="day"&&pDays>=2&&daily>0){
       /* today: the daily average as it stands with today in it, and how much today moved it */
       label="בקצב הזה, ממוצע ליום"+tail;
       const prev=(sumFor(pFilter)-sumFor(it=>pFilter(it)&&inScope(it)))/(pDays-1), diff=daily-prev;
@@ -1364,16 +1375,16 @@ function renderSofar(){
     R.appendChild(d);
   };
   const flightNote= preTrip ? " · ✈️ עוד "+(dd(td,st)-1)+" ימים לטיסה" : "";
-  const scopeWord= sfScope==="trip" ? "בטיול" : sfScope==="month" ? "ב"+monthName(ym,true).split(" ")[0] : "היום";
+  const scopeWord= scope==="trip" ? "בטיול" : scope==="town" ? "ב"+here : scope==="month" ? "ב"+monthName(ym,true).split(" ")[0] : "היום";
   if(!personal){
     const its=S.items.filter(it=>it.kind!=="transfer"&&inScope(it));
     const total=its.reduce((a,it)=>a+V(it),0);
     const mine= me ? its.reduce((a,it)=>a+V(it)*(sharesOf(it)[me]||0),0) : 0;
     const paid= me ? its.filter(it=>it.payer===me).reduce((a,it)=>a+V(it),0) : 0;
-    $("sfKick").textContent="הוצאנו עד עכשיו "+scopeWord;
+    $("sfKick").textContent=(scope==="town"?"הוצאנו ":"הוצאנו עד עכשיו ")+scopeWord;
     money($("sfBig"),total,showCur,"sf");
     const all2=S.items.filter(it=>it.kind!=="transfer");
-    $("sfSub").textContent=( its.length ? its.length+" הוצאות"+(sfScope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (sfScope==="day"?"עוד לא נרשמו הוצאות היום":"עוד לא נרשמו הוצאות") )+flightNote;
+    $("sfSub").textContent=( its.length ? its.length+" הוצאות"+(scope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (scope==="day"?"עוד לא נרשמו הוצאות היום":"עוד לא נרשמו הוצאות") )+flightNote;
     $("sfBar").hidden=true;
     if(me){ cell(mine,"החלק שלך"); cell(paid,"שילמת"); avgCell(total,f=>all2.filter(f).reduce((a,it)=>a+V(it),0)); }
     else { cell(String(its.length),"הוצאות"); daysCell(); avgCell(total,f=>all2.filter(f).reduce((a,it)=>a+V(it),0)); }
@@ -1382,9 +1393,9 @@ function renderSofar(){
     const own=P.filter(it=>inScope(it)).reduce((a,it)=>a+V(it),0);
     const tog=myShareItems().filter(it=>inScope(it)).reduce((a,it)=>a+V(it),0);
     const all=own+tog;
-    $("sfKick").textContent="הוצאת עד עכשיו "+scopeWord;
+    $("sfKick").textContent=(scope==="town"?"הוצאת ":"הוצאת עד עכשיו ")+scopeWord;
     money($("sfBig"),all,showCur,"sf");
-    $("sfSub").textContent=( all>0 ? "לבד + החלק שלך במשותף"+(sfScope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (sfScope==="day"?"עוד אין הוצאות היום":"עוד אין הוצאות") )+flightNote;
+    $("sfSub").textContent=( all>0 ? "לבד + החלק שלך במשותף"+(scope!=="day"&&days>0?" · "+(days===1?"יום אחד":days+" ימים"):"") : (scope==="day"?"עוד אין הוצאות היום":"עוד אין הוצאות") )+flightNote;
     const bar=$("sfBar"); bar.hidden=!(all>0);
     if(all>0){ $("sfBarA").style.width=(own/all*100)+"%"; $("sfBarB").style.width=(tog/all*100)+"%"; }
     cell(own,"לבד","#14B8A6"); cell(tog,"ביחד","linear-gradient(135deg,#6C4BFF,#FF4D8D)");
