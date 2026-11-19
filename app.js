@@ -577,10 +577,24 @@ function timeOf(it){
 function withTime(it,txt){ const t=timeOf(it); return t? "🕒 "+t+" · "+txt : txt; }
 /* how it was paid, on every expense row; old entries without a mark count as cash, so they say so */
 function pmText(it){ if(!it||it.kind==="transfer"||it._fee) return ""; return it.pm==="card" ? "💳 כרטיס"+(feeRate(it)?" · עמלה\u00a01%":"") : "💵 מזומן"; }
+/* the search: every word must match something about the expense — what, who, category, how paid, amount,
+   date (29.10, 29/10, October, a weekday), country (or "הכנות" / "לפני הטיול"), town, currency.
+   A word like >500 or <100 compares the amount (in the currency shown); 200-500 is a range. */
+let matchPC=null, matchPCat=0;
+function matchCtx(){ const now=Date.now(); if(!matchPC||now-matchPCat>800){ matchPC=placeCtx(); matchPCat=now; } return matchPC; }
 function matches(it,q){
   if(!q) return true;
-  const hay=norm([it.desc,pmText(it),catName(catKey(it)),nm(it.payer),it.to?nm(it.to):"",it.cur,CUR[it.cur]?.name,String(it.amount),dayLabel(it.date)].join(" "));
-  return q.split(" ").every(w=>hay.includes(w));
+  const PC=matchCtx(), loc=PC.effLoc(it), [y,m,d]=(it.date||"--").split("-");
+  const place= loc==="prep" ? "לפני הטיול הכנות הכנה" : loc==="?" ? "לא ידוע" : (CTRY[loc]||locName(loc));
+  const town= it.town || (()=>{ const k=PC.stayOf(it); return k>=0&&PC.stays[k] ? PC.stays[k].n : ""; })();
+  const dates= it.date ? [+d+"."+(+m),+d+"/"+(+m),+d+"."+(+m)+"."+y.slice(2),it.date,monthName(y+"-"+m,true)].join(" ") : "";
+  const hay=norm([it.desc,pmText(it),it.pm==="card"?"כרטיס אשראי":it.pm==="cash"?"מזומן":"",catName(catKey(it)),it.catLabel||"",nm(it.payer),it.to?nm(it.to):"",it.kind==="transfer"?"העברה":"",it.cur,CUR[it.cur]?.name,String(it.amount),dayLabel(it.date),dates,place,town].join(" "));
+  const val=spend(it);
+  return q.split(" ").filter(Boolean).every(w=>{
+    let r=w.match(/^([<>])=?(\d+(?:\.\d+)?)$/); if(r) return r[1]===">" ? val>=+r[2] : val<=+r[2];
+    r=w.match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/); if(r) return val>=+r[1]&&val<=+r[2];
+    /* spelling varies (צאנג / צ׳יאנג, תאילנד / טאילנד): also try without י and ו */
+    return hay.includes(w) || hay.replace(/[יו]/g,"").includes(w.replace(/[יו]/g,"")); });
 }
 const CTRY={THB:"🇹🇭 תאילנד",VND:"🇻🇳 וייטנאם",LAK:"🇱🇦 לאוס",KHR:"🇰🇭 קמבודיה",MMK:"🇲🇲 מיאנמר",MYR:"🇲🇾 מלזיה",SGD:"🇸🇬 סינגפור",IDR:"🇮🇩 אינדונזיה",PHP:"🇵🇭 פיליפינים",BND:"🇧🇳 ברוניי",JPY:"🇯🇵 יפן",KRW:"🇰🇷 קוריאה",CNY:"🇨🇳 סין",HKD:"🇭🇰 הונג קונג",MOP:"🇲🇴 מקאו",TWD:"🇹🇼 טייוואן",MNT:"🇲🇳 מונגוליה",INR:"🇮🇳 הודו",NPR:"🇳🇵 נפאל",LKR:"🇱🇰 סרי לנקה",BTN:"🇧🇹 בהוטן",MVR:"🇲🇻 מלדיביים",BDT:"🇧🇩 בנגלדש",PKR:"🇵🇰 פקיסטן",KZT:"🇰🇿 קזחסטן",UZS:"🇺🇿 אוזבקיסטן",KGS:"🇰🇬 קירגיזסטן",AED:"🇦🇪 אמירויות",ILS:"🇮🇱 ישראל",USD:"🇺🇸 ארה״ב",EUR:"🇪🇺 אירופה",GBP:"🇬🇧 בריטניה",CHF:"🇨🇭 שווייץ",AUD:"🇦🇺 אוסטרליה",NZD:"🇳🇿 ניו זילנד",CAD:"🇨🇦 קנדה",TRY:"🇹🇷 טורקיה",GEL:"🇬🇪 גאורגיה",AMD:"🇦🇲 ארמניה",AZN:"🇦🇿 אזרבייג׳ן",JOD:"🇯🇴 ירדן",EGP:"🇪🇬 מצרים",QAR:"🇶🇦 קטאר",OMR:"🇴🇲 עומאן",MAD:"🇲🇦 מרוקו",ZAR:"🇿🇦 דרום אפריקה",KES:"🇰🇪 קניה",TZS:"🇹🇿 טנזניה",FJD:"🇫🇯 פיג׳י",MXN:"🇲🇽 מקסיקו",BRL:"🇧🇷 ברזיל",ARS:"🇦🇷 ארגנטינה",CLP:"🇨🇱 צ׳ילה",PEN:"🇵🇪 פרו",COP:"🇨🇴 קולומביה",CZK:"🇨🇿 צ׳כיה",HUF:"🇭🇺 הונגריה",PLN:"🇵🇱 פולין",RON:"🇷🇴 רומניה",BGN:"🇧🇬 בולגריה",RSD:"🇷🇸 סרביה",SEK:"🇸🇪 שוודיה",NOK:"🇳🇴 נורווגיה",DKK:"🇩🇰 דנמרק",ISK:"🇮🇸 איסלנד"};
 /* where an expense happened: saved with new expenses; older ones are inferred from their currency */
@@ -1040,14 +1054,18 @@ function coins(from){
 /* ================= "the trip in review": story slides ================= */
 let RC=null;
 function recapData(loc,range){
-  const inLoc0=it=> loc ? locOf(it)===loc : locOf(it)!=="prep";
+  /* the trip itself: what was paid before it (flights, insurance) is left out, a booking for a town of the trip is in */
+  const PCr=placeCtx(), stR=tripStart(), tdR=todayStr();
+  const inLoc0=it=> loc ? PCr.effLoc(it)===loc : PCr.effLoc(it)!=="prep";
   const inLoc=it=> inLoc0(it)&&(!range||(it.date>=range.from&&it.date<=range.to));
   const items=S.items.filter(it=>it.kind!=="transfer"&&inLoc(it));
   const V=it=>spend(it,"ILS");
   const total=items.reduce((s,it)=>s+V(it),0);
   const dates=[...new Set(items.map(it=>it.date).filter(Boolean))].sort();
-  const days= dates.length? daysBetween(dates[0],dates[dates.length-1])+1 : 0;
-  const countries=[...new Set(items.map(locOf).filter(c=>CTRY[c]))];
+  /* days = trip days: from the start of the trip (or the first day in this country) to today, never the booking days before it */
+  let d0=dates[0]; if(d0&&stR&&d0<stR) d0=stR; const dEnd= !loc||loc===S.localCur ? tdR : dates[dates.length-1];
+  const days= d0&&dEnd>=d0 ? daysBetween(d0,dEnd)+1 : 0;
+  const countries=[...new Set(PCr.major.filter(c=>CTRY[c]).concat(!S.home&&CTRY[S.localCur]?[S.localCur]:[]))].filter(c=>!loc||c===loc);
   const cats={}; for(const it of items){ const k=catKey(it); cats[k]=(cats[k]||0)+V(it); }
   const topCat=Object.entries(cats).sort((x,y)=>y[1]-x[1])[0];
   const byDay={}; for(const it of items){ (byDay[it.date]=byDay[it.date]||[]).push(it); }
@@ -1343,7 +1361,7 @@ function renderSofar(){
   const PC=placeCtx();
   /* the town is always taken out of its country's expenses, so it can never cost more than the country */
   const kNow=PC.own.get(td), townCtry=(kNow!=null&&PC.major[kNow])||ctry;
-  const inCtry=(it,c)=> (!stT||(it.date||"")>=stT)&&PC.effLoc(it)===c;
+  const inCtry=(it,c)=> PC.effLoc(it)===c;
   const onTownDays=it=> it.town ? it.town===town : PC.stays.some((x,i)=>x.n===town&&PC.stayOf(it)===i);
   const inPlace=it=> place==="town" ? onTownDays(it)&&(!townCtry||inCtry(it,townCtry)) : inCtry(it,ctry);
   /* what happened on the town's days but is not counted there (marked another country, or before the trip) */
@@ -1353,7 +1371,7 @@ function renderSofar(){
   const V=it=>spend(it);
   /* days in the place: the town's own days on the journey; for the country, every day from the first one there until today */
   let townDays=0; if(place==="town") townDays=[...ownD].filter(([,k])=>stays[k].n===town).length;
-  else { const f=[...S.items,...(personal?P:[])].filter(it=>it.kind!=="transfer"&&inPlace(it)).map(it=>it.date).filter(Boolean).sort()[0]; townDays= f&&f<=td ? daysBetween(f,td)+1 : 0; }
+  else { let f=[...S.items,...(personal?P:[])].filter(it=>it.kind!=="transfer"&&inPlace(it)).map(it=>it.date).filter(Boolean).sort()[0]; if(f&&stT&&f<stT) f=stT; townDays= f&&f<=td ? daysBetween(f,td)+1 : 0; }   /* a booking made before the trip doesn't add days */
   const days= scope==="town" ? townDays : sfDays(scope);
   const R=$("sfRow"); R.innerHTML="";
   /* money cells roll to their new value like the big number (also on a currency switch); counts are plain text */
@@ -1366,7 +1384,7 @@ function renderSofar(){
     else if(false){ cell(String(Math.round((new Date(st+"T12:00")-new Date(td+"T12:00"))/864e5)),"ימים לטיסה"); }
     else cell("—","ימים"); };
   /* averages count only what was spent on the trip itself, not flights and insurance bought before it */
-  const onTrip=it=> locOf(it)!=="prep" && (!st || (it.date||"")>=st);
+  const onTrip=it=> PC.effLoc(it)!=="prep";
   const preTrip= !!st && st>td;
   const dd=(a,b)=>Math.round((new Date(b+"T12:00")-new Date(a+"T12:00"))/864e5)+1;
   const pre=it=>!onTrip(it);
@@ -1711,7 +1729,8 @@ function placeCtx(){
   const major=cnt.map(c=>(Object.entries(c).sort((a,b)=>b[1]-a[1])[0]||[null])[0]);
   const stayOf=it=> it.town ? (()=>{ let k=-1; stays.forEach((x,i)=>{ if(x.n===it.town&&(k<0||x.d<=(it.date||""))) k=i; }); return k; })() : (own.has(it.date||"")?own.get(it.date):-1);
   const st=tripStart();
-  const effLoc=it=>{ if(st&&(it.date||"")<st) return "prep"; const l=locOf(it); if(l!=="?") return l; const k=stayOf(it); return (k>=0&&major[k])||l; };
+  /* paid before the trip: "before the trip", unless it is marked with a town of the trip (a hotel booked ahead belongs to its town and country) */
+  const effLoc=it=>{ const l=locOf(it); if(st&&(it.date||"")<st&&!(it.town&&l!=="prep")) return "prep"; if(l!=="?") return l; const k=stayOf(it); return (k>=0&&major[k])||l; };
   /* part of stay k: by its date (or its town), and in the stay's country */
   const inStay=(it,k)=> stayOf(it)===k && (!!it.town || !major[k] || effLoc(it)===major[k]);
   return {stays,own,major,effLoc,inStay,stayOf};
@@ -2222,11 +2241,16 @@ function renderStats(){
   const byMonth={}; let all=0;
   for(const it of items){ const m=monthOf(it); if(!m) continue; const v=spend(it); byMonth[m]=(byMonth[m]||0)+v; all+=v; }
   const months=Object.keys(byMonth).sort();
-  if(!stMonth||!byMonth[stMonth]) stMonth= byMonth[thisMonth()]?thisMonth():(months[months.length-1]||thisMonth());
+  if(!stMonth||(stMonth!=="all"&&!byMonth[stMonth])) stMonth= byMonth[thisMonth()]?thisMonth():(months[months.length-1]||thisMonth());
+  const ALL=stMonth==="all", inMon=it=> ALL || monthOf(it)===stMonth, mLabel= ALL ? "כל הטיול" : monthName(stMonth,true);
   /* monthly bars: one series, one hue; the chosen month is emphasized */
   const M=$("stMonths"); M.innerHTML="";
   const max=Math.max(1,...months.map(m=>byMonth[m]));
   if(!months.length){ M.innerHTML='<div class="hint" style="align-self:center">עוד אין הוצאות.</div>'; }
+  /* "everything so far": one more choice before the months */
+  if(months.length>1){ const b=document.createElement("button"); b.type="button"; b.className="mbar mall"; b.setAttribute("role","listitem"); b.setAttribute("aria-pressed",String(ALL)); b.setAttribute("aria-label","כל הטיול עד עכשיו: "+fmt(all,showCur));
+    const v=document.createElement("span"); v.className="v num"; v.textContent=fmt(all,showCur); const c=document.createElement("span"); c.className="col"; c.textContent="∑"; const l=document.createElement("span"); l.className="l"; l.textContent="עד עכשיו";
+    b.append(v,c,l); b.onclick=()=>{ stMonth="all"; renderStats(); }; M.appendChild(b); }
   for(const m of months){
     const b=document.createElement("button"); b.type="button"; b.className="mbar"; b.setAttribute("role","listitem"); b.setAttribute("aria-pressed",String(m===stMonth));
     b.setAttribute("aria-label",monthName(m,true)+": "+fmt(byMonth[m],showCur)); b.title=monthName(m,true)+": "+fmt(byMonth[m],showCur);
@@ -2235,22 +2259,22 @@ function renderStats(){
     const l=document.createElement("span"); l.className="l"; l.textContent=monthName(m,false);
     b.append(v,c,l); b.onclick=()=>{ stMonth=m; renderStats(); }; M.appendChild(b);
   }
-  const inM=items.filter(it=>monthOf(it)===stMonth);
+  const inM=items.filter(inMon);
   const tot=inM.reduce((s,it)=>s+spend(it),0);
   /* per day = calendar days, as everywhere else: from the month's first expense to today (this month) or to its last one */
-  const md=inM.map(it=>it.date).filter(Boolean).sort(), mEnd= stMonth===thisMonth() ? todayStr() : md[md.length-1];
+  const md=inM.map(it=>it.date).filter(Boolean).sort(), mEnd= (ALL||stMonth===thisMonth()) ? todayStr() : md[md.length-1];
   const days= md.length&&mEnd>=md[0] ? daysBetween(md[0],mEnd)+1 : 1;
   $("stLbl").textContent= stScope==="mine" ? "ההוצאות של "+nm(me) : "ההוצאות של כל הטיול";
-  $("stMonthName").textContent=monthName(stMonth,true);
+  $("stMonthName").textContent=mLabel;
   money($("stMonthTotal"),tot,showCur,"stm:"+stScope);
   if(stScope==="mine"){
     /* summary split: alone (personal) vs. my part of what we shared */
-    const sum=list=>list.filter(it=>monthOf(it)===stMonth).reduce((s,it)=>s+spend(it),0);
+    const sum=list=>list.filter(inMon).reduce((s,it)=>s+spend(it),0);
     const own= acct&&acctFor===me ? sum(P) : 0, shared=sum(myShareItems());
     const others=active().filter(p=>p.id!==me).map(p=>p.name);
     $("stCount").textContent=fmt(own,showCur); $("stL1").textContent="🙋 לבד (אישי)";
     $("stPerDay").textContent=fmt(shared,showCur); $("stL2").textContent="👫 "+(others.length===1?"עם "+others[0]:"משותף")+" (החלק שלך)";
-    $("stAllTime").textContent=fmt(own+shared,showCur); $("stL3").textContent="💜 ביחד החודש";
+    $("stAllTime").textContent=fmt(own+shared,showCur); $("stL3").textContent= ALL ? "💜 ביחד בטיול" : "💜 ביחד החודש";
   }else{
     $("stCount").textContent=inM.length; $("stL1").textContent="הוצאות";
     $("stPerDay").textContent=fmt(tot/days,showCur); $("stL2").textContent="ממוצע ליום";
@@ -2261,7 +2285,7 @@ function renderStats(){
   lock.textContent="כרגע מוצג רק החלק שלך בהוצאות המשותפות. כדי לכלול גם את ההוצאות האישיות, נכנסים פעם אחת ל\"האישי שלי\" עם הסיסמה.";
   /* by category, with amount and share */
   const cats={}; for(const it of inM){ const k=catKey(it); cats[k]=(cats[k]||0)+spend(it); }
-  $("stCatTitle").textContent="📊 על מה הלך הכסף ב"+monthName(stMonth,true).split(" ")[0];
+  $("stCatTitle").textContent="📊 על מה הלך הכסף "+(ALL?"בכל הטיול":"ב"+monthName(stMonth,true).split(" ")[0]);
   const C=$("stCats"); C.innerHTML="";
   const ent=Object.entries(cats).sort((x,y)=>y[1]-x[1]); const cmax=ent[0]?.[1]||1;
   if(!ent.length) C.innerHTML='<div class="hint">אין הוצאות בחודש הזה.</div>';
@@ -2283,8 +2307,12 @@ function renderStats(){
   /* one rule everywhere: anything dated before the trip started counts as "before the trip", and a country's days are
      the calendar days from the first to the last day there (days without expenses count too, as in the daily average) */
   const stC=tripStart(), tdC=todayStr();
-  const PCc=placeCtx(); const byC={}; for(const it of locItems){ const k= stC&&(it.date||"")<stC ? "prep" : PCc.effLoc(it); const o=byC[k]||(byC[k]={v:0,days:new Set(),min:null,max:null}); o.v+=spend(it); if(it.date){ o.days.add(it.date); if(!o.min||it.date<o.min) o.min=it.date; if(!o.max||it.date>o.max) o.max=it.date; } }
-  for(const [k,o] of Object.entries(byC)){ if(k==="prep"||k==="?"||!o.min) continue; const end= k===S.localCur&&!S.home ? tdC : o.max; o.span=daysBetween(o.min,end)+1; }
+  $("stLocTitle").textContent="🌏 לפי מדינה · "+(ALL?"כל הטיול":monthName(stMonth,true).split(" ")[0]);
+  const PCc=placeCtx(); const byC={}; for(const it of locItems.filter(inMon)){ const k=PCc.effLoc(it); const o=byC[k]||(byC[k]={v:0,days:new Set(),min:null,max:null}); o.v+=spend(it); if(it.date){ o.days.add(it.date); if(!o.min||it.date<o.min) o.min=it.date; if(!o.max||it.date>o.max) o.max=it.date; } }
+  /* days in a country: from the first day there (not before the trip) to the last, or to today while you're there; within the chosen month */
+  const mFrom= ALL ? null : stMonth+"-01";
+  for(const [k,o] of Object.entries(byC)){ if(k==="prep"||k==="?"||!o.min) continue; let from=o.min; if(stC&&from<stC) from=stC; if(mFrom&&from<mFrom) from=mFrom;
+    const end= k===S.localCur&&!S.home&&(ALL||stMonth===thisMonth()) ? tdC : o.max; o.span= end>=from ? daysBetween(from,end)+1 : 0; }
   const ce=Object.entries(byC).sort((x,y)=>y[1].v-x[1].v); const cm=ce[0]?.[1].v||1; const CC=$("stCountries"); CC.innerHTML="";
   if(!ce.length) CC.innerHTML='<div class="hint">עוד אין הוצאות.</div>';
   for(const [k,o] of ce){
@@ -2292,7 +2320,7 @@ function renderStats(){
     r.innerHTML='<span></span><div class="bar"><i></i></div><span class="amtpct"><b class="num"></b><small></small></span>';
     r.children[0].textContent=locName(k); r.querySelector("i").style.width=(o.v/cm*100).toFixed(1)+"%"; if(k!=="?"){ r.classList.add("tap"); r.title="סיכום של "+locName(k); r.onclick=()=>openRecap(k); }
     r.querySelector("b").textContent=fmt(o.v,showCur);
-    const n=o.span||o.days.size; { const sm=r.querySelector("small"); sm.textContent=""; if(!(k==="prep"||k==="?")){ const pd=document.createElement("b"); pd.className="num pd"; pd.textContent=fmt(o.v/(n||1),showCur); sm.append(pd," ליום · "+(n===1?"יום אחד":n+" ימים")); } }
+    const n=o.span||o.days.size; { const sm=r.querySelector("small"); sm.textContent=""; if(!(k==="prep"||k==="?")&&o.span!==0){ const pd=document.createElement("b"); pd.className="num pd"; pd.textContent=fmt(o.v/(n||1),showCur); sm.append(pd," ליום · "+(n===1?"יום אחד":n+" ימים")); } }
     CC.appendChild(r);
   }
   /* who paid (whole trip only) */
@@ -2543,10 +2571,13 @@ function weekly(force){
      Ask on a tap until it is allowed; remember the answer. */
   const need=()=>window.DeviceMotionEvent&&typeof DeviceMotionEvent.requestPermission==="function";
   window.askMotion=async(loud)=>{ if(!need()){ if(loud) toast(window.DeviceMotionEvent?"🫨 ניעור לביטול פעיל":"🫨 הטלפון הזה לא מאפשר ניעור"); return true; }
-    try{ const r=await DeviceMotionEvent.requestPermission(); try{ await DeviceOrientationEvent.requestPermission(); }catch(e){}
-      store("trip-motion",r); if(loud) toast(r==="granted"?"🫨 ניעור לביטול פעיל":"🫨 לא אושר. אפשר לאשר בהגדרות ספארי: תנועה וכיוון"); return r==="granted"; }catch(e){ return false; } };
+    /* both asked in the same tap, together: iPhone accepts a request only while it still counts as coming from the tap
+       (asking for the tilt after the first answer came back was silently refused) */
+    try{ const po= window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==="function" ? DeviceOrientationEvent.requestPermission().catch(()=>"denied") : Promise.resolve("granted");
+      const [r,o]=await Promise.all([DeviceMotionEvent.requestPermission().catch(()=>"denied"),po]);
+      store("trip-motion",r); store("trip-orient",o); if(loud) toast(r==="granted"&&o==="granted"?"🫨 החיישן פעיל: ניעור לביטול והטיית הכרטיס":r==="granted"?"🫨 ניעור פעיל · הטיית הכרטיס לא אושרה":"🫨 חיישן התנועה לא אושר. אם סירבת פעם, האייפון לא שואל שוב: מוחקים את האפליקציה מהמסך הראשי ומוסיפים מחדש, או בהגדרות ← ספארי ← מתקדם ← נתוני אתרים"); return r==="granted"; }catch(e){ return false; } };
   let askedNow=false;
-  document.addEventListener("click",e=>{ if(askedNow||e.target.closest&&e.target.closest(".kpad,.amount")) return; if(need()&&load("trip-motion")!=="granted"&&load("trip-motion")!=="denied"){ askedNow=true; window.askMotion(false); } },{capture:true,passive:true});
+  document.addEventListener("click",e=>{ if(askedNow||e.target.closest&&e.target.closest(".kpad,.amount")) return; if(need()&&!((load("trip-motion")==="granted"&&load("trip-orient")==="granted")||load("trip-motion")==="denied")){ askedNow=true; window.askMotion(false); } },{capture:true,passive:true});
   addEventListener("devicemotion",e=>{ const a=e.accelerationIncludingGravity||e.acceleration; if(!a) return;
     const m=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2); const now=Date.now();
     if(m<17) return; peaks=peaks.filter(t=>now-t<1100); if(peaks.length&&now-peaks[peaks.length-1]<120) return; peaks.push(now);

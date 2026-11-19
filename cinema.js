@@ -76,8 +76,9 @@
       gx=nx; gy=ny; go(); },{passive:true});
     document.addEventListener("pointerdown",e=>{ const t=T(); if(!t||!t.contains(e.target)) return;
       /* iPhone asks once for permission to use the motion sensor, on the first touch of the card */
-      if(!asked&&window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==="function"){ asked=true; DeviceOrientationEvent.requestPermission().catch(()=>{}); }
       if(e.target.closest("button")) return; const r=t.getBoundingClientRect(); fx={x:(e.clientX-r.left)/r.width*2-1,y:(e.clientY-r.top)/r.height*2-1}; go(); },{passive:true});
+    /* iPhone asks for the motion sensor only from a finished tap (a click), not from the first touch */
+    document.addEventListener("click",e=>{ const t=T(); if(asked||!t||!t.contains(e.target)) return; asked=true; if(window.askMotion) window.askMotion(false); else if(window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==="function") DeviceOrientationEvent.requestPermission().catch(()=>{}); });
     document.addEventListener("pointermove",e=>{ if(!fx) return; const t=T(); if(!t) return; const r=t.getBoundingClientRect(); fx={x:clamp((e.clientX-r.left)/r.width*2-1,-1,1),y:clamp((e.clientY-r.top)/r.height*2-1,-1,1)}; go(); },{passive:true});
     const up=()=>{ if(fx){ fx=null; go(); } }; document.addEventListener("pointerup",up); document.addEventListener("pointercancel",up);
   })();

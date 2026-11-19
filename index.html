@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261119160756"></script>
+<script src="theme.js?v=20261119170750"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -208,6 +208,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 @media (min-width:640px){.sheet-bg{align-items:center}.sheet{border-radius:26px}}
 .sheet-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .curlist{display:flex;flex-direction:column;gap:2px;min-height:200px}
+.mbar.mall .col{height:auto!important;background:none!important;box-shadow:none!important;font:800 1.5rem var(--display,inherit);color:var(--muted);display:grid;place-items:end center;min-height:44px}
+.mbar.mall[aria-pressed="true"] .col{color:var(--brand)}
 .sf-left{align-self:flex-start;font:inherit;font-size:.8rem;font-weight:700;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px 10px;margin-top:-4px;cursor:pointer}
 .sfplace{margin:2px 0 6px;align-self:flex-start;width:max-content;max-width:100%}
 .sfplace button{font-size:.85rem;padding:5px 12px}
@@ -1307,7 +1309,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
         <h2>🧾 כל ההוצאות המשותפות</h2>
         <div class="seg" id="filter"></div>
       </div>
-      <input id="lSearch" type="search" placeholder="🔎 חיפוש הוצאה: מה, מי, קטגוריה או סכום" autocomplete="off">
+      <input id="lSearch" type="search" placeholder="🔎 מה, מי, מדינה, עיר, הכנות, 29.10, אוקטובר, ‎>500" autocomplete="off">
       <div id="ledger"></div>
     </section>
     <div class="bighead" data-tone="cream"><small>החודש</small><h2>לאן<br>הכסף הלך.</h2></div>
@@ -1450,7 +1452,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
       <section class="stack">
         <h2>🧾 ההוצאות האישיות שלך</h2>
-        <input id="pSearch" type="search" placeholder="🔎 חיפוש הוצאה" autocomplete="off">
+        <input id="pSearch" type="search" placeholder="🔎 מה, מדינה, עיר, הכנות, 29.10, ‎>500" autocomplete="off">
         <div id="pLedger"></div>
       </section>
     </div>
@@ -1481,7 +1483,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       <div class="note" id="stLock" hidden></div>
     </section>
     <section class="card">
-      <div class="card-head"><h2>🌏 לפי מדינה</h2><div class="seg" id="stLocScope"></div></div>
+      <div class="card-head"><h2 id="stLocTitle">🌏 לפי מדינה</h2><div class="seg" id="stLocScope"></div></div>
       <div class="hint" id="stLocNote" hidden>כדי לראות את ההוצאות האישיות, נכנסים פעם אחת ל"האישי שלי" עם הסיסמה.</div>
       <div class="cats" id="stCountries"></div>
     </section>
@@ -1660,7 +1662,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       <h3>עיצוב</h3>
       <div class="seg" id="themeSeg"></div>
       <div class="seg" id="soundSeg" style="margin-top:8px"></div>
-      <button class="btn small" id="motionBtn" type="button" style="margin-top:8px">🫨 הפעלת ניעור לביטול</button>
+      <button class="btn small" id="motionBtn" type="button" style="margin-top:8px">🫨 הפעלת חיישן התנועה: ניעור לביטול והטיית כרטיס המאזן</button>
     </div>
 
     <div class="sec">
@@ -1751,11 +1753,11 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261119160756">
-<script src="config.js?v=20261119160756"></script>
-<script src="motion.js?v=20261119160756"></script>
-<script src="fx.js?v=20261119160756"></script>
-<script src="cinema.js?v=20261119160756"></script>
-<script src="app.js?v=20261119160756"></script>
+<meta name="app-v" content="20261119170750">
+<script src="config.js?v=20261119170750"></script>
+<script src="motion.js?v=20261119170750"></script>
+<script src="fx.js?v=20261119170750"></script>
+<script src="cinema.js?v=20261119170750"></script>
+<script src="app.js?v=20261119170750"></script>
 </body>
 </html>
