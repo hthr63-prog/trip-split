@@ -292,7 +292,7 @@ function flyToTotal(from,label){
     a2.finished.then(()=>{ chip.remove(); if(ok){ M.pop(t); hitFx(r); buzz([8,30,14]); } sound("coin"); }).catch(()=>chip.remove());
   },260);
 }
-document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(!$("curSheet").hidden) closeSheet("curSheet"); else { closeSheet("setSheet"); closeSheet("addSheet"); } } });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(!$("curSheet").hidden) closeSheet("curSheet"); else if(!$("hereSheet").hidden) closeSheet("hereSheet"); else { closeSheet("setSheet"); closeSheet("addSheet"); } } });
 
 /* ---- currency picker ---- */
 let sheetCb=null, sheetCur=null, sheetMode="cur";
@@ -1189,12 +1189,14 @@ let hereAsked=0;
 async function geoState(){ try{ return (await navigator.permissions.query({name:"geolocation"})).state; }catch(e){ return "unknown"; } }
 async function askHere(force){
   if(!navigator.geolocation) return; if(!force&&Date.now()-hereAsked<20*60e3) return;
-  if(!force){ const st=await geoState(); if(st==="denied") return; if(st!=="granted"){ if(load("trip-geo-asked2")) return; store("trip-geo-asked2","1"); } }
+  /* a place picked by hand wins over the phone's guess for a day */
+  if(!force&&HERE&&HERE.manual&&Date.now()-(HERE.at||0)<864e5) return;
+  if(!force){ const st=await geoState(); if(st==="denied") return; if(st!=="granted"){ if(load("trip-geo-asked3")) return; store("trip-geo-asked3","1"); } }
   hereAsked=Date.now();
   try{ navigator.geolocation.getCurrentPosition(p=>{
       const lat=Math.round(p.coords.latitude*100)/100, lng=Math.round(p.coords.longitude*100)/100;
       const moved=!HERE||Math.abs(HERE.lat-lat)>0.01||Math.abs(HERE.lng-lng)>0.01;
-      HERE={lat,lng,at:Date.now()}; store("trip-here",JSON.stringify(HERE)); if(moved&&loaded) renderHero(); recordStop(lat,lng); if(force){ const t=nearTown(lat,lng), last=tripStops().slice(-1)[0]; toast("📍 "+(t?t.name+(last&&last.n===t.name?" · כבר במסע, אין עצירה חדשה":" · נוספה למסע"):"לא מצאתי עיר מוכרת קרובה")); } if(window.__mnTown){ const t=nearTown(lat,lng); if(t) window.__mnTown(t.name); window.__mnTown=null; }
+      const wasManual=HERE&&HERE.manual; HERE={lat,lng,at:Date.now()}; store("trip-here",JSON.stringify(HERE)); if((moved||wasManual)&&loaded){ renderHero(); if(window.FX) FX.autoTheme(); } if(hereOpen()) fillHere(); { const t=nearTown(lat,lng); if(t) recordTown(t,!!(force&&wasManual)); } if(force){ const t=nearTown(lat,lng), last=tripStops().slice(-1)[0]; toast("📍 "+(t?t.name+(last&&last.n===t.name?" · כבר במסע, אין עצירה חדשה":" · נוספה למסע"):"לא מצאתי עיר מוכרת קרובה")); } if(window.__mnTown){ const t=nearTown(lat,lng); if(t) window.__mnTown(t.name); window.__mnTown=null; }
     },e=>{ if(force) toast(e&&e.code===1?"📍 המיקום חסום. מאשרים בהגדרות: פרטיות ← שירותי מיקום ← אתרי ספארי":"📍 לא הצלחתי למצוא מיקום כרגע"); },{enableHighAccuracy:false,maximumAge:force?60e3:30*60e3,timeout:20000}); }catch(e){}
 }
 setTimeout(askHere,1500);
@@ -1205,7 +1207,8 @@ function renderHero(){
   H.dataset.scene=sceneFor(S.localCur);
   /* where the sky is: where the phone is (sunrise/sunset of the real place). Without location permission,
      the capital (or main hub) of the country whose currency is in use; Israel before the flight */
-  { const h=hereNow(), L=h?[h.lat,h.lng]:(PLACE[S.localCur]||PLACE.ILS); H.dataset.lat=L[0]; H.dataset.lng=L[1]; H.dataset.where=h?"here":"capital"; }
+  { const h=hereNow(), L=h?[h.lat,h.lng]:(PLACE[S.localCur]||PLACE.ILS); H.dataset.lat=L[0]; H.dataset.lng=L[1]; H.dataset.where=h?"here":"capital";
+    const b=$("heroHere"), nm=hereName(); b.textContent= nm ? "📍 "+nm+(h&&h.manual?" ✏️":"") : "📍 איפה אנחנו?"; b.classList.toggle("ask",!nm); }
   const k=S.localCur; const name=(CTRY[k]||CUR[k]?.name||k); const flag=name.split(" ")[0]; const country=CTRY[k]?name.slice(flag.length+1):name;
   $("heroFlag").textContent=CTRY[k]?flag:"🌏"; $("heroCountry").textContent=CTRY[k]?country:name;
   const st=tripStart(); const diff= st? daysBetween(st,todayStr()) : 0;
@@ -1238,6 +1241,34 @@ function renderInsight(){
   clearInterval(insTimer); if(list.length>1) insTimer=setInterval(()=>{ insIdx++; const L=insights(); if(!L.length) return; const [i2,t2]=L[insIdx%L.length]; $("insIco").textContent=i2; $("insTxt").textContent=t2; flash(I,"swap",400); },7000);
 }
 $("heroPlace").onclick=()=>$("localBtn").click();
+/* ---- where are we: the phone's location, or a city and country picked by hand ---- */
+function hereName(){ const h=hereNow(); if(!h) return ""; if(h.name) return h.name; try{ const t=nearTown(h.lat,h.lng); return t?t.name:""; }catch(e){ return ""; } }
+function hereOpen(){ const s=$("hereSheet"); return s&&!s.hidden; }
+async function fillHere(){
+  const h=hereNow(), st=await geoState(), nm=hereName();
+  $("hereNowTxt").textContent= h ? (h.manual?"✏️ נבחר ידנית: ":"📡 לפי הטלפון: ")+(nm||"מקום לא מוכר")+(h.manual&&h.ctry&&CTRY[h.ctry]?" · "+CTRY[h.ctry]:"") : st==="denied" ? "📵 המיקום חסום בטלפון הזה. מאשרים בהגדרות ← פרטיות ← שירותי מיקום ← אתרי ספארי ← \"בעת השימוש ביישום\"" : "עוד אין מיקום בטלפון הזה";
+  const sel=$("hereCtry"); if(!sel.options.length){ for(const [k,v] of Object.entries(CTRY).sort((a,b)=>a[1].split(" ").slice(1).join(" ").localeCompare(b[1].split(" ").slice(1).join(" "),"he"))){ const o=document.createElement("option"); o.value=k; o.textContent=v; sel.appendChild(o); }
+    const dl=$("hereTowns"); for(const t of TOWNS){ const o=document.createElement("option"); o.value=t[0]; dl.appendChild(o); } }
+  sel.value= h&&h.ctry&&CTRY[h.ctry] ? h.ctry : CTRY[S.localCur] ? S.localCur : "THB";
+  $("hereCity").value= nm.replace(/^ליד /,"");
+}
+async function setHereManual(city,ctry){
+  city=(city||"").trim().slice(0,40); if(!city){ toast("✏️ כותבים שם של עיר"); $("hereCity").focus(); return; }
+  const t=TOWNS.find(x=>x[0]===city), P=PLACE[ctry];
+  /* a known town has its own spot; another city is put at its country's main city (enough for sunset) */
+  const lat= t ? t[1] : P ? P[0] : HERE ? HERE.lat : 13.75, lng= t ? t[2] : P ? P[1] : HERE ? HERE.lng : 100.5;
+  HERE={lat,lng,at:Date.now(),manual:true,name:city,ctry}; store("trip-here",JSON.stringify(HERE));
+  closeSheet("hereSheet"); renderHero(); if(window.FX) FX.autoTheme();
+  await recordTown({name:city,lat,lng},true);
+  if(ctry!==S.localCur&&canWrite&&!S.home&&CUR[ctry]) toast("📍 "+city+" · אם עברתם מדינה, מחליפים מטבע בלחיצה על "+((CTRY[S.localCur]||"").split(" ")[0]||"הדגל"));
+  else toast("📍 עכשיו ב"+city);
+}
+$("heroHere").onclick=()=>{ buzz(5); fillHere(); openSheet("hereSheet"); };
+$("hereClose").onclick=()=>closeSheet("hereSheet");
+$("hereGps").onclick=()=>{ buzz(6); askHere(true); };
+$("hereSave").onclick=()=>setHereManual($("hereCity").value,$("hereCtry").value);
+$("hereCity").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("hereSave").click(); } });
+
 
 /* a tap that lands just outside a small pill (in the gap or the padding around it) goes to the nearest one */
 function nearTap(box,sel){ box.addEventListener("click",e=>{ if(e.target.closest(sel)) return;
@@ -1603,16 +1634,21 @@ function journeyTowns(legs){ const m=new Map();
   for(const l of legs){ const t=m.get(l.name)||{name:l.name,lat:l.lat,lng:l.lng,days:0,spent:0,alone:0,visits:[],items:[]}; t.days+=l.days; t.spent+=l.spent; t.alone+=l.alone||0; t.visits.push([l.from,l.left||(l.last?null:l.to)]); if(l.est) t.est=true; t.items.push(...l.items); m.set(l.name,t); }
   return [...m.values()]; }
 let stopBusy=false;
-async function recordStop(lat,lng){
-  if(!loaded||!canWrite||stopBusy||navigator.onLine===false) return; const t=nearTown(lat,lng); if(!t) return;
+async function recordStop(lat,lng){ const t=nearTown(lat,lng); if(t) return recordTown(t); }
+async function recordTown(t,fix){
+  if(!loaded||!canWrite||stopBusy||navigator.onLine===false||!t) return;
   const all=tripStops(), last=all[all.length-1]; if(last&&last.n===t.name&&!last.e) return;   /* still in the same town */
   const st=tripStart(); if(st&&todayStr()<st) return;   /* not before the flight */
   stopBusy=true; let added=false;
   /* through updateTrips: it also builds the trip list for older spaces that never had one */
   try{ await updateTrips(list=>{ const T=list.find(x=>x.id===curTrip); if(!T) return;
       const cur=(T.stops||[]).slice().sort((a,b)=>a.d.localeCompare(b.d)||(a.at||0)-(b.at||0)); const l=cur[cur.length-1]; if(l&&l.n===t.name&&!l.e) return;
-      if(l&&!l.e) l.e=todayStr();   /* the last place was left today */
-      T.stops=[...cur,{n:t.name,lat:t.lat,lng:t.lng,d:todayStr(),e:null,at:Date.now(),by:me||null}]; added=true; });
+      const today=todayStr();
+      /* picking the place by hand (or asking the phone again after that) corrects today's place rather than adding another */
+      if(l&&!l.m&&l.d===today&&!l.e&&(fix||l.h)){ cur.pop(); const p=cur[cur.length-1]; if(p&&p.e===today){ if(p.n===t.name){ p.e=null; T.stops=cur; added=true; return; } } }
+      const L2=cur[cur.length-1]; if(L2&&L2.n===t.name&&!L2.e){ T.stops=cur; added=true; return; }
+      if(L2&&!L2.e) L2.e=today;   /* the last place was left today */
+      T.stops=[...cur,{n:t.name,lat:t.lat,lng:t.lng,d:today,e:null,at:Date.now(),by:me||null,...(fix?{h:1}:{})}]; added=true; });
     if(!added) return;
     toast("📍 יעד חדש במסע: "+t.name); renderJourneys(); }catch(e){} finally{ stopBusy=false; }
 }
@@ -1630,7 +1666,11 @@ function worldRings(){
   for(const part of String(window.WORLD||"").split(";")){ const n=part.split(",").map(Number); let x=0,y=0; const lon=new Float32Array(n.length/2), lat=new Float32Array(n.length/2);
     let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
     for(let i=0;i<n.length;i+=2){ x+=n[i]; y+=n[i+1]; const a=x/Q,b=y/Q; lon[i/2]=a; lat[i/2]=b; if(a<mnx)mnx=a; if(a>mxx)mxx=a; if(b<mny)mny=b; if(b>mxy)mxy=b; }
-    const cl=(mnx+mxx)/2, cb=(mny+mxy)/2; out.push({lon,lat,c:[cl,cb],r:Math.max(mxx-mnx,mxy-mny)*0.75}); }
+    /* the same outline without the jump at the 180° line (Russia, Antarctica); a piece that goes right round
+       the pole is closed through the pole, so "inside" can be tested on the flat map */
+    const m=lon.length, ul=new Float32Array(m); let off=0; ul[0]=lon[0]; for(let i=1;i<m;i++){ let d=lon[i]-lon[i-1]; if(d>180) off-=360; else if(d<-180) off+=360; ul[i]=lon[i]+off; }
+    let cd=lon[0]-lon[m-1]; if(cd>180) cd-=360; else if(cd<-180) cd+=360; const wrap=Math.round((ul[m-1]-ul[0]+cd)/360)*360;
+    const cl=(mnx+mxx)/2, cb=(mny+mxy)/2; out.push({lon,lat,ul,wrap,pole:mny+mxy<0?-90:90,c:[cl,cb],r:Math.max(mxx-mnx,mxy-mny)*0.75}); }
   if(out.length>1) RINGS=out; return out;
 }
 const D2R=Math.PI/180;
@@ -1667,6 +1707,60 @@ function nightShade(g,c){
     const a= cz>0.08 ? 0 : cz<-0.12 ? 0.62 : (0.08-cz)/0.2*0.62, k=(j*w+i)*4; dt[k]=8; dt[k+1]=6; dt[k+2]=40; dt[k+3]=a*255; }
   ox.putImageData(img,0,0); c.save(); c.imageSmoothingEnabled=true; c.drawImage(o,0,0,g.W,g.H); c.restore();
 }
+/* one piece of land, cut where it goes behind the earth. The cut ends are joined along the rim in the
+   direction that runs over land (checked against the outline itself), so a big coast half behind the
+   horizon never floods the sea. Returns false when nothing of it faces us. */
+function inRing(r,lon,lat){
+  const X=r.ul||r.lon, Y=r.lat, n=X.length;
+  if(r.wrap){ /* round the pole: shift the point into the outline's 360° and close it through the pole */
+    const a=Math.min(X[0],X[n-1]); let L=lon; while(L<a) L+=360; while(L>=a+360) L-=360; let ins=false;
+    const px=i=> i<n ? X[i] : i===n ? X[n-1] : X[0], py=i=> i<n ? Y[i] : r.pole, N=n+2;
+    for(let i=0,j=N-1;i<N;j=i++){ const yi=py(i), yj=py(j), xi=px(i), xj=px(j); if((yi>lat)!==(yj>lat)&&L<(xj-xi)*(lat-yi)/(yj-yi)+xi) ins=!ins; } return ins; }
+  for(const L of [lon,lon-360,lon+360]){ let ins=false;
+    for(let i=0,j=n-1;i<n;j=i++){ if((Y[i]>lat)!==(Y[j]>lat)&&L<(X[j]-X[i])*(lat-Y[i])/(Y[j]-Y[i])+X[i]) ins=!ins; } if(ins) return true; }
+  return false; }
+function rimLonLat(g,a){ const x=Math.cos(a), y=-Math.sin(a), p0=g.lat*D2R;
+  let lon=g.lon+Math.atan2(x,-y*Math.sin(p0))/D2R; lon=((lon+540)%360)-180; return [lon,Math.asin(y*Math.cos(p0))/D2R]; }
+function landPath(c,g,r){
+  const n=r.lon.length, stp=g.R<500&&n>60?2:1, p0=g.lat*D2R, sp0=Math.sin(p0), cp0=Math.cos(p0);
+  const U=r.ul||r.lon, cz=i=>{ const p=r.lat[i]*D2R; return sp0*Math.sin(p)+cp0*Math.cos(p)*Math.cos((U[i]-g.lon)*D2R); };
+  const idx=[]; for(let i=0;i<n;i+=stp) idx.push(i); const m=idx.length, z=idx.map(cz);
+  let vis=0; for(const v of z) if(v>=0) vis++;
+  if(!vis) return false;
+  if(vis===m){ for(let k=0;k<m;k++){ const [x,y]=gproj(g,r.lon[idx[k]],r.lat[idx[k]]); k?c.lineTo(x,y):c.moveTo(x,y); } c.closePath(); return true; }
+  /* where the outline crosses the horizon, as an angle on the rim */
+  const cross=(a,b)=>{ const t=z[a]/(z[a]-z[b]), i=idx[a], j=idx[b]; const [x,y]=gproj(g,U[i]+(U[j]-U[i])*t,r.lat[i]+(r.lat[j]-r.lat[i])*t); return Math.atan2(y-g.cy,x-g.cx); };
+  /* the parts that face us, each from the rim back to the rim */
+  let k0=0; while(z[k0]>=0) k0++;
+  const segs=[]; let cur=null;
+  for(let s=1;s<=m;s++){ const a=(k0+s-1)%m, b=(k0+s)%m;
+    if(z[a]<0&&z[b]>=0){ cur={a0:cross(a,b),pts:[b]}; }
+    else if(z[a]>=0&&z[b]>=0&&cur){ cur.pts.push(b); }
+    else if(z[a]>=0&&z[b]<0&&cur){ cur.a1=cross(a,b); segs.push(cur); cur=null; } }
+  if(!segs.length) return false;
+  const TAU=2*Math.PI, fwd=(a,b)=>((b-a)%TAU+TAU)%TAU;
+  /* every cut on the rim, in order round it; for each exit, the land runs along the rim on one side of it
+     (checked half way to the neighbouring cut), and that is the way to the next entry */
+  const cuts=[]; segs.forEach((s,k)=>{ cuts.push({a:fwd(0,s.a0),k,in:true},{a:fwd(0,s.a1),k,in:false}); }); cuts.sort((x,y)=>x.a-y.a);
+  const L=cuts.length, landAt=(a0,a1)=>{ const d=fwd(a0,a1); if(d<1e-6) return null; const [lo,la]=rimLonLat(g,a0+d/2); return inRing(r,lo,la); };
+  const nextIn=(a,dir)=>{ let best=-1, bd=Infinity; segs.forEach((t,j)=>{ const d= dir>0 ? fwd(a,t.a0) : fwd(t.a0,a); if(d<bd){ bd=d; best=j; } }); return [best,bd]; };
+  /* one outline always keeps land on the same side, so the clear cuts vote for the way round, and all follow it */
+  let vote=0;
+  for(let i=0;i<L;i++){ const x=cuts[i]; if(x.in) continue;
+    const f=landAt(x.a,cuts[(i+1)%L].a), bk=landAt(cuts[(i-1+L)%L].a,x.a);
+    if(f===true&&bk===false) vote++; else if(bk===true&&f===false) vote--; }
+  const dir= vote>0 ? 1 : vote<0 ? -1 : 0;
+  for(const s of segs){ let d=dir; if(!d){ const F=nextIn(s.a1,1), B=nextIn(s.a1,-1); d= F[1]<=B[1] ? 1 : -1; }
+    const [to,bd]=nextIn(s.a1,d); s.dir=d; s.to=to; s.bd=bd; }
+  const used=new Set();
+  for(let st=0;st<segs.length;st++){ if(used.has(st)) continue; let k=st, first=true;
+    while(k>=0&&!used.has(k)){ used.add(k); const s=segs[k];
+      const x0=g.cx+Math.cos(s.a0)*g.R, y0=g.cy+Math.sin(s.a0)*g.R; first?c.moveTo(x0,y0):c.lineTo(x0,y0); first=false;
+      for(const q of s.pts){ const [x,y]=gproj(g,r.lon[idx[q]],r.lat[idx[q]]); c.lineTo(x,y); }
+      c.arc(g.cx,g.cy,g.R,s.a1,s.a1+s.dir*s.bd,s.dir<0); k=s.to; }
+    c.closePath(); }
+  return true;
+}
 function drawGlobe(g){
   g=g||GLOBE; if(!g||!g.cv.isConnected) return; const c=g.ctx, W=g.W, H=g.H; c.clearRect(0,0,W,H);
   const hot=g.mode==="mine"?"#14C9A5":"#FF4D8D", gold="#FFC93C";
@@ -1684,9 +1778,7 @@ function drawGlobe(g){
   const land=c.createLinearGradient(0,g.cy-g.R,0,g.cy+g.R); land.addColorStop(0,"#B9F0D2"); land.addColorStop(1,"#7DD8B0");
   c.fillStyle=land; c.strokeStyle="rgba(255,255,255,.45)"; c.lineWidth=.8;
   for(const r of g.rings){ if(angDist(g.lon,g.lat,r.c[0],r.c[1])-r.r>view) continue;
-    c.beginPath(); let any=false; const n=r.lon.length, stp=g.R<500&&n>60?2:1;
-    for(let i=0;i<n;i+=stp){ const [x,y,v]=gproj(g,r.lon[i],r.lat[i]); if(v) any=true; i?c.lineTo(x,y):c.moveTo(x,y); }
-    if(!any) continue; c.closePath(); c.fill(); c.stroke(); }
+    c.beginPath(); if(landPath(c,g,r)){ c.fill(); c.stroke(); } }
   nightShade(g,c);
   const sh=c.createRadialGradient(g.cx-g.R*.45,g.cy-g.R*.5,g.R*.05,g.cx,g.cy,g.R*1.02); sh.addColorStop(0,"rgba(255,255,255,.22)"); sh.addColorStop(.65,"rgba(255,255,255,0)"); sh.addColorStop(1,"rgba(5,0,40,.45)");
   c.fillStyle=sh; c.fillRect(0,0,W,H); c.restore();
@@ -1788,7 +1880,11 @@ function renderStopsEditor(){
       const num=document.createElement("span"); num.className="j-num"; num.textContent=String(i+1);
       const sel=document.createElement("select"); sel.setAttribute("aria-label","יעד"); for(const n of names){ const o=document.createElement("option"); o.value=n; o.textContent=n; if(n===r.n) o.selected=true; sel.appendChild(o); }
       if(!names.includes(r.n)){ const o=document.createElement("option"); o.value=r.n; o.textContent=r.n; o.selected=true; sel.prepend(o); }
-      sel.onchange=()=>{ r.n=sel.value; const t=TOWNS.find(x=>x[0]===sel.value); if(t){ r.lat=t[1]; r.lng=t[2]; } };
+      { const o=document.createElement("option"); o.value="__other"; o.textContent="✏️ עיר אחרת…"; sel.appendChild(o); }
+      sel.onchange=()=>{ if(sel.value==="__other"){ const nm=(prompt("איך קוראים לעיר?","")||"").trim().slice(0,40); if(!nm){ sel.value=r.n; return; }
+          /* a city not in the list: at the place picked in "📍 איפה אנחנו" if it is the same name, else the country's main city */
+          const h=HERE&&HERE.name===nm?HERE:null, P=PLACE[S.localCur]||[r.lat,r.lng]; r.n=nm; r.lat=h?h.lat:P[0]; r.lng=h?h.lng:P[1]; draw(); return; }
+        r.n=sel.value; const t=TOWNS.find(x=>x[0]===sel.value); if(t){ r.lat=t[1]; r.lng=t[2]; } };
       const x=document.createElement("button"); x.type="button"; x.className="j-x"; x.textContent="✕"; x.setAttribute("aria-label","הסרת יעד"); x.onclick=()=>{ rows.splice(i,1); draw(); };
       top.append(num,sel,x); card.appendChild(top);
       const dates=document.createElement("div"); dates.className="j-dates";

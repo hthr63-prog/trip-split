@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261119093152"></script>
+<script src="theme.js?v=20261119102256"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -373,6 +373,18 @@ table.daily td.num{text-align:right}
 .hero .scene{position:absolute;inset:0;width:100%;height:100%;z-index:-1}
 .hero .stars{opacity:var(--star)}
 .hero-txt{position:relative;display:grid;grid-template-columns:1fr auto;grid-template-areas:"place day" "chips chips";gap:6px 10px;padding:14px 16px 14px;color:#fff;min-height:150px;align-content:space-between;text-shadow:0 1px 8px rgba(40,10,90,.35)}
+.hero-where{grid-area:place;justify-self:start;align-self:start;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.hero-where .hero-place{grid-area:auto}
+.hero-here{font:inherit;font-size:.82rem;font-weight:700;color:#fff;background:rgba(20,10,60,.28);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:3px 10px;cursor:pointer;max-width:58vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-here.ask{background:#FFC93C;color:#1E1640;border-color:transparent}
+.here-now{margin:4px 0 12px;color:var(--muted);font-size:.92rem}
+.here-gps{width:100%}
+.here-or{display:flex;align-items:center;gap:10px;margin:16px 0 10px;color:var(--muted);font-size:.82rem}
+.here-or::before,.here-or::after{content:"";flex:1;height:1px;background:var(--line)}
+.here-f{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;font-size:.85rem;color:var(--muted)}
+.here-f select,.here-f input{font:inherit;font-size:1rem;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.here-save{width:100%}
+.here-tip{margin:12px 0 0;font-size:.78rem;color:var(--muted)}
 .hero-place{grid-area:place;justify-self:start;align-self:start;font:inherit;font-family:var(--display);font-weight:600;font-size:1.05rem;color:#fff;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:999px;padding:5px 12px;cursor:pointer}
 .hero-day{grid-area:day;text-align:left;display:flex;flex-direction:column;align-items:flex-end;line-height:1}
 .hero-day .heronum{font-family:var(--display);font-weight:700;font-size:2.2rem;direction:rtl;font-variant-numeric:tabular-nums}
@@ -1185,7 +1197,8 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
       <g class="ly" style="--i:4"><ellipse cx="88" cy="22" rx="13" ry="5" fill="#E0A100"/><rect x="75" y="14" width="26" height="8" fill="#FFC93C"/><ellipse cx="88" cy="14" rx="13" ry="5" fill="#FFD866"/><text x="88" y="16.5" font-size="7" text-anchor="middle" fill="#B47A00" font-weight="700">฿</text></g>
     </svg>
     <div class="hero-txt">
-      <button class="hero-place" id="heroPlace" type="button" aria-label="החלפת מדינה"><span id="heroFlag">🇹🇭</span> <span id="heroCountry">תאילנד</span></button>
+      <div class="hero-where"><button class="hero-place" id="heroPlace" type="button" aria-label="החלפת מדינה"><span id="heroFlag">🇹🇭</span> <span id="heroCountry">תאילנד</span></button>
+      <button class="hero-here" id="heroHere" type="button" aria-label="איפה אנחנו עכשיו">📍 איפה אנחנו?</button></div>
       <div class="hero-day"><span id="heroDay" class="heronum">יום 1</span><small id="heroSince"></small></div>
       <div class="hero-chips" id="heroChips"></div>
     </div>
@@ -1506,6 +1519,20 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
   </div>
 </div>
 
+<div class="sheet-bg" id="hereSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hereTitle">
+    <div class="sheet-head"><h2 id="hereTitle">📍 איפה אנחנו עכשיו</h2><button class="btn small" id="hereClose" type="button">סגירה</button></div>
+    <p class="here-now" id="hereNowTxt"></p>
+    <button class="btn primary here-gps" id="hereGps" type="button">📡 לפי המיקום של הטלפון</button>
+    <div class="here-or"><span>או לבחור לבד</span></div>
+    <label class="here-f"><span>מדינה</span><select id="hereCtry"></select></label>
+    <label class="here-f"><span>עיר</span><input id="hereCity" type="text" list="hereTowns" placeholder="למשל צ׳יאנג מאי" autocomplete="off" enterkeyhint="done"></label>
+    <datalist id="hereTowns"></datalist>
+    <button class="btn here-save" id="hereSave" type="button">שמירה</button>
+    <p class="here-tip">השקיעה, המצב הכהה האוטומטי והמסע על הגלובוס עובדים לפי המקום הזה. המיקום המדויק נשמר רק בטלפון הזה, ולמסע המשותף נכנס רק שם העיר.</p>
+  </div>
+</div>
+
 <!-- settings -->
 <div class="sheet-bg" id="acctSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="acctTitle">
@@ -1706,11 +1733,11 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261119093152">
-<script src="config.js?v=20261119093152"></script>
-<script src="motion.js?v=20261119093152"></script>
-<script src="fx.js?v=20261119093152"></script>
-<script src="cinema.js?v=20261119093152"></script>
-<script src="app.js?v=20261119093152"></script>
+<meta name="app-v" content="20261119102256">
+<script src="config.js?v=20261119102256"></script>
+<script src="motion.js?v=20261119102256"></script>
+<script src="fx.js?v=20261119102256"></script>
+<script src="cinema.js?v=20261119102256"></script>
+<script src="app.js?v=20261119102256"></script>
 </body>
 </html>
