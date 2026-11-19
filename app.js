@@ -16,7 +16,11 @@ const MONEY=new Map();   /* last shown value per number, to count from it */
 function money(el,v,cur,key){
   if(!el) return; key=key||el.id||""; const prev=MONEY.get(key); MONEY.set(key,{v,cur});
   /* a new display currency rolls too: from the number shown a moment ago to the new one, in the new currency */
-  if(calm()||!prev||!isFinite(prev.v)||!isFinite(v)||Math.abs(prev.v-v)<0.005){ el.textContent=fmt(v,cur); return; }
+  /* written straight away: any roll still running on this element is stopped, or it would land on an old number */
+  if(calm()||!prev||!isFinite(prev.v)||!isFinite(v)||Math.abs(prev.v-v)<0.005){
+    if(el.__to===v&&el.__toCur===cur&&el.classList.contains("ticking")) return;   /* already rolling to this very number */
+    el.__cnt=(el.__cnt||0)+1; el.__to=v; el.__toCur=cur; el.classList.remove("ticking"); el.textContent=fmt(v,cur); return; }
+  el.__to=v; el.__toCur=cur;
   /* the number rolls to its new value on a spring (motion.js), like a meter settling */
   el.classList.add("ticking");
   if(window.Motion){ Motion.count(el,prev.v,v,x=>{ el.textContent=fmt(x,cur); if(x===v) el.classList.remove("ticking"); },"smooth"); return; }
@@ -138,6 +142,10 @@ function rateNow(c){ return c==="ILS" ? 1 : conv(1,c,"ILS"); }
 function feeRate(it){ return it&&it.kind!=="transfer"&&it.pm==="card"&&!it._fee&&it.cur&&it.cur!=="ILS" ? 0.01 : 0; }
 function ils(it){ const v=+it.amount||0; return it.rIls>0 ? v*it.rIls : conv(v,it.cur||"ILS","ILS"); }
 function conv(v,from,to){ if(from===to) return v; return v/perUsd(from)*perUsd(to); }
+/* what an expense cost, in the currency shown: one rule for every total in the app.
+   Its own amount when shown in its own currency; otherwise at the rate saved when it was entered
+   (what it really cost then), so totals don't drift as rates move and always equal the rows they sum. */
+function spend(it,to){ to=to||showCur; const c=it.cur||"ILS", v=+it.amount||0; if(c===to) return v; return conv(ils(it),"ILS",to); }
 /* number formatters are costly to create: make the three once */
 const NF=[0,1,2].map(d=>new Intl.NumberFormat("en-US",{minimumFractionDigits:0,maximumFractionDigits:d}));
 function fmt(v,cur){
@@ -187,7 +195,7 @@ function compute(){
     add(it.payer,c,v,vf);
     for(const k in sh) add(k,c,-v*sh[k],-vf*sh[k]);
     if(it.kind==="transfer") continue;
-    const sv=conv(vb,"ILS",showCur); total+=sv;
+    const sv=spend(it); total+=sv;   /* shown totals: the same value as every other total (the 1% stays in the balance only) */
     paid[it.payer]=(paid[it.payer]||0)+sv;
     for(const k in sh) share[k]=(share[k]||0)+sv*sh[k];
     const ck=it.cat||"other"; cats[ck]=(cats[ck]||0)+sv;
@@ -554,7 +562,7 @@ function catBars(el,panel,cats){
 }
 function renderCats(){
   const ym=thisMonth(), cats={};
-  for(const it of S.items){ if(it.kind==="transfer"||monthOf(it)!==ym) continue; const k=catKey(it); cats[k]=(cats[k]||0)+conv(+it.amount||0,it.cur,showCur); }
+  for(const it of S.items){ if(it.kind==="transfer"||monthOf(it)!==ym) continue; const k=catKey(it); cats[k]=(cats[k]||0)+spend(it); }
   $("catTitle").textContent="📊 לאן הלך הכסף ב"+monthName(ym,true).split(" ")[0];
   catBars("cats","catPanel",cats);
   if(!Object.keys(cats).length&&S.items.length){ $("catPanel").hidden=false; $("cats").innerHTML='<div class="hint">עוד אין הוצאות החודש.</div>'; }
@@ -589,10 +597,10 @@ function monthOf(it){ return (it.date||"").slice(0,7); }
 function thisMonth(){ return todayStr().slice(0,7); }
 function monthName(ym,long){ const [y,m]=ym.split("-").map(Number); return new Date(y,m-1,1).toLocaleDateString("he-IL",long?{month:"long",year:"numeric"}:{month:"short"}); }
 /* totals shown beside each day heading */
-function sharedDay(d){ const v=S.items.filter(it=>it.date===d&&it.kind!=="transfer").reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0); return v>0?"סה״כ "+fmt(v,showCur):""; }
+function sharedDay(d){ const v=S.items.filter(it=>it.date===d&&it.kind!=="transfer").reduce((s,it)=>s+spend(it),0); return v>0?"סה״כ "+fmt(v,showCur):""; }
 function mineDay(d){
-  const alone=P.filter(it=>it.date===d).reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0);
-  const tog=myShareItems().filter(it=>it.date===d).reduce((s,it)=>s+conv(it.amount,it.cur,showCur),0);
+  const alone=P.filter(it=>it.date===d).reduce((s,it)=>s+spend(it),0);
+  const tog=myShareItems().filter(it=>it.date===d).reduce((s,it)=>s+spend(it),0);
   return "לבד "+fmt(alone,showCur)+" · ביחד "+fmt(tog,showCur)+" · משולב "+fmt(alone+tog,showCur);
 }
 function dayHead(h,d,extra){ h.className="dayhead"; const a=document.createElement("span"); a.textContent=dayLabel(d); h.appendChild(a); if(extra){ const b=document.createElement("span"); b.className="daysum num"; b.textContent=extra; h.appendChild(b); } }
@@ -688,7 +696,7 @@ function renderLedger_(){
   for(const it of shown){
     const ym=(it.date||"").slice(0,7);
     if(fold&&ym!==curMon){ curMon=ym; skipMon=false; if(ym!==tm){ const mi=list.filter(x=>(x.date||"").slice(0,7)===ym); skipMon=!st.month(ym);
-        monthFold(L,ym,mi,!skipMon,"shared",renderLedger,mi.filter(x=>x.kind!=="transfer").reduce((a,x)=>a+conv(+x.amount||0,x.cur,showCur),0)); } }
+        monthFold(L,ym,mi,!skipMon,"shared",renderLedger,mi.filter(x=>x.kind!=="transfer").reduce((a,x)=>a+spend(x),0)); } }
     if(skipMon) continue;
     if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,sharedDay(it.date)); box.appendChild(h); L.appendChild(box);
       skip=fold&&!st.day(it.date); if(fold) dayFold(box,h,it.date,byDay.get(it.date),!skip,"shared",renderLedger); }
@@ -851,8 +859,8 @@ function renderPersonal_(){
   const shared=myShareItems();
   let own=0, share=0, today=0; const cats={}; const td=todayStr();
   const ym=thisMonth();
-  for(const it of P){ const v=conv(+it.amount||0,it.cur,showCur); own+=v; if(monthOf(it)===ym){ const k=catKey(it); cats[k]=(cats[k]||0)+v; } if(it.date===td) today+=v; }
-  for(const it of shared){ const v=conv(it.amount,it.cur,showCur); share+=v; if(monthOf(it)===ym){ const k=catKey(it); cats[k]=(cats[k]||0)+v; } if(it.date===td) today+=v; }
+  for(const it of P){ const v=spend(it); own+=v; if(monthOf(it)===ym){ const k=catKey(it); cats[k]=(cats[k]||0)+v; } if(it.date===td) today+=v; }
+  for(const it of shared){ const v=spend(it); share+=v; if(monthOf(it)===ym){ const k=catKey(it); cats[k]=(cats[k]||0)+v; } if(it.date===td) today+=v; }
   $("pCatTitle").textContent="📊 לאן הלך הכסף שלך ב"+monthName(ym,true).split(" ")[0];
   $("pLbl").textContent="ההוצאות של "+nm(me)+" בטיול · רק "+(fem(me)?"את רואה":"אתה רואה")+" את המסך הזה";
   $("pOnly").textContent= fem(me)?"רק את רואה":"רק אתה רואה";
@@ -873,9 +881,9 @@ function renderPersonal_(){
   for(const it of shown){
     const ym=(it.date||"").slice(0,7);
     if(fold&&ym!==curMon){ curMon=ym; skipMon=false; if(ym!==tm){ const mi=list.filter(x=>(x.date||"").slice(0,7)===ym); skipMon=!st.month(ym);
-        monthFold(L,ym,mi,!skipMon,"mine",renderPersonal,mi.reduce((a,x)=>a+conv(+x.amount||0,x.cur,showCur),0)); } }
+        monthFold(L,ym,mi,!skipMon,"mine",renderPersonal,mi.reduce((a,x)=>a+spend(x),0)); } }
     if(skipMon) continue;
-    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,(()=>{ const v=list.filter(x=>x.date===it.date).reduce((a,x)=>a+conv(+x.amount||0,x.cur,showCur),0); return v>0?"סה״כ "+fmt(v,showCur):""; })()); box.appendChild(h); L.appendChild(box);
+    if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,(()=>{ const v=list.filter(x=>x.date===it.date).reduce((a,x)=>a+spend(x),0); return v>0?"סה״כ "+fmt(v,showCur):""; })()); box.appendChild(h); L.appendChild(box);
       skip=fold&&!st.day(it.date); if(fold) dayFold(box,h,it.date,byDay.get(it.date),!skip,"mine",renderPersonal); }
     if(skip) continue;
     const r=document.createElement("div"); r.className="row"+(isNew(it.id)?" enter":""); r.dataset.id=it.id;
@@ -886,7 +894,7 @@ function renderPersonal_(){
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
-    if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(conv(+it.amount,it.cur,"ILS"),"ILS"); right.appendChild(s); }
+    if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(spend(it,"ILS"),"ILS"); right.appendChild(s); }
     const acts=document.createElement("div"); acts.className="acts";
     if(it._fee){ const n=document.createElement("span"); n.className="m fee-note"; n.textContent= it.catLabel==="הפרשי שער" ? "💱 מתוך החלפה בארנק" : it._pfx ? "💳 מחושב לבד מהתשלומים בכרטיס" : "🏧 מתוך משיכה בארנק"; right.appendChild(n);
       const w=CASH.find(x=>x.id===it._wid);
@@ -1035,7 +1043,7 @@ function recapData(loc,range){
   const inLoc0=it=> loc ? locOf(it)===loc : locOf(it)!=="prep";
   const inLoc=it=> inLoc0(it)&&(!range||(it.date>=range.from&&it.date<=range.to));
   const items=S.items.filter(it=>it.kind!=="transfer"&&inLoc(it));
-  const V=it=>conv(+it.amount||0,it.cur,"ILS");
+  const V=it=>spend(it,"ILS");
   const total=items.reduce((s,it)=>s+V(it),0);
   const dates=[...new Set(items.map(it=>it.date).filter(Boolean))].sort();
   const days= dates.length? daysBetween(dates[0],dates[dates.length-1])+1 : 0;
@@ -1046,7 +1054,7 @@ function recapData(loc,range){
   const bigDay=Object.entries(byDay).map(([d,l])=>[d,l.reduce((s,it)=>s+V(it),0),l]).sort((x,y)=>y[1]-x[1])[0];
   const bigOne=[...items].sort((x,y)=>V(y)-V(x))[0];
   const paid={}; for(const it of items){ paid[it.payer]=(paid[it.payer]||0)+V(it); }
-  const share=me? myShareItems().filter(inLoc).reduce((s,it)=>s+conv(it.amount,it.cur,"ILS"),0) : 0;
+  const share=me? myShareItems().filter(inLoc).reduce((s,it)=>s+spend(it,"ILS"),0) : 0;
   const alone=me&&acct&&acctFor===me ? P.filter(inLoc).reduce((s,it)=>s+V(it),0) : null;
   const transfers=S.items.filter(it=>it.kind==="transfer"&&inLoc(it)).length;
   return {loc,week:range||null,items,total,dates,days:range?7:days,countries,topCat,cats,bigDay,bigOne,paid,share,alone,transfers,avg: (range?7:days)? total/(range?7:days) : 0};
@@ -1242,7 +1250,8 @@ function renderHero(){
   const st=tripStart(); const diff= st? daysBetween(st,todayStr()) : 0;
   if(st&&diff<0){ const left=-diff; const to=(CTRY[S.dest]||"").split(" ").slice(1).join(" "); $("heroDay").textContent= left===1?"מחר!":"עוד "+left; $("heroSince").textContent= (left===1?"טסים":"ימים לטיסה")+(to?" ל"+to:"")+" ✈️"; }
   else { $("heroDay").textContent="יום "+(diff+1); $("heroSince").textContent="לטיול"; }
-  const countries=new Set(S.items.filter(it=>it.kind!=="transfer").map(locOf).filter(c=>CTRY[c])).size;
+  /* countries you have been in: the country of each stay on the journey (and the one you are in now) */
+  const countries=(()=>{ const st=tripStart(); if(!st||st>todayStr()) return 0; const PC=placeCtx(); const set=new Set(PC.major.filter(c=>CTRY[c])); if(!S.home&&CTRY[S.localCur]) set.add(S.localCur); return set.size; })();
   const C=$("heroChips"); C.innerHTML="";
   const chip=(txt,hot)=>{ const s=document.createElement("span"); s.textContent=txt; if(hot) s.className="hot"; C.appendChild(s); };
   const sk=streak(); if(sk>=2) chip("🔥 "+sk+" ימים ברצף",true);
@@ -1252,12 +1261,12 @@ function renderHero(){
 let insIdx=0, insTimer=null;
 function insights(){
   const out=[]; const td=todayStr(); const sh=S.items.filter(it=>it.kind!=="transfer"&&locOf(it)!=="prep");
-  const byDay={}; for(const it of sh){ byDay[it.date]=(byDay[it.date]||0)+conv(+it.amount||0,it.cur,showCur); }
+  const byDay={}; for(const it of sh){ byDay[it.date]=(byDay[it.date]||0)+spend(it); }
   const days=Object.keys(byDay).filter(d=>d!==td); const avg=days.length? days.reduce((s,d)=>s+byDay[d],0)/days.length : 0;
   const today=byDay[td]||0;
   if(false&&avg>0&&today>0){ const diff=(today-avg)/avg; out.push(diff<=-.1?["👏","היום הוצאתם "+fmt(today,showCur)+", "+Math.round(-diff*100)+"% פחות מהממוצע היומי"]:diff>=.1?["🧭","היום כבר "+fmt(today,showCur)+", "+Math.round(diff*100)+"% מעל הממוצע היומי ("+fmt(avg,showCur)+")"]:["🎯","היום בדיוק בקצב: "+fmt(today,showCur)+", כמו הממוצע היומי"]); }
   else if(false) out.push(["☀️",""]);
-  const ym=thisMonth(), cats={}; let tot=0; for(const it of sh){ if(monthOf(it)!==ym) continue; const v=conv(+it.amount||0,it.cur,showCur); cats[catKey(it)]=(cats[catKey(it)]||0)+v; tot+=v; }
+  const ym=thisMonth(), cats={}; let tot=0; for(const it of sh){ if(monthOf(it)!==ym) continue; const v=spend(it); cats[catKey(it)]=(cats[catKey(it)]||0)+v; tot+=v; }
   const top=Object.entries(cats).sort((x,y)=>y[1]-x[1])[0]; if(top&&tot>0) out.push([catName(top[0]).split(" ")[0],"הכי הרבה החודש הולך על "+catName(top[0]).split(" ").slice(1).join(" ")+": "+Math.round(top[1]/tot*100)+"% מההוצאות"]);
   const week=sh.filter(it=>daysBetween(it.date||td,td)<7).length; if(week>0) out.push(["✍️",week+" הוצאות נרשמו השבוע. ככה המאזן תמיד מדויק"]);
   const c=compute(); if(me&&!c.debts.length&&sh.length) out.push(["🤝","אתם מאוזנים. אף אחד לא חייב כלום"]);
@@ -1341,7 +1350,7 @@ function renderSofar(){
   const leftOut= scope==="town"&&place==="town" ? [...S.items.filter(it=>it.kind!=="transfer"),...(personal?P:[])].filter(it=>onTownDays(it)&&!inPlace(it)) : [];
   { const ps=$("sfPlace"); ps.hidden= scope!=="town"; if(scope==="town") seg(ps,[...(town?[["town","🏙️ "+town]]:[]),...(ctry?[["country",CTRY[ctry]]]:[])],v=>v===place,v=>{ store("trip-sf-place",v); renderSofar(); }); }
   const inScope=it=> scope==="trip" ? true : scope==="town" ? inPlace(it) : scope==="month" ? monthOf(it)===ym : it.date===td;
-  const V=it=>conv(+it.amount||0,it.cur,showCur);
+  const V=it=>spend(it);
   /* days in the place: the town's own days on the journey; for the country, every day from the first one there until today */
   let townDays=0; if(place==="town") townDays=[...ownD].filter(([,k])=>stays[k].n===town).length;
   else { const f=[...S.items,...(personal?P:[])].filter(it=>it.kind!=="transfer"&&inPlace(it)).map(it=>it.date).filter(Boolean).sort()[0]; townDays= f&&f<=td ? daysBetween(f,td)+1 : 0; }
@@ -1604,6 +1613,8 @@ async function pSave(){
   const c=await loadAcct(); if(!c) return showErr("pErr","צריך להיכנס לחשבון האישי קודם.");
   const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat||"other",catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||defLoc(),pm:pform.pm||"cash",date:$("pDate").value||todayStr(),trip:curTrip,...(pform.town?{town:pform.town}:{})};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
+  /* the rate of the day is kept with it, like the shared ones, so its value in shekels stays what it cost */
+  data.rIls=(old&&old.cur===data.cur&&old.rIls>0)?old.rIls:rateNow(data.cur);
   const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz()});
   const job=run(()=>EXP().doc(id).set(doc));
   if(!$("addSheet").hidden){ buzz(10); flyToTotal($("pSave"),catEmoji(data)+" "+fmt(amount,data.cur)); closeSheet("addSheet"); }
@@ -1714,11 +1725,11 @@ function journeyLegs(mode){
   const legs=stays.map((x,i)=>{ const days=[...own].filter(([,k])=>k===i).map(([d])=>d).sort();
     const its=items.filter(it=>PC.inStay(it,i)).concat(tagged.filter(it=>legOf(it)===i));
     return {name:x.n,lat:x.lat,lng:x.lng,from:x.d,to:x.e||(stays[i+1]?stays[i+1].d:null),left:x.e||null,last:i===stays.length-1&&!x.e,est:!!x.est,
-      days:days.length,dates:days,items:its,spent:its.reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0),
-      alone:its.filter(it=>it._alone).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0)}; });   /* a town passed through the same day stays on the route, with 0 days */
+      days:days.length,dates:days,items:its,spent:its.reduce((a,it)=>a+spend(it),0),
+      alone:its.filter(it=>it._alone).reduce((a,it)=>a+spend(it),0)}; });   /* a town passed through the same day stays on the route, with 0 days */
   /* towns paid for but not (yet) on the route: on the globe with their money and no days */
   const ex=new Map(); for(const it of tagged){ if(legOf(it)>=0) continue; const e=ex.get(it.town)||{name:it.town,items:[]}; e.items.push(it); ex.set(it.town,e); }
-  legs.extra=[...ex.values()].map(e=>{ const ll=townLL(e.name,locOf(e.items[0]))||[0,0]; const sum=f=>e.items.filter(f).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0);
+  legs.extra=[...ex.values()].map(e=>{ const ll=townLL(e.name,locOf(e.items[0]))||[0,0]; const sum=f=>e.items.filter(f).reduce((a,it)=>a+spend(it),0);
     return {name:e.name,lat:ll[0],lng:ll[1],items:e.items,spent:sum(()=>true),alone:sum(it=>it._alone),ahead:true}; });
   return legs;
 }
@@ -1998,7 +2009,7 @@ function townCard(t,g){
   g=g||GLOBE; const box=g&&g.cv.parentNode; if(!box) return; let o=box.querySelector(".gl-card"); if(o) o.remove(); if(!t) return;
   o=document.createElement("div"); o.className="gl-card"; o.setAttribute("role","dialog"); o.setAttribute("aria-label",t.name);
   const sd=s=>{ const [y,m,d]=s.split("-").map(Number); return d+"."+m; };
-  const cats={}; for(const it of t.items){ const k=catKey(it); cats[k]=(cats[k]||0)+conv(+it.amount||0,it.cur,showCur); }
+  const cats={}; for(const it of t.items){ const k=catKey(it); cats[k]=(cats[k]||0)+spend(it); }
   const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,3);
   const rows=[["💰",g.mode==="mine"?"הוצאות":"הוצאנו",fmt(t.spent,showCur)],["📅","ימים",String(t.days)],["📊","ממוצע ליום",t.days?fmt(t.spent/t.days,showCur):"—"],["🧾","הוצאות",String(t.items.filter(i=>i.kind!=="transfer").length)]];
   const h=document.createElement("div"); h.className="glc-h"; const n=document.createElement("b"); n.textContent="📍 "+t.name; const x=document.createElement("button"); x.type="button"; x.className="glc-x"; x.textContent="✕"; x.setAttribute("aria-label","סגירה"); x.onclick=()=>townCard(null,g); h.append(n,x); o.appendChild(h);
@@ -2064,7 +2075,7 @@ function renderStopsEditor(){
         b.onclick=()=>{ const nx=rows[i+1]; r.e=nx?nx.d:today; draw(); }; l.append(s,b); dates.appendChild(l); }
       card.appendChild(dates);
       /* what these dates cover in the expenses (counted exactly as the globe will), so a wrong date shows at once */
-      const mine=[...own].filter(([,k])=>k===r).map(([d])=>d).sort(), set=new Set(mine), its=ex.filter(it=>it.town ? it.town===r.n&&rows.filter(q=>q.n===r.n).sort((a,b)=>a.d.localeCompare(b.d)).filter((q,j)=>j===0||q.d<=(it.date||"")).pop()===r : set.has(it.date)), span=mine.length, sum=its.reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0);
+      const mine=[...own].filter(([,k])=>k===r).map(([d])=>d).sort(), set=new Set(mine), its=ex.filter(it=>it.town ? it.town===r.n&&rows.filter(q=>q.n===r.n).sort((a,b)=>a.d.localeCompare(b.d)).filter((q,j)=>j===0||q.d<=(it.date||"")).pop()===r : set.has(it.date)), span=mine.length, sum=its.reduce((s,it)=>s+spend(it),0);
       const info=document.createElement("div"); info.className="j-info"; info.textContent= r.e&&r.e<r.d ? "⚠️ תאריך העזיבה לפני ההגעה" : span>0 ? "לפי ההוצאות: "+(span===1?"יום אחד":span+" ימים")+" ("+sd(mine[0])+(span>1?"–"+sd(mine[span-1]):"")+") · "+its.length+" הוצאות · "+fmt(sum,showCur) : "אין ימים ליעד הזה (יעד אחר מכסה את התאריכים)";
       card.appendChild(info);
       list.appendChild(card); }); };
@@ -2123,7 +2134,7 @@ function morning(){
   const st=tripStart(), day= st&&st<=t ? daysBetween(st,t)+1 : null;
   const here=hereNow&&hereNow(); const town= here? (nearTown(here.lat,here.lng)||{}).name : null;
   const y=new Date(); y.setDate(y.getDate()-1); const ys=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0");
-  const yday=S.items.filter(it=>it.kind!=="transfer"&&it.date===ys).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0);
+  const yday=S.items.filter(it=>it.kind!=="transfer"&&it.date===ys).reduce((a,it)=>a+spend(it),0);
   const sky=($("hero")&&$("hero").dataset.sky)||"day";
   const o=document.createElement("div"); o.className="morning"; o.dataset.sky=sky; o.setAttribute("role","dialog"); o.setAttribute("aria-label",hi);
   const ic= sky==="night"?"🌙":sky==="dusk"?"🌅":"☀️";
@@ -2209,7 +2220,7 @@ function renderStats(){
   seg($("stScope"),mineOk?[["trip","כל הטיול"],["mine","שלי"]]:[["trip","כל הטיול"]],v=>v===stScope,v=>{stScope=v;renderStats();});
   const items=statItems();
   const byMonth={}; let all=0;
-  for(const it of items){ const m=monthOf(it); if(!m) continue; const v=conv(+it.amount||0,it.cur,showCur); byMonth[m]=(byMonth[m]||0)+v; all+=v; }
+  for(const it of items){ const m=monthOf(it); if(!m) continue; const v=spend(it); byMonth[m]=(byMonth[m]||0)+v; all+=v; }
   const months=Object.keys(byMonth).sort();
   if(!stMonth||!byMonth[stMonth]) stMonth= byMonth[thisMonth()]?thisMonth():(months[months.length-1]||thisMonth());
   /* monthly bars: one series, one hue; the chosen month is emphasized */
@@ -2225,14 +2236,16 @@ function renderStats(){
     b.append(v,c,l); b.onclick=()=>{ stMonth=m; renderStats(); }; M.appendChild(b);
   }
   const inM=items.filter(it=>monthOf(it)===stMonth);
-  const tot=inM.reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0);
-  const days=new Set(inM.map(it=>it.date)).size||1;
+  const tot=inM.reduce((s,it)=>s+spend(it),0);
+  /* per day = calendar days, as everywhere else: from the month's first expense to today (this month) or to its last one */
+  const md=inM.map(it=>it.date).filter(Boolean).sort(), mEnd= stMonth===thisMonth() ? todayStr() : md[md.length-1];
+  const days= md.length&&mEnd>=md[0] ? daysBetween(md[0],mEnd)+1 : 1;
   $("stLbl").textContent= stScope==="mine" ? "ההוצאות של "+nm(me) : "ההוצאות של כל הטיול";
   $("stMonthName").textContent=monthName(stMonth,true);
   money($("stMonthTotal"),tot,showCur,"stm:"+stScope);
   if(stScope==="mine"){
     /* summary split: alone (personal) vs. my part of what we shared */
-    const sum=list=>list.filter(it=>monthOf(it)===stMonth).reduce((s,it)=>s+conv(+it.amount||0,it.cur,showCur),0);
+    const sum=list=>list.filter(it=>monthOf(it)===stMonth).reduce((s,it)=>s+spend(it),0);
     const own= acct&&acctFor===me ? sum(P) : 0, shared=sum(myShareItems());
     const others=active().filter(p=>p.id!==me).map(p=>p.name);
     $("stCount").textContent=fmt(own,showCur); $("stL1").textContent="🙋 לבד (אישי)";
@@ -2247,7 +2260,7 @@ function renderStats(){
   const lock=$("stLock"); lock.hidden=!(stScope==="mine"&&!(acct&&acctFor===me));
   lock.textContent="כרגע מוצג רק החלק שלך בהוצאות המשותפות. כדי לכלול גם את ההוצאות האישיות, נכנסים פעם אחת ל\"האישי שלי\" עם הסיסמה.";
   /* by category, with amount and share */
-  const cats={}; for(const it of inM){ const k=catKey(it); cats[k]=(cats[k]||0)+conv(+it.amount||0,it.cur,showCur); }
+  const cats={}; for(const it of inM){ const k=catKey(it); cats[k]=(cats[k]||0)+spend(it); }
   $("stCatTitle").textContent="📊 על מה הלך הכסף ב"+monthName(stMonth,true).split(" ")[0];
   const C=$("stCats"); C.innerHTML="";
   const ent=Object.entries(cats).sort((x,y)=>y[1]-x[1]); const cmax=ent[0]?.[1]||1;
@@ -2270,7 +2283,7 @@ function renderStats(){
   /* one rule everywhere: anything dated before the trip started counts as "before the trip", and a country's days are
      the calendar days from the first to the last day there (days without expenses count too, as in the daily average) */
   const stC=tripStart(), tdC=todayStr();
-  const PCc=placeCtx(); const byC={}; for(const it of locItems){ const k= stC&&(it.date||"")<stC ? "prep" : PCc.effLoc(it); const o=byC[k]||(byC[k]={v:0,days:new Set(),min:null,max:null}); o.v+=conv(+it.amount||0,it.cur,showCur); if(it.date){ o.days.add(it.date); if(!o.min||it.date<o.min) o.min=it.date; if(!o.max||it.date>o.max) o.max=it.date; } }
+  const PCc=placeCtx(); const byC={}; for(const it of locItems){ const k= stC&&(it.date||"")<stC ? "prep" : PCc.effLoc(it); const o=byC[k]||(byC[k]={v:0,days:new Set(),min:null,max:null}); o.v+=spend(it); if(it.date){ o.days.add(it.date); if(!o.min||it.date<o.min) o.min=it.date; if(!o.max||it.date>o.max) o.max=it.date; } }
   for(const [k,o] of Object.entries(byC)){ if(k==="prep"||k==="?"||!o.min) continue; const end= k===S.localCur&&!S.home ? tdC : o.max; o.span=daysBetween(o.min,end)+1; }
   const ce=Object.entries(byC).sort((x,y)=>y[1].v-x[1].v); const cm=ce[0]?.[1].v||1; const CC=$("stCountries"); CC.innerHTML="";
   if(!ce.length) CC.innerHTML='<div class="hint">עוד אין הוצאות.</div>';
@@ -2285,7 +2298,7 @@ function renderStats(){
   /* who paid (whole trip only) */
   $("stPayersCard").hidden= stScope!=="trip";
   if(stScope==="trip"){
-    const pay={}; for(const it of inM){ pay[it.payer]=(pay[it.payer]||0)+conv(+it.amount||0,it.cur,showCur); }
+    const pay={}; for(const it of inM){ pay[it.payer]=(pay[it.payer]||0)+spend(it); }
     const Pp=$("stPayers"); Pp.innerHTML=""; const pe=Object.entries(pay).sort((x,y)=>y[1]-x[1]); const pmax=pe[0]?.[1]||1;
     if(!pe.length) Pp.innerHTML='<div class="hint">אין הוצאות בחודש הזה.</div>';
     for(const [id,v] of pe){
@@ -2665,8 +2678,8 @@ function renderDaily(){
   $("dShowin").hidden=true; dayCur=showCur;   /* one currency choice for the whole page: the card above */
   const share=myShareItems(); const days=new Map();
   const add=(it,k,v)=>{ if(!it.date) return; const o=days.get(it.date)||{alone:0,tog:0}; o[k]+=v; days.set(it.date,o); };
-  for(const it of P) add(it,"alone",conv(+it.amount||0,it.cur,dayCur));
-  for(const it of share) add(it,"tog",conv(it.amount,it.cur,dayCur));
+  for(const it of P) add(it,"alone",spend(it,dayCur));
+  for(const it of share) add(it,"tog",spend(it,dayCur));
   const T=$("dTable"); T.innerHTML="";
   const list=[...days.entries()].sort((x,y)=>y[0].localeCompare(x[0]));
   if(!list.length){ T.innerHTML='<tr><td colspan="4" class="hint">עוד אין הוצאות.</td></tr>'; return; }
@@ -3163,7 +3176,7 @@ function runwayCalc(r){
   if(!r) return null; const st=tripStart(), td=todayStr(); if(!st||st>td) return null;
   const W=worthCalc(r), days=Math.round((new Date(td+"T12:00")-new Date(st+"T12:00"))/864e5)+1;
   const onTrip=it=> locOf(it)!=="prep" && (it.date||"")>=st && (it.date||"")<=td;
-  const spent=P.filter(onTrip).reduce((a,it)=>a+conv(+it.amount||0,it.cur,r.cur),0)+myShareItems().filter(onTrip).reduce((a,it)=>a+conv(+it.amount||0,it.cur,r.cur)*(sharesOf(it)[me]||0),0);
+  const spent=P.filter(onTrip).reduce((a,it)=>a+spend(it,r.cur),0)+myShareItems().filter(onTrip).reduce((a,it)=>a+spend(it,r.cur),0);   /* the share is already in the amount */
   const perDay=spent/days; if(!(perDay>0)||!(W.total>0)) return {total:W.total,perDay,days:null,cur:r.cur};
   const left=Math.floor(W.total/perDay), end=new Date(Date.now()+left*864e5);
   return {total:W.total,perDay,days:left,cur:r.cur,until:end.getDate()+"."+(end.getMonth()+1)+(end.getFullYear()!==new Date().getFullYear()?"."+String(end.getFullYear()).slice(2):"")};
