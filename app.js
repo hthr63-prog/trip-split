@@ -768,8 +768,7 @@ async function refreshPersonal(){
     INCOME=mine.filter(x=>x.type==="budget-in");
     BUDGET=mine.filter(x=>x.type==="budget").sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||null;
     STOPS=mine.filter(x=>x.type==="stop");
-    /* only a place newer than the last stop counts (an old reading must not add a stop back) */
-    { const h=hereNow(), last=Math.max(0,...STOPS.map(x=>x.createdAt||0)); if(h&&(h.at||0)>last) setTimeout(()=>recordStop(h.lat,h.lng,h.at),400); }
+    setTimeout(moveOldStops,1500);
     P=[...mine.filter(x=>x.type!=="cash"&&x.type!=="budget"&&x.type!=="budget-in"&&x.type!=="stop"),...fees]; pLoaded=true; syncCardFees(); if(!$("acctSheet").hidden) fillAcct(); if(view==="personal") renderAll();
   }catch(e){ console.error(e); pLoaded=true; }
 }
@@ -1133,7 +1132,10 @@ function applyTrip(){
   /* follow a newly opened trip unless this phone deliberately looks at another one */
   if(!v||!L.find(t=>t.id===v)||(seen&&seen!==act&&v===seen)) v=act;
   store("trip-active-seen",act); curTrip=v; store("trip-view",v);
-  const T=tripById(curTrip); S.trip=T.name||""; S.startDate=T.startDate||""; S.dest=CUR[T.localCur]?T.localCur:"THB"; homeMode();
+  const T=tripById(curTrip); S.trip=T.name||""; S.startDate=T.startDate||""; S.dest=CUR[T.localCur]?T.localCur:"THB";
+  /* Israel was until 12.11; the trip (days, daily average) starts on 13.11 */
+  if(curTrip==="t1"&&S.startDate==="2026-11-12"){ S.startDate="2026-11-13"; setTimeout(()=>{ if(canWrite) patchTrip("t1",{startDate:"2026-11-13"}).catch(()=>{}); },4000); }
+  homeMode();
 }
 /* until the flight you're at home: shekels, Israel, and expenses count as "before the trip" */
 function homeMode(){ const st=tripStart(); S.home=!!(st&&todayStr()<st); S.localCur= S.home ? "ILS" : (S.dest||S.localCur); }
@@ -1160,7 +1162,7 @@ function switchTrip(id){
 }
 
 /* the trip starts on 12.11.2026 unless changed in settings */
-const TRIP_START="2026-11-12";
+const TRIP_START="2026-11-13";
 function tripStart(){ if(S.startDate) return S.startDate; if(TRIP_START&&curTrip==="t1") return TRIP_START; const ds=S.items.filter(it=>it.kind!=="transfer"&&locOf(it)!=="prep"&&it.date).map(it=>it.date).sort(); return ds[0]||null; }
 function daysBetween(a,b){ const [y1,m1,d1]=a.split("-").map(Number),[y2,m2,d2]=b.split("-").map(Number); return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/864e5); }
 function streak(){
@@ -1176,13 +1178,18 @@ const PLACE={ILS:[32.08,34.78],THB:[13.75,100.5],VND:[21.03,105.85],LAK:[17.97,1
 let HERE=(()=>{ try{ const v=JSON.parse(load("trip-here")||"null"); return v&&isFinite(v.lat)&&isFinite(v.lng)?v:null; }catch(e){ return null; } })();
 function hereNow(){ return HERE&&Date.now()-(HERE.at||0)<3*864e5 ? HERE : null; }
 let hereAsked=0;
-function askHere(){
-  if(!navigator.geolocation||Date.now()-hereAsked<20*60e3) return; hereAsked=Date.now();
+/* Location is asked for ONCE. After that it is read only if the phone already allows it (no repeated prompts);
+   the "📍 איפה אנחנו?" button in the journey asks on purpose. */
+async function geoState(){ try{ return (await navigator.permissions.query({name:"geolocation"})).state; }catch(e){ return "unknown"; } }
+async function askHere(force){
+  if(!navigator.geolocation) return; if(!force&&Date.now()-hereAsked<20*60e3) return;
+  if(!force){ const st=await geoState(); if(st==="denied") return; if(st!=="granted"){ if(load("trip-geo-asked")) return; store("trip-geo-asked","1"); } }
+  hereAsked=Date.now();
   try{ navigator.geolocation.getCurrentPosition(p=>{
       const lat=Math.round(p.coords.latitude*100)/100, lng=Math.round(p.coords.longitude*100)/100;
       const moved=!HERE||Math.abs(HERE.lat-lat)>0.01||Math.abs(HERE.lng-lng)>0.01;
-      HERE={lat,lng,at:Date.now()}; store("trip-here",JSON.stringify(HERE)); if(moved&&loaded) renderHero(); recordStop(lat,lng); if(window.__mnTown){ const t=nearTown(lat,lng); if(t) window.__mnTown(t.name); window.__mnTown=null; }
-    },()=>{},{enableHighAccuracy:false,maximumAge:30*60e3,timeout:20000}); }catch(e){}
+      HERE={lat,lng,at:Date.now()}; store("trip-here",JSON.stringify(HERE)); if(moved&&loaded) renderHero(); recordStop(lat,lng); if(force){ const t=nearTown(lat,lng); toast("📍 "+(t?t.name:"מיקום עודכן")); } if(window.__mnTown){ const t=nearTown(lat,lng); if(t) window.__mnTown(t.name); window.__mnTown=null; }
+    },e=>{ if(force) toast(e&&e.code===1?"📍 המיקום חסום. מאשרים בהגדרות: פרטיות ← שירותי מיקום ← אתרי ספארי":"📍 לא הצלחתי למצוא מיקום כרגע"); },{enableHighAccuracy:false,maximumAge:force?60e3:30*60e3,timeout:20000}); }catch(e){}
 }
 setTimeout(askHere,1500);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") askHere(); });
@@ -1545,28 +1552,45 @@ function statItems(){
 const TOWNS=[["תל אביב",32.08,34.78],["ירושלים",31.77,35.21],["בנגקוק",13.75,100.5],["צ׳יאנג מאי",18.79,98.98],["פאי",19.36,98.44],["צ׳יאנג ראי",19.91,99.83],["צ׳יאנג דאו",19.37,98.96],["מה הונג סון",19.3,97.97],["סוקוטאי",17.01,99.82],["איוטאיה",14.35,100.57],["קנצ׳נבורי",14.02,99.53],["הואה הין",12.57,99.96],["פטאיה",12.93,100.88],["קו צ׳אנג",12.06,102.33],["קו סמט",12.57,101.45],["קו פנגן",9.73,100.02],["קו סמוי",9.51,100.01],["קו טאו",10.1,99.84],["קרבי",8.09,98.91],["אאו נאנג",8.04,98.82],["פוקט",7.88,98.39],["קו פי פי",7.74,98.77],["קו לנטה",7.62,99.05],["קו ליפה",6.49,99.3],["קאו סוק",8.91,98.53],["האט יאי",7.01,100.47],["אודון תאני",17.41,102.79],["נונג קאי",17.88,102.74],["לואנג פרבנג",19.89,102.13],["ונג ויינג",18.92,102.45],["ויינטיאן",17.97,102.6],["נונג קיאו",20.57,102.62],["פאקסה",15.12,105.8],["4000 האיים",14.11,105.85],["האנוי",21.03,105.85],["הא לונג",20.95,107.08],["סאפה",22.34,103.84],["הא ג׳יאנג",22.82,104.98],["נין בין",20.25,105.97],["פונג נה",17.59,106.28],["הואה",16.46,107.59],["דה נאנג",16.05,108.2],["הוי אן",15.88,108.33],["נה טראנג",12.24,109.19],["דלאת",11.94,108.44],["מוי נה",10.93,108.29],["הו צ׳י מין",10.78,106.7],["קאן טו",10.03,105.78],["פו קוק",10.29,103.98],["סיאם ריפ",13.36,103.86],["פנום פן",11.56,104.92],["קמפוט",10.61,104.18],["קו רונג",10.73,103.25],["בטמבנג",13.1,103.2],["יאנגון",16.84,96.17],["בגאן",21.17,94.86],["מנדליי",21.97,96.08],["אגם אינלה",20.55,96.92],["קואלה לומפור",3.14,101.69],["פנאנג",5.41,100.33],["לנגקאווי",6.35,99.8],["מלאקה",2.19,102.25],["קמרון היילנדס",4.47,101.38],["האיים פרהנטיאן",5.92,102.73],["סינגפור",1.35,103.82],["אובוד",-8.51,115.26],["קוטה, באלי",-8.72,115.17],["צ׳אנגו",-8.65,115.14],["האיים גילי",-8.35,116.04],["לומבוק",-8.65,116.32],["יוגיקרטה",-7.8,110.36],["ג׳קרטה",-6.2,106.85],["לבואן באג׳ו",-8.5,119.88],["מנילה",14.6,120.98],["אל נידו",11.19,119.4],["קורון",12.0,120.2],["סבו",10.32,123.89],["סיארגאו",9.85,126.05],["בוהול",9.65,123.85],["דלהי",28.61,77.21],["מומבאי",19.08,72.88],["גואה",15.5,73.83],["ריישיקש",30.09,78.27],["מנאלי",32.24,77.19],["דרמסלה",32.22,76.32],["וארנסי",25.32,83.0],["ג׳איפור",26.91,75.79],["אגרה",27.18,78.01],["קטמנדו",27.7,85.32],["פוקרה",28.21,83.99],["קולומבו",6.93,79.86],["אלה",6.87,81.05],["קנדי",7.29,80.63],["טוקיו",35.68,139.69],["קיוטו",35.01,135.77],["אוסקה",34.69,135.5],["סיאול",37.57,126.98],["הונג קונג",22.32,114.17],["טאיפיי",25.03,121.57],["בייג׳ינג",39.9,116.4]];
 function kmBetween(a,b,c,d){ const R=6371, r=Math.PI/180, x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2; return 2*R*Math.asin(Math.sqrt(x)); }
 function nearTown(lat,lng){ let best=null, km=1e9; for(const t of TOWNS){ const k=kmBetween(lat,lng,t[1],t[2]); if(k<km){ km=k; best=t; } } return best&&km<60 ? {name:best[0],lat:best[1],lng:best[2],km} : best ? {name:"ליד "+best[0],lat:Math.round(lat*10)/10,lng:Math.round(lng*10)/10,km} : null; }
-let STOPS=[];
+let STOPS=[];   /* old personal stops (before the journey became shared); merged in and moved over once */
+/* The journey is shared by the trip: a list of {n: town, lat, lng, d: arrival date}. Either phone adds a stop when
+   it finds itself in a new town; stops can also be added or fixed by hand. Only the town (its centre) is kept. */
+function tripStops(){ const T=tripById(curTrip)||{}; const sh=(T.stops||[]).map(x=>({...x}));
+  for(const x of STOPS){ if(!sh.some(y=>y.n===x.name&&y.d===x.date)) sh.push({n:x.name,lat:x.lat,lng:x.lng,d:x.date,at:x.createdAt||0,old:true}); }
+  return sh.filter(x=>x&&x.n&&x.d).sort((a,b)=>a.d.localeCompare(b.d)||(a.at||0)-(b.at||0)); }
 let stopBusy=false;
-async function recordStop(lat,lng,at){
-  if(!me||!(acct&&acctFor===me)||stopBusy) return; const t=nearTown(lat,lng); if(!t) return;
-  const last=[...STOPS].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).pop();
-  if(last&&last.name===t.name) return;   /* still in the same town */
-  if(last&&at&&at<=(last.createdAt||0)) return;
-  stopBusy=true; setTimeout(()=>{ stopBusy=false; },1500);
-  try{ const c=await loadAcct(); if(!c) return; const id="s"+Date.now().toString(36);
-    const doc=await encFor(c,{type:"stop",name:t.name,lat:t.lat,lng:t.lng,date:todayStr(),createdAt:Date.now(),trip:curTrip});
-    STOPS=[...STOPS,{id,name:t.name,lat:t.lat,lng:t.lng,date:todayStr(),createdAt:Date.now()}];
-    EXP().doc(id).set(doc).catch(()=>{}); if(view==="stats") renderJourney(); }catch(e){}
+async function recordStop(lat,lng){
+  if(!loaded||!canWrite||stopBusy||navigator.onLine===false) return; const t=nearTown(lat,lng); if(!t) return;
+  const all=tripStops(), last=all[all.length-1]; if(last&&last.n===t.name) return;   /* still in the same town */
+  const st=tripStart(); if(st&&todayStr()<st) return;   /* not before the flight */
+  stopBusy=true;
+  /* through updateTrips: it also builds the trip list for older spaces that never had one */
+  let added=false;
+  try{ await updateTrips(list=>{ const T=list.find(x=>x.id===curTrip); if(!T) return;
+      const cur=(T.stops||[]).slice().sort((a,b)=>a.d.localeCompare(b.d)||(a.at||0)-(b.at||0)); const l=cur[cur.length-1]; if(l&&l.n===t.name) return;
+      T.stops=[...cur,{n:t.name,lat:t.lat,lng:t.lng,d:todayStr(),at:Date.now(),by:me||null}]; added=true; });
+    if(!added) return;
+    toast("📍 עצירה חדשה במסע: "+t.name); if(view==="stats") renderJourney(); }catch(e){} finally{ stopBusy=false; }
 }
-/* the legs of the trip: consecutive days in the same town are one leg */
+/* old personal stops move into the shared journey once */
+function moveOldStops(){ if(!STOPS.length||!canWrite) return; const T=tripById(curTrip)||{}; const have=T.stops||[];
+  const add=STOPS.filter(x=>!have.some(y=>y.n===x.name&&y.d===x.date)); if(!add.length) return;
+  patchTrip(curTrip,{stops:[...have,...add.map(x=>({n:x.name,lat:x.lat,lng:x.lng,d:x.date,at:x.createdAt||0,by:me||null}))].sort((a,b)=>a.d.localeCompare(b.d))}).catch(()=>{}); }
+/* legs: a stay in one town until the next stop; the last runs until today */
 function journeyLegs(){
-  const s=[...STOPS].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); const legs=[];
-  for(const x of s){ const l=legs[legs.length-1]; if(l&&l.name===x.name) continue; legs.push({...x,from:x.date}); }
-  legs.forEach((l,i)=>{ l.to= legs[i+1] ? legs[i+1].from : todayStr(); l.days=Math.max(1,daysBetween(l.from,l.to)+(legs[i+1]?0:1)); });
-  const mine=[...myShareItems(),...(acct&&acctFor===me?P:[])];
-  for(const l of legs) l.spent=mine.filter(it=>it.date>=l.from&&(it.date<l.to||(!legs[legs.indexOf(l)+1]&&it.date<=l.to))).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0);
+  const s=tripStops(), legs=[];
+  for(const x of s){ const l=legs[legs.length-1]; if(l&&l.name===x.n) continue; legs.push({name:x.n,lat:x.lat,lng:x.lng,from:x.d}); }
+  const today=todayStr(), ex=S.items.filter(it=>it.kind!=="transfer");
+  legs.forEach((l,i)=>{ const nx=legs[i+1]; l.to= nx ? nx.from : today; l.last=!nx;
+    l.days=Math.max(1,daysBetween(l.from,l.to)+(nx?0:1));
+    l.items=ex.filter(it=>it.date>=l.from&&(nx?it.date<l.to:it.date<=l.to));
+    l.spent=l.items.reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0); });
   return legs;
 }
+/* towns: going back to the same place adds to its days and money */
+function journeyTowns(legs){ const m=new Map();
+  for(const l of legs){ const t=m.get(l.name)||{name:l.name,lat:l.lat,lng:l.lng,days:0,spent:0,visits:[],items:[]}; t.days+=l.days; t.spent+=l.spent; t.visits.push([l.from,l.last?null:l.to]); t.items.push(...l.items); m.set(l.name,t); }
+  return [...m.values()]; }
 /* ================= the journey as a globe =================
    A real globe (land from world.js, loaded only when the graphs screen opens), turned with a finger,
    pinched to zoom. It flies in from the whole earth to where you have been; the route is drawn between the stops. */
@@ -1588,53 +1612,6 @@ function gproj(g,lon,lat){ const l=(lon-g.lon)*D2R, p=lat*D2R, p0=g.lat*D2R, cp=
   if(cosc<0){ const m=Math.hypot(x,y)||1; x/=m; y/=m; }   /* behind the earth: pinned to the rim */
   return [g.cx+x*g.R, g.cy-y*g.R, cosc>=0]; }
 function angDist(a,b,c,d){ return Math.acos(Math.min(1,Math.sin(b*D2R)*Math.sin(d*D2R)+Math.cos(b*D2R)*Math.cos(d*D2R)*Math.cos((a-c)*D2R)))/D2R; }
-function drawGlobe(){
-  const g=GLOBE; if(!g||!g.cv.isConnected) return; const c=g.ctx, W=g.W, H=g.H; c.clearRect(0,0,W,H);
-  const dark=document.documentElement.dataset.theme==="dark", cs=getComputedStyle(document.documentElement);
-  const brand=cs.getPropertyValue("--brand").trim()||"#6C4BFF", hot=cs.getPropertyValue("--hot").trim()||"#FF4D8D", ink=cs.getPropertyValue("--ink").trim()||"#1E1640";
-  /* glow + ocean */
-  const glow=c.createRadialGradient(g.cx,g.cy,g.R*.92,g.cx,g.cy,g.R*1.12); glow.addColorStop(0,dark?"rgba(140,110,255,.45)":"rgba(108,75,255,.25)"); glow.addColorStop(1,"rgba(108,75,255,0)");
-  c.fillStyle=glow; c.beginPath(); c.arc(g.cx,g.cy,g.R*1.12,0,7); c.fill();
-  const sea=c.createRadialGradient(g.cx-g.R*.35,g.cy-g.R*.4,g.R*.1,g.cx,g.cy,g.R); sea.addColorStop(0,dark?"#2B3F86":"#BFD8FF"); sea.addColorStop(1,dark?"#121A45":"#6E97E8");
-  c.save(); c.beginPath(); c.arc(g.cx,g.cy,g.R,0,7); c.fillStyle=sea; c.fill(); c.clip();
-  /* graticule */
-  c.strokeStyle=dark?"rgba(255,255,255,.08)":"rgba(255,255,255,.35)"; c.lineWidth=1;
-  const step=g.R>2500?2:g.R>900?5:15;
-  for(let lon=-180;lon<180;lon+=step){ c.beginPath(); let on=false; for(let lat=-85;lat<=85;lat+=2.5){ const [x,y,v]=gproj(g,lon,lat); if(v){ on?c.lineTo(x,y):c.moveTo(x,y); on=true; } else on=false; } c.stroke(); }
-  for(let lat=-75;lat<=75;lat+=step){ c.beginPath(); let on=false; for(let lon=-180;lon<=180;lon+=2.5){ const [x,y,v]=gproj(g,lon,lat); if(v){ on?c.lineTo(x,y):c.moveTo(x,y); on=true; } else on=false; } c.stroke(); }
-  /* land: only rings near the visible side */
-  const view=Math.min(90,Math.asin(Math.min(1,Math.hypot(W,H)/2/g.R))/D2R+2);
-  c.fillStyle=dark?"#5B6FB0":"#F6F3E9"; c.strokeStyle=dark?"rgba(255,255,255,.25)":"rgba(80,90,140,.35)"; c.lineWidth=.8;
-  for(const r of g.rings){ if(angDist(g.lon,g.lat,r.c[0],r.c[1])-r.r>view) continue;
-    c.beginPath(); let any=false; const n=r.lon.length, stp=g.R<500&&n>60?2:1;
-    for(let i=0;i<n;i+=stp){ const [x,y,v]=gproj(g,r.lon[i],r.lat[i]); if(v) any=true; i?c.lineTo(x,y):c.moveTo(x,y); }
-    if(!any) continue; c.closePath(); c.fill(); c.stroke(); }
-  /* shading for roundness */
-  const sh=c.createRadialGradient(g.cx-g.R*.4,g.cy-g.R*.45,g.R*.05,g.cx,g.cy,g.R*1.02); sh.addColorStop(0,"rgba(255,255,255,.18)"); sh.addColorStop(.7,"rgba(255,255,255,0)"); sh.addColorStop(1,"rgba(10,5,40,.28)");
-  c.fillStyle=sh; c.fillRect(0,0,W,H); c.restore();
-  /* the route: great-circle arcs, drawn up to g.draw (0..1) */
-  const L=g.legs; if(!L.length) return;
-  const seg=[]; for(let i=1;i<L.length;i++){ const a=L[i-1], b=L[i]; const pts=[]; for(let k=0;k<=24;k++){ const t=k/24; pts.push(gc(a,b,t)); } seg.push(pts); }
-  const total=seg.length; let drawn=g.draw*total;
-  c.lineCap="round"; c.lineJoin="round";
-  for(let s=0;s<seg.length&&drawn>0;s++,drawn--){ const part=Math.min(1,drawn), pts=seg[s], m=Math.max(1,Math.round(part*24));
-    const A0=gproj(g,pts[0][0],pts[0][1]), B0=gproj(g,pts[24][0],pts[24][1]), hmax=Math.min(26,Math.hypot(A0[0]-B0[0],A0[1]-B0[1])*.16);   /* a gentle arch, lower for short hops */
-    c.beginPath(); for(let k=0;k<=m;k++){ const [x,y,v]=gproj(g,pts[k][0],pts[k][1]); const lift=Math.sin(k/24*Math.PI)*hmax; k?c.lineTo(x,y-lift):c.moveTo(x,y-lift); }
-    c.strokeStyle=hot; c.lineWidth=3.2; c.shadowColor="rgba(255,77,141,.5)"; c.shadowBlur=8; c.stroke(); c.shadowBlur=0; }
-  /* pins first, then labels: each label takes the first free spot that covers no pin and no other label;
-     where there is no room (towns close together, whole-earth view) only the latest place keeps its label */
-  const P2=[]; L.forEach((l,i)=>{ const [x,y,v]=gproj(g,l.lng,l.lat); if(!v) return; if(g.draw<i/Math.max(1,L.length-1)-0.001) return; P2.push({l,i,x,y,now:i===L.length-1}); });
-  for(const p of P2){ c.beginPath(); c.arc(p.x,p.y,p.now?7.5:5.5,0,7); c.fillStyle=p.now?hot:"#fff"; c.fill(); c.lineWidth=3; c.strokeStyle=p.now?"#fff":hot; c.stroke(); }
-  const taken=P2.map(p=>({x0:p.x-10,x1:p.x+10,y0:p.y-10,y1:p.y+10})); c.textAlign="center"; c.direction="rtl";
-  for(const p of [...P2].sort((a,b)=>b.i-a.i)){ const l=p.l, x=p.x, y=p.y;
-    const sub=(l.days===1?"יום":l.days+" ימים")+(l.spent>0?" · "+fmt(l.spent,showCur):"");
-    c.font="700 12px Assistant, system-ui, sans-serif"; const w=Math.max(c.measureText(l.name).width,c.measureText(sub).width*0.9)+14;
-    for(const [lx,ly] of [[x,y-42],[x,y+14],[x+w/2+12,y-15],[x-w/2-12,y-15]]){ const b={x0:lx-w/2,x1:lx+w/2,y0:ly,y1:ly+30};
-      if(b.x0<2||b.x1>W-2||b.y0<2||b.y1>H-2||taken.some(o=>!(b.x1<o.x0||b.x0>o.x1||b.y1<o.y0||b.y0>o.y1))) continue; taken.push(b);
-      c.fillStyle=dark?"rgba(20,14,50,.82)":"rgba(255,255,255,.92)"; roundRect(c,b.x0,b.y0,w,30,9); c.fill();
-      c.fillStyle=dark?"#fff":ink; c.font="700 12px Assistant, system-ui, sans-serif"; c.fillText(l.name,lx,ly+13);
-      c.fillStyle=dark?"rgba(255,255,255,.7)":"rgba(40,30,80,.7)"; c.font="500 10.5px Assistant, system-ui, sans-serif"; c.fillText(sub,lx,ly+26); break; } }
-}
 function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 /* a point a share t of the way along the great circle from a to b */
 function gc(a,b,t){ const f1=a.lat*D2R,l1=a.lng*D2R,f2=b.lat*D2R,l2=b.lng*D2R; const d=angDist(a.lng,a.lat,b.lng,b.lat)*D2R; if(d<1e-6) return [a.lng,a.lat];
@@ -1643,25 +1620,127 @@ function gc(a,b,t){ const f1=a.lat*D2R,l1=a.lng*D2R,f2=b.lat*D2R,l2=b.lng*D2R; c
 function globeFit(legs,W,H){
   if(!legs.length){ const h=hereNow&&hereNow(); return {lon:h?h.lng:100.5,lat:h?h.lat:13.7,R:Math.min(W,H)*.42}; }
   const mean=legs.reduce((a,l)=>[a[0]+l.lng,a[1]+l.lat],[0,0]).map(v=>v/legs.length);
-  const span=Math.max(1.2,...legs.map(l=>angDist(mean[0],mean[1],l.lng,l.lat)));
+  const span=Math.max(1.2,...legs.map(l=>angDist(mean[0],mean[1],l.lng,l.lat)))*1.7;   /* room around the towns for their labels */
   return {lon:mean[0],lat:mean[1],R:Math.min(9000,Math.max(Math.min(W,H)*.42,Math.min(W,H)*.36/Math.sin(Math.min(80,span)*D2R)))};
 }
+function drawGlobe(){
+  const g=GLOBE; if(!g||!g.cv.isConnected) return; const c=g.ctx, W=g.W, H=g.H; c.clearRect(0,0,W,H);
+  const hot="#FF4D8D", gold="#FFC93C";
+  /* deep night sky with a few stars, fixed so they do not move with the globe */
+  const bg=c.createLinearGradient(0,0,0,H); bg.addColorStop(0,"#120B33"); bg.addColorStop(1,"#241455"); c.fillStyle=bg; c.fillRect(0,0,W,H);
+  if(!g.stars){ g.stars=[]; for(let i=0;i<70;i++) g.stars.push([Math.random()*W,Math.random()*H,Math.random()*1.3+.2,Math.random()*.6+.2]); }
+  for(const [x,y,r,a] of g.stars){ c.globalAlpha=a; c.fillStyle="#fff"; c.beginPath(); c.arc(x,y,r,0,7); c.fill(); } c.globalAlpha=1;
+  /* atmosphere */
+  const glow=c.createRadialGradient(g.cx,g.cy,g.R*.95,g.cx,g.cy,g.R*1.16); glow.addColorStop(0,"rgba(120,160,255,.55)"); glow.addColorStop(1,"rgba(120,160,255,0)");
+  c.fillStyle=glow; c.beginPath(); c.arc(g.cx,g.cy,Math.min(g.R*1.16,Math.hypot(W,H)),0,7); c.fill();
+  /* ocean */
+  const sea=c.createRadialGradient(g.cx-g.R*.35,g.cy-g.R*.45,g.R*.05,g.cx,g.cy,g.R); sea.addColorStop(0,"#3E7BE0"); sea.addColorStop(.6,"#1F4FB8"); sea.addColorStop(1,"#122E7A");
+  c.save(); c.beginPath(); c.arc(g.cx,g.cy,g.R,0,7); c.fillStyle=sea; c.fill(); c.clip();
+  c.strokeStyle="rgba(255,255,255,.10)"; c.lineWidth=1; const step=g.R>2500?2:g.R>900?5:15;
+  for(let lon=-180;lon<180;lon+=step){ c.beginPath(); let on=false; for(let lat=-85;lat<=85;lat+=2.5){ const [x,y,v]=gproj(g,lon,lat); if(v){ on?c.lineTo(x,y):c.moveTo(x,y); on=true; } else on=false; } c.stroke(); }
+  for(let lat=-75;lat<=75;lat+=step){ c.beginPath(); let on=false; for(let lon=-180;lon<=180;lon+=2.5){ const [x,y,v]=gproj(g,lon,lat); if(v){ on?c.lineTo(x,y):c.moveTo(x,y); on=true; } else on=false; } c.stroke(); }
+  const view=Math.min(90,Math.asin(Math.min(1,Math.hypot(W,H)/2/g.R))/D2R+2);
+  const land=c.createLinearGradient(0,g.cy-g.R,0,g.cy+g.R); land.addColorStop(0,"#B9F0D2"); land.addColorStop(1,"#7DD8B0");
+  c.fillStyle=land; c.strokeStyle="rgba(255,255,255,.45)"; c.lineWidth=.8;
+  for(const r of g.rings){ if(angDist(g.lon,g.lat,r.c[0],r.c[1])-r.r>view) continue;
+    c.beginPath(); let any=false; const n=r.lon.length, stp=g.R<500&&n>60?2:1;
+    for(let i=0;i<n;i+=stp){ const [x,y,v]=gproj(g,r.lon[i],r.lat[i]); if(v) any=true; i?c.lineTo(x,y):c.moveTo(x,y); }
+    if(!any) continue; c.closePath(); c.fill(); c.stroke(); }
+  const sh=c.createRadialGradient(g.cx-g.R*.45,g.cy-g.R*.5,g.R*.05,g.cx,g.cy,g.R*1.02); sh.addColorStop(0,"rgba(255,255,255,.22)"); sh.addColorStop(.65,"rgba(255,255,255,0)"); sh.addColorStop(1,"rgba(5,0,40,.45)");
+  c.fillStyle=sh; c.fillRect(0,0,W,H); c.restore();
+  /* the route, as glowing arches */
+  const L=g.legs; c.lineCap="round"; c.lineJoin="round";
+  if(L.length>1){ let drawn=g.draw*(L.length-1);
+    for(let i=1;i<L.length&&drawn>0;i++,drawn--){ const a=L[i-1], b=L[i], part=Math.min(1,drawn), pts=[]; for(let k=0;k<=24;k++) pts.push(gc({lat:a.lat,lng:a.lng},{lat:b.lat,lng:b.lng},k/24));
+      const A0=gproj(g,pts[0][0],pts[0][1]), B0=gproj(g,pts[24][0],pts[24][1]), hmax=Math.min(30,Math.hypot(A0[0]-B0[0],A0[1]-B0[1])*.2), m=Math.max(1,Math.round(part*24));
+      c.beginPath(); for(let k=0;k<=m;k++){ const [x,y]=gproj(g,pts[k][0],pts[k][1]); const lift=Math.sin(k/24*Math.PI)*hmax; k?c.lineTo(x,y-lift):c.moveTo(x,y-lift); }
+      c.strokeStyle="rgba(255,77,141,.35)"; c.lineWidth=9; c.stroke(); c.strokeStyle=hot; c.lineWidth=3; c.stroke(); } }
+  /* towns: a bubble that grows with what you spent there, its name and the amount */
+  const T=g.towns, maxS=Math.max(1,...T.map(t=>t.spent)); g.hits=[];
+  const P2=[]; for(const t of T){ const [x,y,v]=gproj(g,t.lng,t.lat); if(!v) continue; P2.push({t,x,y,r:7+Math.sqrt(t.spent/maxS)*9,now:t.name===(L[L.length-1]||{}).name}); }
+  if(g.draw<1) P2.forEach(p=>{ const i=L.findIndex(l=>l.name===p.t.name); if(i>0&&g.draw<i/(L.length-1)-0.001) p.hide=true; });
+  for(const p of P2){ if(p.hide) continue; const pulse=c.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*2.2); pulse.addColorStop(0,p.now?"rgba(255,201,60,.55)":"rgba(255,77,141,.45)"); pulse.addColorStop(1,"rgba(255,77,141,0)");
+    c.fillStyle=pulse; c.beginPath(); c.arc(p.x,p.y,p.r*2.2,0,7); c.fill();
+    c.beginPath(); c.arc(p.x,p.y,p.r,0,7); c.fillStyle=p.now?gold:hot; c.fill(); c.lineWidth=3; c.strokeStyle="#fff"; c.stroke();
+    g.hits.push({x:p.x,y:p.y,r:Math.max(22,p.r+10),t:p.t}); }
+  const taken=P2.filter(p=>!p.hide).map(p=>({x0:p.x-p.r,x1:p.x+p.r,y0:p.y-p.r,y1:p.y+p.r})); c.textAlign="center"; c.direction="rtl";
+  for(const p of P2.filter(p=>!p.hide).sort((a,b)=>b.t.spent-a.t.spent)){ const t=p.t, amt=fmt(t.spent,showCur);
+    c.font="800 12.5px Assistant, system-ui, sans-serif"; const w=Math.max(c.measureText(t.name).width,c.measureText(amt).width)+18;
+    for(const [lx,ly] of [[p.x,p.y-p.r-38],[p.x,p.y+p.r+6],[p.x+p.r+w/2+6,p.y-16],[p.x-p.r-w/2-6,p.y-16]]){ const b={x0:lx-w/2,x1:lx+w/2,y0:ly,y1:ly+32};
+      if(b.x0<2||b.x1>W-2||b.y0<44||b.y1>H-2||taken.some(o=>!(b.x1<o.x0||b.x0>o.x1||b.y1<o.y0||b.y0>o.y1))) continue; taken.push(b);
+      c.fillStyle="rgba(255,255,255,.95)"; roundRect(c,b.x0,b.y0,w,32,11); c.fill();
+      c.fillStyle="#1E1640"; c.font="800 12.5px Assistant, system-ui, sans-serif"; c.fillText(t.name,lx,ly+14);
+      c.fillStyle=hot; c.font="800 11.5px Assistant, system-ui, sans-serif"; c.fillText(amt,lx,ly+27);
+      g.hits.push({x:lx,y:ly+16,r:Math.max(24,w/2),t}); break; } }
+}
 function renderJourney(){
-  const box=$("jMap"); if(!box) return; const legs=journeyLegs(), note=$("jNote");
-  note.textContent= !legs.length ? (!(acct&&acctFor===me) ? "המסע נשמר באישי (מוצפן, רק אתה רואה). פותחים את האישי, ומאז כל עיר חדשה תיכנס לגלובוס." : "כל עיר חדשה תיכנס לגלובוס. מזהים אותה בטלפון עצמו.")
-    : legs.length===1 ? "כאן זה מתחיל · מסובבים באצבע, צובטים לזום" : legs.length+" עצירות · "+legs.reduce((a,l)=>a+l.days,0)+" ימים · מסובבים באצבע";
+  const box=$("jMap"); if(!box) return; const legs=journeyLegs(), towns=journeyTowns(legs), note=$("jNote");
+  const total=legs.reduce((a,l)=>a+l.spent,0), days=legs.reduce((a,l)=>a+l.days,0);
+  note.textContent= !legs.length ? "עוד אין עצירות · \"📍 איפה אנחנו?\" או \"✏️ עריכה\"" : "נגיעה בעיר לפרטים · מסובבים באצבע";
   loadWorld().then(()=>{
-    let cv=box.querySelector("canvas.globe");
-    const W=box.clientWidth||340, H=Math.round(Math.min(420,Math.max(300,W*0.95))), dpr=Math.min(3,window.devicePixelRatio||1);
-    if(!cv){ box.innerHTML=""; cv=document.createElement("canvas"); cv.className="globe"; cv.setAttribute("role","img"); box.appendChild(cv); }
-    cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+"px"; cv.style.height=H+"px"; cv.setAttribute("aria-label","גלובוס המסע: "+(legs.map(l=>l.name).join(", ")||"עוד אין עצירות"));
+    let cv=box.querySelector("canvas.globe"), head=box.querySelector(".gl-head");
+    const W=box.clientWidth||340, H=Math.round(Math.min(440,Math.max(320,W*1.02))), dpr=Math.min(3,window.devicePixelRatio||1);
+    if(!cv){ box.innerHTML=""; cv=document.createElement("canvas"); cv.className="globe"; cv.setAttribute("role","img"); box.appendChild(cv);
+      head=document.createElement("div"); head.className="gl-head"; box.appendChild(head); }
+    if(!box.querySelector(".gl-zoom")){ const z=document.createElement("div"); z.className="gl-zoom";
+      for(const [t,l,f] of [["＋","קירוב",1.6],["－","התרחקות",1/1.6],["🌍","כל כדור הארץ",0]]){ const b=document.createElement("button"); b.type="button"; b.textContent=t; b.setAttribute("aria-label",l);
+        b.onclick=()=>{ const g=GLOBE; if(!g) return; if(!f){ const out=g.R>Math.min(g.W,g.H)*.6; flyGlobe(out?{lon:g.lon,lat:g.lat*.3,R:Math.min(g.W,g.H)*.4}:g.fit); } else flyGlobe({lon:g.lon,lat:g.lat,R:Math.max(Math.min(g.W,g.H)*.3,Math.min(12000,g.R*f))}); }; z.appendChild(b); }
+      box.appendChild(z); }
+    head.innerHTML=""; if(legs.length){ const b=document.createElement("b"); b.className="num"; b.textContent=fmt(total,showCur); const sm=document.createElement("small"); sm.textContent=days+" ימים · "+towns.length+(towns.length===1?" עיר":" ערים"); head.append(b,sm); }
+    cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+"px"; cv.style.height=H+"px"; cv.setAttribute("aria-label","גלובוס המסע: "+(towns.map(t=>t.name+" "+fmt(t.spent,showCur)).join(", ")||"עוד אין עצירות"));
     const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
     const fit=globeFit(legs,W,H), prev=GLOBE&&GLOBE.cv===cv?GLOBE:null;
-    GLOBE={cv,ctx,W,H,cx:W/2,cy:H/2,legs,rings:prev?prev.rings:null,lon:prev?prev.lon:fit.lon-70,lat:prev?prev.lat:fit.lat*0.3,R:prev?prev.R:Math.min(W,H)*.42,draw:prev?prev.draw:0,fit,flown:prev?prev.flown:false};
+    GLOBE={cv,ctx,W,H,cx:W/2,cy:H/2+12,legs,towns,rings:prev?prev.rings:null,lon:prev?prev.lon:fit.lon-70,lat:prev?prev.lat:fit.lat*0.3,R:prev?prev.R:Math.min(W,H)*.40,draw:prev?prev.draw:0,fit,flown:prev?prev.flown:false};
     GLOBE.rings=worldRings(); drawGlobe(); globeInput(cv);
     if(!GLOBE.flown) globeWhenSeen(box);
   });
+  renderStopsEditor();
 }
+/* a card for one town: total, days, per day, the visits, what the money went on */
+function townCard(t){
+  const box=$("jMap"); let o=box.querySelector(".gl-card"); if(o) o.remove(); if(!t) return;
+  o=document.createElement("div"); o.className="gl-card"; o.setAttribute("role","dialog"); o.setAttribute("aria-label",t.name);
+  const sd=s=>{ const [y,m,d]=s.split("-").map(Number); return d+"."+m; };
+  const cats={}; for(const it of t.items){ const k=catKey(it); cats[k]=(cats[k]||0)+conv(+it.amount||0,it.cur,showCur); }
+  const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const rows=[["💰","הוצאנו",fmt(t.spent,showCur)],["📅","ימים",String(t.days)],["📊","ממוצע ליום",fmt(t.spent/Math.max(1,t.days),showCur)],["🧾","הוצאות",String(t.items.filter(i=>i.kind!=="transfer").length)]];
+  const h=document.createElement("div"); h.className="glc-h"; const n=document.createElement("b"); n.textContent="📍 "+t.name; const x=document.createElement("button"); x.type="button"; x.className="glc-x"; x.textContent="✕"; x.setAttribute("aria-label","סגירה"); x.onclick=()=>townCard(null); h.append(n,x); o.appendChild(h);
+  const g=document.createElement("div"); g.className="glc-g"; for(const [ic,l,v] of rows){ const d=document.createElement("div"); const s1=document.createElement("small"); s1.textContent=ic+" "+l; const s2=document.createElement("b"); s2.className="num"; s2.textContent=v; d.append(s2,s1); g.appendChild(d); } o.appendChild(g);
+  const vs=document.createElement("div"); vs.className="glc-v"; vs.textContent=(t.visits.length>1?"🔁 "+t.visits.length+" ביקורים: ":"🗓️ ")+t.visits.map(([a,b])=>sd(a)+(b?"–"+sd(b):" ← עכשיו")).join(" · "); o.appendChild(vs);
+  if(top.length){ const c=document.createElement("div"); c.className="glc-c"; c.textContent=top.map(([k,v])=>catName(k).split(" ")[0]+" "+Math.round(v/Math.max(1,t.spent)*100)+"%").join("  "); o.appendChild(c); }
+  box.appendChild(o); buzz(8); sound("tick");
+  if(!calm()) o.animate([{opacity:0,transform:"translateY(14px) scale(.96)"},{opacity:1,transform:"none"}],{duration:320,easing:"cubic-bezier(.2,.9,.3,1.2)"});
+}
+/* the journey by hand: add a past stop, fix a town or a date, remove a mistake */
+let stopsEdit=false;
+function renderStopsEditor(){
+  const card=$("journey"); if(!card) return; let bar=$("jBar"), ed=$("jEdit");
+  if(!bar){ bar=document.createElement("div"); bar.id="jBar"; bar.className="j-bar"; card.appendChild(bar); ed=document.createElement("div"); ed.id="jEdit"; ed.className="j-edit"; card.appendChild(ed); }
+  bar.innerHTML="";
+  const here=document.createElement("button"); here.type="button"; here.className="btn small"; here.textContent="📍 איפה אנחנו?"; here.onclick=()=>{ buzz(6); askHere(true); };
+  const edb=document.createElement("button"); edb.type="button"; edb.className="btn small"; edb.textContent=stopsEdit?"סגירת העריכה":"✏️ עריכת המסע"; edb.onclick=()=>{ stopsEdit=!stopsEdit; buzz(5); renderStopsEditor(); };
+  bar.append(here); if(canWrite) bar.append(edb);
+  ed.hidden=!stopsEdit; if(!stopsEdit){ ed.innerHTML=""; return; }
+  const rows=tripStops().map(x=>({n:x.n,d:x.d,lat:x.lat,lng:x.lng,at:x.at||0,by:x.by||null})); ed.innerHTML="";
+  const hint=document.createElement("div"); hint.className="hint"; hint.textContent="כל שורה היא יום ההגעה לעיר. נשארים בה עד העצירה הבאה."; ed.appendChild(hint);
+  const names=[...TOWNS.map(t=>t[0])].sort((a,b)=>a.localeCompare(b,"he"));
+  const list=document.createElement("div"); list.className="j-rows"; ed.appendChild(list);
+  const draw=()=>{ list.innerHTML=""; rows.forEach((r,i)=>{ const row=document.createElement("div"); row.className="j-row";
+      const d=document.createElement("input"); d.type="date"; d.value=r.d; d.setAttribute("aria-label","תאריך הגעה"); d.onchange=()=>{ r.d=d.value; };
+      const sel=document.createElement("select"); sel.setAttribute("aria-label","עיר"); for(const n of names){ const o=document.createElement("option"); o.value=n; o.textContent=n; if(n===r.n) o.selected=true; sel.appendChild(o); }
+      if(!names.includes(r.n)){ const o=document.createElement("option"); o.value=r.n; o.textContent=r.n; o.selected=true; sel.prepend(o); }
+      sel.onchange=()=>{ r.n=sel.value; const t=TOWNS.find(x=>x[0]===sel.value); if(t){ r.lat=t[1]; r.lng=t[2]; } };
+      const x=document.createElement("button"); x.type="button"; x.className="j-x"; x.textContent="✕"; x.setAttribute("aria-label","הסרת עצירה"); x.onclick=()=>{ rows.splice(i,1); draw(); };
+      row.append(d,sel,x); list.appendChild(row); }); };
+  draw();
+  const add=document.createElement("button"); add.type="button"; add.className="btn small"; add.textContent="➕ הוספת עצירה";
+  add.onclick=()=>{ const last=rows[rows.length-1]; const t=TOWNS.find(x=>x[0]==="בנגקוק"); rows.push({n:last?last.n:t[0],lat:last?last.lat:t[1],lng:last?last.lng:t[2],d:todayStr(),at:Date.now(),by:me||null}); draw(); };
+  const save=document.createElement("button"); save.type="button"; save.className="btn primary small"; save.textContent="שמירה";
+  save.onclick=async()=>{ const clean=rows.filter(r=>r.n&&/^\d{4}-\d{2}-\d{2}$/.test(r.d)).map(r=>({n:r.n,lat:r.lat,lng:r.lng,d:r.d,at:r.at||Date.now(),by:r.by||me||null})).sort((a,b)=>a.d.localeCompare(b.d)||a.at-b.at);
+    const ok=await patchTrip(curTrip,{stops:clean}); if(ok){ STOPS=[]; stopsEdit=false; const T=tripById(curTrip); if(T) T.stops=clean; if(GLOBE) GLOBE.flown=false, GLOBE=null; const b=$("jMap"); if(b) b.innerHTML=""; renderJourney(); toast("🧭 המסע עודכן"); } };
+  const f=document.createElement("div"); f.className="actions"; f.append(add,save); ed.appendChild(f);
+}
+
 /* when it first comes into view: from the whole earth to where you have been, then the route draws itself */
 let gIO=null;
 function globeWhenSeen(box){ if(gIO) gIO.disconnect(); if(!("IntersectionObserver" in window)||calm()){ const g=GLOBE; Object.assign(g,{lon:g.fit.lon,lat:g.fit.lat,R:g.fit.R,draw:1,flown:true}); drawGlobe(); return; }
@@ -1675,7 +1754,7 @@ function globeWhenSeen(box){ if(gIO) gIO.disconnect(); if(!("IntersectionObserve
 /* one finger turns the globe, two fingers zoom, a double tap flies out to the whole earth and back */
 function globeInput(cv){
   if(cv.__wired) return; cv.__wired=true; const pts=new Map(); let lastTap=0, d0=0, R0=0;
-  cv.style.touchAction="none";
+  cv.style.touchAction="pan-y";   /* up/down still scrolls the page; sideways turns the globe */
   cv.addEventListener("pointerdown",e=>{ cv.setPointerCapture(e.pointerId); pts.set(e.pointerId,[e.clientX,e.clientY]); const g=GLOBE; if(!g) return; g.drag=true;
     if(pts.size===2){ const [a,b]=[...pts.values()]; d0=Math.hypot(a[0]-b[0],a[1]-b[1]); R0=g.R; }
     const now=Date.now(); if(pts.size===1&&now-lastTap<300){ const out=g.R>Math.min(g.W,g.H)*.6; const to=out?{lon:g.lon,lat:g.lat*.3,R:Math.min(g.W,g.H)*.42}:g.fit; flyGlobe(to); } lastTap=now; });
@@ -1685,6 +1764,9 @@ function globeInput(cv){
     if(pts.size===2){ const [a,b]=[...pts.values()]; const d=Math.hypot(a[0]-b[0],a[1]-b[1]); if(d0) g.R=Math.max(Math.min(g.W,g.H)*.3,Math.min(12000,R0*d/d0)); }
     if(!g.raf) g.raf=requestAnimationFrame(()=>{ g.raf=0; drawGlobe(); }); });
   const up=e=>{ pts.delete(e.pointerId); if(pts.size<2) d0=0; if(!pts.size&&GLOBE) GLOBE.drag=false; };
+  let tapAt=null; cv.addEventListener("pointerdown",e=>{ tapAt=[e.clientX,e.clientY,Date.now()]; });
+  cv.addEventListener("pointerup",e=>{ const g=GLOBE; if(g&&tapAt&&Math.hypot(e.clientX-tapAt[0],e.clientY-tapAt[1])<8&&Date.now()-tapAt[2]<500){ const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+      const h=(g.hits||[]).map(h=>[h,Math.hypot(h.x-x,h.y-y)]).filter(([h,d])=>d<=h.r).sort((a,b)=>a[1]-b[1])[0]; townCard(h?h[0].t:null); } tapAt=null; });
   cv.addEventListener("pointerup",up); cv.addEventListener("pointercancel",up);
 }
 function flyGlobe(to){ const g=GLOBE; if(!g) return; const from={lon:g.lon,lat:g.lat,R:g.R}, t0=performance.now(), T=1100; buzz(6);
