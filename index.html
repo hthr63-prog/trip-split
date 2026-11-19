@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261119060539"></script>
+<script src="theme.js?v=20261119063856"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -957,7 +957,8 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 .kp-next{font:inherit;font-weight:700;margin-inline-start:auto;padding:8px 14px;min-height:40px;border-radius:999px;border:0;background:var(--ink);color:var(--surface)}
 .kp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;direction:ltr}
 .kp-k{font:600 1.55rem var(--display,inherit);min-height:54px;border-radius:16px;border:0;background:var(--surface-2);color:var(--ink);transition:transform .1s ease,background-color .15s}
-.kp-k:active{transform:scale(.93);background:color-mix(in srgb,var(--brand) 18%,var(--surface-2))}
+.kp-k:active,.kp-k.down{transform:scale(.93);background:color-mix(in srgb,var(--brand) 18%,var(--surface-2))}
+.kpad{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .kp-del{font-size:1.2rem}
 @media (prefers-reduced-motion:reduce){.kpad{animation:none}}
 
@@ -1649,11 +1650,11 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261119060539">
-<script src="config.js?v=20261119060539"></script>
-<script src="motion.js?v=20261119060539"></script>
-<script src="fx.js?v=20261119060539"></script>
-<script src="cinema.js?v=20261119060539"></script>
-<script src="app.js?v=20261119060539"></script>
+<meta name="app-v" content="20261119063856">
+<script src="config.js?v=20261119063856"></script>
+<script src="motion.js?v=20261119063856"></script>
+<script src="fx.js?v=20261119063856"></script>
+<script src="cinema.js?v=20261119063856"></script>
+<script src="app.js?v=20261119063856"></script>
 </body>
 </html>

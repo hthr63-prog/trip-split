@@ -1926,23 +1926,31 @@ function keypad(inputId,curOf,nextId){
   const keys=["1","2","3","4","5","6","7","8","9",".","0","⌫"];
   const set=v=>{ inp.value=v; inp.dispatchEvent(new Event("input",{bubbles:true})); };
   const raw=()=>String(inp.value||"").replace(/,/g,"");
+  /* A key acts the moment it is touched. On iPhone a tap is "touch" first and "click" ~later; in between
+     the phone moved focus around and the click landed on whatever was under the finger (the name field),
+     which closed the keys. Cancelling the touch keeps focus where it is and there is no stray click at all. */
+  const tap=(b,fn)=>{ let t=null;
+    b.addEventListener("touchstart",e=>{ e.preventDefault(); t=e.changedTouches[0]; b.classList.add("down"); },{passive:false});
+    b.addEventListener("touchmove",e=>{ const m=e.changedTouches[0]; if(t&&(Math.abs(m.clientX-t.clientX)>14||Math.abs(m.clientY-t.clientY)>14)){ t=null; b.classList.remove("down"); } },{passive:true});
+    b.addEventListener("touchend",e=>{ e.preventDefault(); b.classList.remove("down"); if(t){ t=null; fn(); } },{passive:false});
+    b.addEventListener("touchcancel",()=>{ t=null; b.classList.remove("down"); });
+    b.addEventListener("mousedown",e=>e.preventDefault());
+    b.addEventListener("click",fn);   /* mouse, keyboard, assistive tech */ };
   for(const k of keys){ const b=document.createElement("button"); b.type="button"; b.className="kp-k"+(k==="⌫"?" kp-del":""); b.textContent=k; if(k==="⌫") b.setAttribute("aria-label","מחיקה");
-    b.addEventListener("pointerdown",e=>{ e.preventDefault(); });   /* keep the caret in the amount */
-    b.onclick=()=>{ buzz(5); let r=raw();
+    tap(b,()=>{ buzz(5); let r=raw();
       if(k==="⌫") r=r.slice(0,-1); else if(k==="."){ if(!r.includes(".")) r=(r||"0")+"."; } else { if(r==="0") r=""; if(/\.\d\d$/.test(r)) return; if(r.replace(".","").length>=9) return; r+=k; }
-      set(r); };
+      set(r); });
     grid.appendChild(b); }
   const paintQuick=()=>{ quick.innerHTML=""; const c=curOf();
     for(const ils of [10,30,100]){ const v=niceAmt(conv(ils,"ILS",c)); const b=document.createElement("button"); b.type="button"; b.className="kp-q"; b.dir="ltr"; b.textContent="+"+fmt(v,c);
-      b.addEventListener("pointerdown",e=>e.preventDefault());
-      b.onclick=()=>{ buzz(6); const n=(parseFloat(raw())||0)+v; set(String(Math.round(n*100)/100)); if(window.Motion) Motion.pop(inp); }; quick.appendChild(b); }
+      tap(b,()=>{ buzz(6); const n=(parseFloat(raw())||0)+v; set(String(Math.round(n*100)/100)); if(window.Motion) Motion.pop(inp); }); quick.appendChild(b); }
     const nx=document.createElement("button"); nx.type="button"; nx.className="kp-next"; nx.textContent="שם ←"; nx.onclick=()=>{ buzz(5); box.hidden=true; try{ $(nextId).focus(); }catch(e){} }; quick.appendChild(nx); };
   inp.closest(".amount").after(box);
-  /* iPhone takes the focus away from the field on every key tap, so the keys do NOT follow focus:
-     they open when the amount is tapped and close only when another field is chosen (or "שם ←"). */
+  /* the keys open when the amount is touched and close only when another field is touched (or "שם ←");
+     they never follow focus, which the phone moves around on its own */
   const show=()=>{ if(box.hidden){ paintQuick(); box.hidden=false; } };
-  inp.addEventListener("focus",show); inp.addEventListener("click",show);
-  document.addEventListener("focusin",e=>{ if(box.hidden) return; const t=e.target; if(t===inp||box.contains(t)) return; if(t.matches&&t.matches("input,textarea,select")) box.hidden=true; });
+  inp.addEventListener("focus",show); inp.addEventListener("click",show); inp.addEventListener("touchstart",show,{passive:true});
+  document.addEventListener("pointerdown",e=>{ if(box.hidden) return; const t=e.target; if(t===inp||box.contains(t)) return; if(t.closest&&t.closest("input,textarea,select,.mic")) box.hidden=true; },{capture:true,passive:true});
 }
 keypad("fAmt",()=>cur.fCur||S.localCur,"fDesc");
 keypad("pAmt",()=>cur.pCur||S.localCur,"pDesc");
@@ -2101,7 +2109,8 @@ function weekly(force){
   window.askMotion=async(loud)=>{ if(!need()){ if(loud) toast(window.DeviceMotionEvent?"🫨 ניעור לביטול פעיל":"🫨 הטלפון הזה לא מאפשר ניעור"); return true; }
     try{ const r=await DeviceMotionEvent.requestPermission(); try{ await DeviceOrientationEvent.requestPermission(); }catch(e){}
       store("trip-motion",r); if(loud) toast(r==="granted"?"🫨 ניעור לביטול פעיל":"🫨 לא אושר. אפשר לאשר בהגדרות ספארי: תנועה וכיוון"); return r==="granted"; }catch(e){ return false; } };
-  document.addEventListener("click",()=>{ if(need()&&load("trip-motion")!=="granted"&&load("trip-motion")!=="denied") window.askMotion(false); },{capture:true,passive:true});
+  let askedNow=false;
+  document.addEventListener("click",e=>{ if(askedNow||e.target.closest&&e.target.closest(".kpad,.amount")) return; if(need()&&load("trip-motion")!=="granted"&&load("trip-motion")!=="denied"){ askedNow=true; window.askMotion(false); } },{capture:true,passive:true});
   addEventListener("devicemotion",e=>{ const a=e.accelerationIncludingGravity||e.acceleration; if(!a) return;
     const m=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2); const now=Date.now();
     if(m<17) return; peaks=peaks.filter(t=>now-t<1100); if(peaks.length&&now-peaks[peaks.length-1]<120) return; peaks.push(now);
