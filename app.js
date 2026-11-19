@@ -1905,18 +1905,22 @@ function renderJourney(mode){
   note.textContent= !legs.length ? (mine?"היעדים משותפים · מוסיפים אותם במסך הגרפים":"עוד אין יעדים · \"📍 איפה אנחנו?\" או \"✏️ היעדים שלנו\"") : legs.some(l=>l.est) ? "היעד הראשון נספר מתחילת הטיול · ✏️ לתקן תאריכים" : mine ? "שלך: אישי + החלק שלך במשותף · נגיעה ביעד לפרטים" : "נגיעה ביעד לפרטים · מסובבים באצבע";
   loadWorld().then(()=>{
     let cv=box.querySelector("canvas.globe"), head=box.querySelector(".gl-head");
-    const W=box.clientWidth||340, H=Math.round(Math.min(440,Math.max(320,W*1.02))), dpr=Math.min(3,window.devicePixelRatio||1);
+    const full=box.classList.contains("gl-full");
+    const W= full ? box.clientWidth||innerWidth : box.clientWidth||340, H= full ? box.clientHeight||innerHeight : Math.round(Math.min(440,Math.max(320,W*1.02))), dpr=Math.min(3,window.devicePixelRatio||1);
     if(!cv){ box.innerHTML=""; cv=document.createElement("canvas"); cv.className="globe"; cv.setAttribute("role","img"); box.appendChild(cv);
       head=document.createElement("div"); head.className="gl-head"; box.appendChild(head); }
     if(!box.querySelector(".gl-zoom")){ const z=document.createElement("div"); z.className="gl-zoom";
-      for(const [t,l,f] of [["＋","קירוב",1.6],["－","התרחקות",1/1.6],["🌍","כל כדור הארץ",0]]){ const b=document.createElement("button"); b.type="button"; b.textContent=t; b.setAttribute("aria-label",l);
+      for(const [t,l,f] of [["＋","קירוב",1.6],["－","התרחקות",1/1.6],["🌍","כל כדור הארץ",0],["⛶","מסך מלא","full"]]){ const b=document.createElement("button"); b.type="button"; b.textContent=t; b.setAttribute("aria-label",l);
+        if(f==="full"){ b.className="gl-fs"; b.onclick=()=>globeFull(box,mode); z.appendChild(b); continue; }
         b.onclick=()=>{ const g=cv.__g; if(!g) return; if(!f){ const out=g.R>Math.min(g.W,g.H)*.6; flyGlobe(out?{lon:g.lon,lat:g.lat*.3,R:Math.min(g.W,g.H)*.4}:g.fit,g); } else flyGlobe({lon:g.lon,lat:g.lat,R:Math.max(Math.min(g.W,g.H)*.3,Math.min(12000,g.R*f))},g); }; z.appendChild(b); }
       box.appendChild(z); }
     head.innerHTML=""; if(legs.length){ const b=document.createElement("b"); b.className="num"; b.textContent=fmt(total,showCur); const sm=document.createElement("small"); sm.textContent=(days===1?"יום אחד":days+" ימים")+" · "+(towns.length===1?"יעד אחד":towns.length+" יעדים")+" · "+fmt(total/Math.max(1,days),showCur)+" ליום"; head.append(b,sm);
       if(mine){ const al=[...legs,...(legs.extra||[])].reduce((a,l)=>a+(l.alone||0),0), sp=document.createElement("div"); sp.className="gl-split"; const x1=document.createElement("span"); x1.textContent="🙋 אישי "+fmt(al,showCur); const x2=document.createElement("span"); x2.textContent="👫 משותף "+fmt(total-al,showCur); sp.append(x1,x2); head.appendChild(sp); } }
     cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+"px"; cv.style.height=H+"px"; cv.setAttribute("aria-label",(mine?"הגלובוס שלי: ":"גלובוס המסע: ")+(towns.map(t=>t.name+" "+fmt(t.spent,showCur)).join(", ")||"עוד אין יעדים"));
     const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
-    const fit=globeFit(legs,W,H), prev=cv.__g;
+    const fit=globeFit(legs,W,H), prev0=cv.__g, prev=prev0&&{...prev0};
+    /* the window changed size (full screen and back): the globe keeps its look, scaled to the new room */
+    if(prev&&(prev.W!==W||prev.H!==H)){ prev.R*=Math.min(W,H)/Math.min(prev.W,prev.H); prev.stars=null; }
     const g={cv,ctx,W,H,cx:W/2,cy:H/2+12,legs,towns,mode,rings:worldRings(),lon:prev?prev.lon:fit.lon-70,lat:prev?prev.lat:fit.lat*0.3,R:prev?prev.R:Math.min(W,H)*.40,draw:prev?prev.draw:0,fit,flown:prev?prev.flown:false,stars:prev?prev.stars:null};
     cv.__g=g; if(mine) GLOBE_ME=g; else GLOBE=g;
     drawGlobe(g); globeInput(cv);
@@ -1924,6 +1928,20 @@ function renderJourney(mode){
   });
   if(!mine) renderStopsEditor();
 }
+/* the globe as the whole window: tap ⛶, everything else steps aside; ✕ (or Esc) brings it back */
+function globeFull(box,mode,force){ const on= force!=null ? force : !box.classList.contains("gl-full");
+  if(on===box.classList.contains("gl-full")) return;
+  /* lifted out to the page itself while full (a moving card around it would otherwise hold it in) */
+  if(on){ box.__home=document.createComment("globe"); box.parentNode.insertBefore(box.__home,box); document.body.appendChild(box); }
+  else if(box.__home&&box.__home.parentNode){ box.__home.parentNode.insertBefore(box,box.__home); box.__home.remove(); box.__home=null; }
+  box.classList.toggle("gl-full",on); document.body.classList.toggle("globe-open",on); buzz(6);
+  const cv=box.querySelector("canvas.globe"); if(cv) cv.style.touchAction= on ? "none" : "pan-y";
+  const b=box.querySelector(".gl-fs"); if(b){ b.textContent= on ? "✕" : "⛶"; b.setAttribute("aria-label",on?"יציאה ממסך מלא":"מסך מלא"); }
+  townCard(null,cv&&cv.__g);
+  if(on) box.__back=()=>globeFull(box,mode,false); else box.__back=null;
+  renderJourney(mode); if(!on) setTimeout(()=>box.scrollIntoView({block:"center"}),30); }
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ const b=document.querySelector(".jmap.gl-full"); if(b&&b.__back) b.__back(); } });
+addEventListener("resize",()=>{ const b=document.querySelector(".jmap.gl-full"); if(b) renderJourney(b.id==="jMapMe"?"mine":"shared"); });
 /* a card for one place: total, days, per day, the visits, what the money went on */
 function townCard(t,g){
   g=g||GLOBE; const box=g&&g.cv.parentNode; if(!box) return; let o=box.querySelector(".gl-card"); if(o) o.remove(); if(!t) return;

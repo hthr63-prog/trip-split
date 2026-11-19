@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261119112749"></script>
+<script src="theme.js?v=20261119115347"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -1030,6 +1030,13 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 .glc-g div{display:flex;flex-direction:column;align-items:center;background:#F6F4FF;border-radius:12px;padding:6px 2px}
 .glc-g b{font:800 .98rem var(--display,inherit)}.glc-g small{font-size:.68rem;color:#6B6590;white-space:nowrap}
 .glc-v,.glc-c{font-size:.82rem;color:#4A4470}
+.jmap.gl-full{position:fixed!important;inset:0;z-index:1000;border-radius:0!important;margin:0;background:#120B33!important}
+.jmap.gl-full .gl-zoom{top:calc(env(safe-area-inset-top) + 10px)}
+.jmap.gl-full .gl-head{top:calc(env(safe-area-inset-top) + 10px)}
+.jmap.gl-full .gl-card{bottom:calc(env(safe-area-inset-bottom) + 12px)}
+body.globe-open{overflow:hidden}
+body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
+.gl-zoom .gl-fs{font-size:1rem}
 .gl-zoom{position:absolute;top:10px;inset-inline-end:10px;display:flex;flex-direction:column;gap:6px}
 .gl-zoom button{width:38px;height:38px;border-radius:12px;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:1.1rem;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .j-bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
@@ -1740,11 +1747,11 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261119112749">
-<script src="config.js?v=20261119112749"></script>
-<script src="motion.js?v=20261119112749"></script>
-<script src="fx.js?v=20261119112749"></script>
-<script src="cinema.js?v=20261119112749"></script>
-<script src="app.js?v=20261119112749"></script>
+<meta name="app-v" content="20261119115347">
+<script src="config.js?v=20261119115347"></script>
+<script src="motion.js?v=20261119115347"></script>
+<script src="fx.js?v=20261119115347"></script>
+<script src="cinema.js?v=20261119115347"></script>
+<script src="app.js?v=20261119115347"></script>
 </body>
 </html>
