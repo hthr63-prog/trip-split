@@ -214,12 +214,18 @@ function isDark(){ const t=themePref(); return t==="dark"||(t==="auto"&&document
 function applyTheme(t){
   if(t==="auto"){ store("trip-theme",""); window.FX&&FX.autoTheme(true); }
   else { document.documentElement.dataset.theme=t; store("trip-theme",t); }
-  $("themeBtn").setAttribute("aria-checked",String(isDark()));
+  $("themeBtn").setAttribute("aria-checked",String(isDark())); $("themeBtn").dataset.mode=themePref(); $("themeBtn").setAttribute("aria-label","מצב תצוגה: "+({auto:"אוטומטי לפי השקיעה",light:"בהיר",dark:"כהה"})[themePref()]);
   if($("motionBtn")) $("motionBtn").onclick=()=>window.askMotion&&window.askMotion(true);
   if($("soundSeg")) seg($("soundSeg"),[["on","🔔 צלילים"],["off","🔕 בלי"]],v=>v===(load("trip-sound")==="off"?"off":"on"),v=>{ store("trip-sound",v); applyTheme(themePref()); if(v==="on") sound("coin"); });
   if($("themeSeg")) seg($("themeSeg"),[["auto","🌅 אוטומטי"],["light","☀️ בהיר"],["dark","🌙 כהה"]],v=>v===themePref(),v=>applyTheme(v));
 }
-$("themeBtn").onclick=()=>{ const r=document.documentElement; if(!calm()){ r.classList.add("theming"); setTimeout(()=>r.classList.remove("theming"),500); } buzz(6); applyTheme(isDark()?"light":"dark"); };
+/* three places on the switch: ☀️ light · 🌅 automatic (by sunset where you are) · 🌙 dark. Tap a place, or tap to move on. */
+$("themeBtn").onclick=e=>{ const r=document.documentElement, b=$("themeBtn"), box=b.getBoundingClientRect();
+  const order=["light","auto","dark"]; let next;
+  if(e&&e.clientX&&box.width){ next=order[Math.max(0,Math.min(2,Math.floor((e.clientX-box.left)/box.width*3)))]; if(next===themePref()) next=order[(order.indexOf(next)+1)%3]; }
+  else next=order[(order.indexOf(themePref())+1)%3];
+  if(!calm()){ r.classList.add("theming"); setTimeout(()=>r.classList.remove("theming"),500); } buzz(6); applyTheme(next);
+  toast(({auto:"🌅 אוטומטי: כהה מהשקיעה ועד הזריחה",light:"☀️ בהיר",dark:"🌙 כהה"})[next]); };
 /* automatic: dark after sunset where you are, light after sunrise (fx.js); the switch above sets it by hand */
 
 /* ---- search keywords per currency ---- */
@@ -1579,7 +1585,7 @@ function stayDays(stays){
 }
 /* the money of a day, for the couple (shared) or for me (mine alone + my share of the shared) */
 function dayItems(mode){
-  if(mode==="mine") return [...(acct&&acctFor===me?P:[]), ...myShareItems()];
+  if(mode==="mine") return [...(acct&&acctFor===me?P:[]).map(it=>({...it,_alone:true})), ...myShareItems()];
   return S.items.filter(it=>it.kind!=="transfer");
 }
 function journeyLegs(mode){
@@ -1587,11 +1593,12 @@ function journeyLegs(mode){
   return stays.map((x,i)=>{ const days=[...own].filter(([,k])=>k===i).map(([d])=>d).sort();
     const set=new Set(days), its=items.filter(it=>set.has(it.date));
     return {name:x.n,lat:x.lat,lng:x.lng,from:x.d,to:x.e||(stays[i+1]?stays[i+1].d:null),left:x.e||null,last:i===stays.length-1&&!x.e,est:!!x.est,
-      days:days.length,dates:days,items:its,spent:its.reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0)}; });   /* a town passed through the same day stays on the route, with 0 days */
+      days:days.length,dates:days,items:its,spent:its.reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0),
+      alone:its.filter(it=>it._alone).reduce((a,it)=>a+conv(+it.amount||0,it.cur,showCur),0)}; });   /* a town passed through the same day stays on the route, with 0 days */
 }
 /* towns: going back to the same place adds to its days and money */
 function journeyTowns(legs){ const m=new Map();
-  for(const l of legs){ const t=m.get(l.name)||{name:l.name,lat:l.lat,lng:l.lng,days:0,spent:0,visits:[],items:[]}; t.days+=l.days; t.spent+=l.spent; t.visits.push([l.from,l.left||(l.last?null:l.to)]); if(l.est) t.est=true; t.items.push(...l.items); m.set(l.name,t); }
+  for(const l of legs){ const t=m.get(l.name)||{name:l.name,lat:l.lat,lng:l.lng,days:0,spent:0,alone:0,visits:[],items:[]}; t.days+=l.days; t.spent+=l.spent; t.alone+=l.alone||0; t.visits.push([l.from,l.left||(l.last?null:l.to)]); if(l.est) t.est=true; t.items.push(...l.items); m.set(l.name,t); }
   return [...m.values()]; }
 let stopBusy=false;
 async function recordStop(lat,lng){
@@ -1643,6 +1650,21 @@ function globeFit(legs,W,H){
   const span=Math.max(7,Math.max(1.2,...legs.map(l=>angDist(mean[0],mean[1],l.lng,l.lat)))*1.7);
   return {lon:mean[0],lat:mean[1],R:Math.min(9000,Math.max(Math.min(W,H)*.42,Math.min(W,H)*.36/Math.sin(Math.min(80,span)*D2R)))};
 }
+/* where the sun is overhead now (declination by the day of the year, longitude by the UTC hour) */
+function subsolar(){ const d=new Date(), y0=Date.UTC(d.getUTCFullYear(),0,1), n=(d-y0)/864e5, h=d.getUTCHours()+d.getUTCMinutes()/60;
+  const B=2*Math.PI*(n-81)/364, eot=9.87*Math.sin(2*B)-7.53*Math.cos(B)-1.5*Math.sin(B);   /* minutes */
+  return {lat:-23.44*Math.cos(2*Math.PI*(n+10)/365), lng:((-15*(h-12)-eot/4)+540)%360-180}; }
+/* the night side, darkened with a soft dusk line: drawn small and stretched, so it costs little */
+function nightShade(g,c){
+  const sc=3, w=Math.ceil(g.W/sc), h=Math.ceil(g.H/sc); let o=g.nightCv; if(!o||o.width!==w||o.height!==h){ o=g.nightCv=document.createElement("canvas"); o.width=w; o.height=h; }
+  const ox=o.getContext("2d"), img=ox.createImageData(w,h), dt=img.data, sun=subsolar(), sl=sun.lat*D2R, sg=sun.lng, p0=g.lat*D2R, sp0=Math.sin(p0), cp0=Math.cos(p0);
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++){ const x=(i*sc+sc/2-g.cx)/g.R, y=(g.cy-(j*sc+sc/2))/g.R, rho=Math.hypot(x,y); if(rho>1) continue;
+    const cc=Math.asin(Math.min(1,rho)), sc2=Math.sin(cc), cc2=Math.cos(cc);
+    const lat=rho<1e-9?p0:Math.asin(cc2*sp0+y*sc2*cp0/rho), lon=g.lon+Math.atan2(x*sc2,rho*cc2*cp0-y*sc2*sp0)/D2R;
+    const cz=Math.sin(lat)*Math.sin(sl)+Math.cos(lat)*Math.cos(sl)*Math.cos((lon-sg)*D2R);
+    const a= cz>0.08 ? 0 : cz<-0.12 ? 0.62 : (0.08-cz)/0.2*0.62, k=(j*w+i)*4; dt[k]=8; dt[k+1]=6; dt[k+2]=40; dt[k+3]=a*255; }
+  ox.putImageData(img,0,0); c.save(); c.imageSmoothingEnabled=true; c.drawImage(o,0,0,g.W,g.H); c.restore();
+}
 function drawGlobe(g){
   g=g||GLOBE; if(!g||!g.cv.isConnected) return; const c=g.ctx, W=g.W, H=g.H; c.clearRect(0,0,W,H);
   const hot=g.mode==="mine"?"#14C9A5":"#FF4D8D", gold="#FFC93C";
@@ -1663,6 +1685,7 @@ function drawGlobe(g){
     c.beginPath(); let any=false; const n=r.lon.length, stp=g.R<500&&n>60?2:1;
     for(let i=0;i<n;i+=stp){ const [x,y,v]=gproj(g,r.lon[i],r.lat[i]); if(v) any=true; i?c.lineTo(x,y):c.moveTo(x,y); }
     if(!any) continue; c.closePath(); c.fill(); c.stroke(); }
+  nightShade(g,c);
   const sh=c.createRadialGradient(g.cx-g.R*.45,g.cy-g.R*.5,g.R*.05,g.cx,g.cy,g.R*1.02); sh.addColorStop(0,"rgba(255,255,255,.22)"); sh.addColorStop(.65,"rgba(255,255,255,0)"); sh.addColorStop(1,"rgba(5,0,40,.45)");
   c.fillStyle=sh; c.fillRect(0,0,W,H); c.restore();
   const L=g.legs; c.lineCap="round"; c.lineJoin="round";
@@ -1708,7 +1731,8 @@ function renderJourney(mode){
       for(const [t,l,f] of [["＋","קירוב",1.6],["－","התרחקות",1/1.6],["🌍","כל כדור הארץ",0]]){ const b=document.createElement("button"); b.type="button"; b.textContent=t; b.setAttribute("aria-label",l);
         b.onclick=()=>{ const g=cv.__g; if(!g) return; if(!f){ const out=g.R>Math.min(g.W,g.H)*.6; flyGlobe(out?{lon:g.lon,lat:g.lat*.3,R:Math.min(g.W,g.H)*.4}:g.fit,g); } else flyGlobe({lon:g.lon,lat:g.lat,R:Math.max(Math.min(g.W,g.H)*.3,Math.min(12000,g.R*f))},g); }; z.appendChild(b); }
       box.appendChild(z); }
-    head.innerHTML=""; if(legs.length){ const b=document.createElement("b"); b.className="num"; b.textContent=fmt(total,showCur); const sm=document.createElement("small"); sm.textContent=(mine?"שלך · ":"")+(days===1?"יום אחד":days+" ימים")+" · "+(towns.length===1?"יעד אחד":towns.length+" יעדים")+" · "+fmt(total/Math.max(1,days),showCur)+" ליום"; head.append(b,sm); }
+    head.innerHTML=""; if(legs.length){ const b=document.createElement("b"); b.className="num"; b.textContent=fmt(total,showCur); const sm=document.createElement("small"); sm.textContent=(days===1?"יום אחד":days+" ימים")+" · "+(towns.length===1?"יעד אחד":towns.length+" יעדים")+" · "+fmt(total/Math.max(1,days),showCur)+" ליום"; head.append(b,sm);
+      if(mine){ const al=legs.reduce((a,l)=>a+(l.alone||0),0), sp=document.createElement("div"); sp.className="gl-split"; const x1=document.createElement("span"); x1.textContent="🙋 אישי "+fmt(al,showCur); const x2=document.createElement("span"); x2.textContent="👫 משותף "+fmt(total-al,showCur); sp.append(x1,x2); head.appendChild(sp); } }
     cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+"px"; cv.style.height=H+"px"; cv.setAttribute("aria-label",(mine?"הגלובוס שלי: ":"גלובוס המסע: ")+(towns.map(t=>t.name+" "+fmt(t.spent,showCur)).join(", ")||"עוד אין יעדים"));
     const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
     const fit=globeFit(legs,W,H), prev=cv.__g;
@@ -1726,9 +1750,10 @@ function townCard(t,g){
   const sd=s=>{ const [y,m,d]=s.split("-").map(Number); return d+"."+m; };
   const cats={}; for(const it of t.items){ const k=catKey(it); cats[k]=(cats[k]||0)+conv(+it.amount||0,it.cur,showCur); }
   const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  const rows=[["💰",g.mode==="mine"?"הוצאת":"הוצאנו",fmt(t.spent,showCur)],["📅","ימים",String(t.days)],["📊","ממוצע ליום",fmt(t.spent/Math.max(1,t.days),showCur)],["🧾","הוצאות",String(t.items.filter(i=>i.kind!=="transfer").length)]];
+  const rows=[["💰",g.mode==="mine"?"הוצאות":"הוצאנו",fmt(t.spent,showCur)],["📅","ימים",String(t.days)],["📊","ממוצע ליום",fmt(t.spent/Math.max(1,t.days),showCur)],["🧾","הוצאות",String(t.items.filter(i=>i.kind!=="transfer").length)]];
   const h=document.createElement("div"); h.className="glc-h"; const n=document.createElement("b"); n.textContent="📍 "+t.name; const x=document.createElement("button"); x.type="button"; x.className="glc-x"; x.textContent="✕"; x.setAttribute("aria-label","סגירה"); x.onclick=()=>townCard(null,g); h.append(n,x); o.appendChild(h);
   const gr=document.createElement("div"); gr.className="glc-g"; for(const [ic,l,v] of rows){ const d=document.createElement("div"); const s1=document.createElement("small"); s1.textContent=ic+" "+l; const s2=document.createElement("b"); s2.className="num"; s2.textContent=v; d.append(s2,s1); gr.appendChild(d); } o.appendChild(gr);
+  if(g.mode==="mine"){ const sp=document.createElement("div"); sp.className="glc-split"; for(const [ic,l,v] of [["🙋","אישי",t.alone||0],["👫","משותף (החלק שלך)",t.spent-(t.alone||0)]]){ const d=document.createElement("div"); const a=document.createElement("b"); a.className="num"; a.textContent=fmt(v,showCur); const b=document.createElement("small"); b.textContent=ic+" "+l; d.append(a,b); sp.appendChild(d); } o.appendChild(sp); }
   const vs=document.createElement("div"); vs.className="glc-v"; vs.textContent=(t.visits.length>1?"🔁 "+t.visits.length+" ביקורים: ":"🗓️ ")+t.visits.map(([a,b])=>sd(a)+(b?"–"+sd(b):" ← עכשיו")).join(" · ")+(t.est?" · ההגעה משוערת (מתחילת הטיול)":""); o.appendChild(vs);
   if(top.length){ const c=document.createElement("div"); c.className="glc-c"; c.textContent=top.map(([k,v])=>catName(k).split(" ")[0]+" "+Math.round(v/Math.max(1,t.spent)*100)+"%").join("  "); o.appendChild(c); }
   box.appendChild(o); buzz(8); sound("tick");
@@ -1976,7 +2001,11 @@ function renderStats(){
   /* both: my own expenses plus my part of the shared ones */
   const locItems= locScope==="mine" ? mineP : locScope==="both" ? [...myShareItems(),...mineP] : S.items.filter(it=>it.kind!=="transfer");
   $("stLocNote").hidden=!((locScope==="mine"||locScope==="both")&&!(acct&&acctFor===me));
-  const byC={}; for(const it of locItems){ const k=locOf(it); const o=byC[k]||(byC[k]={v:0,days:new Set()}); o.v+=conv(+it.amount||0,it.cur,showCur); if(it.date) o.days.add(it.date); }
+  /* one rule everywhere: anything dated before the trip started counts as "before the trip", and a country's days are
+     the calendar days from the first to the last day there (days without expenses count too, as in the daily average) */
+  const stC=tripStart(), tdC=todayStr();
+  const byC={}; for(const it of locItems){ const k= stC&&(it.date||"")<stC ? "prep" : locOf(it); const o=byC[k]||(byC[k]={v:0,days:new Set(),min:null,max:null}); o.v+=conv(+it.amount||0,it.cur,showCur); if(it.date){ o.days.add(it.date); if(!o.min||it.date<o.min) o.min=it.date; if(!o.max||it.date>o.max) o.max=it.date; } }
+  for(const [k,o] of Object.entries(byC)){ if(k==="prep"||k==="?"||!o.min) continue; const end= k===S.localCur&&!S.home ? tdC : o.max; o.span=daysBetween(o.min,end)+1; }
   const ce=Object.entries(byC).sort((x,y)=>y[1].v-x[1].v); const cm=ce[0]?.[1].v||1; const CC=$("stCountries"); CC.innerHTML="";
   if(!ce.length) CC.innerHTML='<div class="hint">עוד אין הוצאות.</div>';
   for(const [k,o] of ce){
@@ -1984,7 +2013,7 @@ function renderStats(){
     r.innerHTML='<span></span><div class="bar"><i></i></div><span class="amtpct"><b class="num"></b><small></small></span>';
     r.children[0].textContent=locName(k); r.querySelector("i").style.width=(o.v/cm*100).toFixed(1)+"%"; if(k!=="?"){ r.classList.add("tap"); r.title="סיכום של "+locName(k); r.onclick=()=>openRecap(k); }
     r.querySelector("b").textContent=fmt(o.v,showCur);
-    const n=o.days.size; { const sm=r.querySelector("small"); sm.textContent=""; if(!(k==="prep"||k==="?")){ const pd=document.createElement("b"); pd.className="num pd"; pd.textContent=fmt(o.v/(n||1),showCur); sm.append(pd," ליום · "+(n===1?"יום אחד":n+" ימים")); } }
+    const n=o.span||o.days.size; { const sm=r.querySelector("small"); sm.textContent=""; if(!(k==="prep"||k==="?")){ const pd=document.createElement("b"); pd.className="num pd"; pd.textContent=fmt(o.v/(n||1),showCur); sm.append(pd," ליום · "+(n===1?"יום אחד":n+" ימים")); } }
     CC.appendChild(r);
   }
   /* who paid (whole trip only) */

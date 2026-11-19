@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261119081750"></script>
+<script src="theme.js?v=20261119085256"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -1031,6 +1031,25 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 .j-here{font:inherit;font-size:.8rem;font-weight:700;min-height:42px;border-radius:12px;border:1.5px dashed var(--brand);background:color-mix(in srgb,var(--brand) 8%,var(--surface));color:var(--brand);padding:4px 6px}
 .j-still{font:inherit;font-size:.75rem;border:0;background:none;color:var(--brand);text-decoration:underline;align-self:flex-start;padding:2px 0}
 .j-info{font-size:.82rem;color:var(--ink);font-weight:600;background:var(--surface);border-radius:10px;padding:6px 10px}
+
+/* three-way theme switch: light · auto · dark */
+.tswitch.t3{width:108px;background:linear-gradient(90deg,#FFE7A3,#FFB37A 45%,#7B6CF0 70%,#2A1A66)}
+.tswitch.t3 .t3-ic{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);place-items:center;font-size:12px;font-weight:800;color:rgba(255,255,255,.85)}
+.tswitch.t3 .t3-ic b:nth-child(2){font-family:var(--display,inherit);color:#fff}
+.tswitch.t3 .tk{opacity:0}
+.tswitch.t3[data-mode="dark"] .tk{opacity:1}
+.tswitch.t3[data-mode="light"]{background:linear-gradient(90deg,#FFF3C4,#FFD86B)}
+.tswitch.t3 .knob{width:32px;height:32px}
+.tswitch.t3[data-mode="light"] .knob{transform:translateX(0)}
+.tswitch.t3[data-mode="auto"] .knob{transform:translateX(34px)}
+.tswitch.t3[data-mode="dark"] .knob{transform:translateX(68px);background:#EDE9FF}
+.tswitch.t3 .knob b{opacity:0;transform:scale(.5) rotate(-60deg)}
+.tswitch.t3[data-mode="light"] .k-sun,.tswitch.t3[data-mode="auto"] .k-auto,.tswitch.t3[data-mode="dark"] .k-moon{opacity:1;transform:none}
+/* personal globe: total and its two parts */
+.gl-split{display:flex;gap:10px;margin-top:4px;font-size:.78rem;font-weight:700;opacity:.92}
+.glc-split{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.glc-split div{display:flex;justify-content:space-between;align-items:center;background:#EFFBF7;border-radius:12px;padding:6px 10px}
+.glc-split b{font:800 .95rem var(--display,inherit)}.glc-split small{font-size:.75rem;color:#4A6B63}
 </style>
 </head>
 <body>
@@ -1041,7 +1060,7 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
       <div class="hbtns">
         <button class="btn icon-btn" id="statsBtn" type="button" aria-label="גרפים לפי חודשים"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg></button>
         <button class="btn icon-btn" id="settingsBtn" type="button" aria-label="הגדרות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
-        <button class="tswitch" id="themeBtn" type="button" role="switch" aria-checked="false" aria-label="מצב כהה"><span class="tk" aria-hidden="true"><i></i><i></i><i></i></span><span class="knob" aria-hidden="true"><b class="k-sun">☀️</b><b class="k-moon">🌙</b></span></button>
+        <button class="tswitch t3" id="themeBtn" type="button" data-mode="auto" aria-label="מצב תצוגה"><span class="tk" aria-hidden="true"><i></i><i></i><i></i></span><span class="t3-ic" aria-hidden="true"><b>☀️</b><b>A</b><b>🌙</b></span><span class="knob" aria-hidden="true"><b class="k-sun">☀️</b><b class="k-auto">🌅</b><b class="k-moon">🌙</b></span></button>
       </div>
     </div>
     <div class="t">
@@ -1686,11 +1705,11 @@ body:has(.sheet-bg:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inse
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261119081750">
-<script src="config.js?v=20261119081750"></script>
-<script src="motion.js?v=20261119081750"></script>
-<script src="fx.js?v=20261119081750"></script>
-<script src="cinema.js?v=20261119081750"></script>
-<script src="app.js?v=20261119081750"></script>
+<meta name="app-v" content="20261119085256">
+<script src="config.js?v=20261119085256"></script>
+<script src="motion.js?v=20261119085256"></script>
+<script src="fx.js?v=20261119085256"></script>
+<script src="cinema.js?v=20261119085256"></script>
+<script src="app.js?v=20261119085256"></script>
 </body>
 </html>
