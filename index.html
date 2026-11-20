@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261120041314"></script>
+<script src="theme.js?v=20261120113547"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -213,6 +213,12 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .sf-left{align-self:flex-start;font:inherit;font-size:.8rem;font-weight:700;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px 10px;margin-top:-4px;cursor:pointer}
 .sfplace{margin:2px 0 6px;align-self:flex-start;width:max-content;max-width:100%}
 .sfplace button{font-size:.85rem;padding:5px 12px}
+.hist-bg{position:fixed;inset:0;z-index:900;background:rgba(10,6,30,.5);display:flex;align-items:flex-end;justify-content:center}
+.hist{background:var(--surface);color:var(--ink);width:min(560px,100%);max-height:80vh;overflow:auto;border-radius:24px 24px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom) + 16px);display:flex;flex-direction:column;gap:12px}
+.hist-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hist-r{border:1px solid var(--line);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.hist-r small{color:var(--muted)}
+.hist-c{font-size:.92rem;display:flex;flex-direction:column;gap:2px}
 .locrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .locrow .curbtn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .curbtn.town small{opacity:.7;font-weight:500}
@@ -1753,11 +1759,11 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261120041314">
-<script src="config.js?v=20261120041314"></script>
-<script src="motion.js?v=20261120041314"></script>
-<script src="fx.js?v=20261120041314"></script>
-<script src="cinema.js?v=20261120041314"></script>
-<script src="app.js?v=20261120041314"></script>
+<meta name="app-v" content="20261120113547">
+<script src="config.js?v=20261120113547"></script>
+<script src="motion.js?v=20261120113547"></script>
+<script src="fx.js?v=20261120113547"></script>
+<script src="cinema.js?v=20261120113547"></script>
+<script src="app.js?v=20261120113547"></script>
 </body>
 </html>

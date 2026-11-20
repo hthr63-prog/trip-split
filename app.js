@@ -732,7 +732,8 @@ function renderLedger_(){
     if(me&&it.kind!=="transfer"){ const sh=sharesOf(it); const fa=(+it.amount)*(1+feeRate(it)); const d=fa*paidShare(it,me)-fa*(sh[me]||0); if(Math.abs(d)>0.0001){ const s=document.createElement("span"); s.className="mine num "+(d>0?"plus":"minus"); s.textContent=(d>0?"מגיע לך ":"עליך ")+fmt(Math.abs(d),it.cur); right.appendChild(s); } }
     if(canWrite){
       const acts=document.createElement("div"); acts.className="acts";
-      if(it.kind!=="transfer"){ const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>startEdit(it); acts.appendChild(e); }
+      if(it.kind!=="transfer"){ const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>startEdit(it); acts.appendChild(e);
+        if(it.hist&&it.hist.length){ const hb=document.createElement("button"); hb.className="link"; hb.type="button"; hb.textContent="🕘 גרסאות"; hb.onclick=()=>showHistory(it,false); acts.appendChild(hb); } }
       if(it.kind!=="transfer"){ const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.title="להוסיף את אותה הוצאה להיום"; ag.onclick=()=>again(it,false); acts.prepend(ag); }
       const d=delBtn(()=>delItem(it,false)); if(it.kind==="transfer"){ d.textContent="ביטול ההעברה"; d.dataset.label="ביטול ההעברה"; }
       acts.appendChild(d);
@@ -919,6 +920,7 @@ function renderPersonal_(){
       r.append(dot,main,right); r.dataset.id=it.id;
       box.appendChild(w ? swipeWrap(r,it,true,{again:()=>againCash(w),againLabel:w.sub==="exchange"?"🔁 עוד החלפה כזו":"🔁 עוד משיכה כזו",del:()=>delItem({id:w.id,desc:w.sub==="exchange"?"החלפת מטבע":"משיכה מכספומט"},true),delLabel:w.sub==="exchange"?"🗑 מחיקת ההחלפה":"🗑 מחיקת המשיכה"}) : r); continue; }
     const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>pStartEdit(it); acts.appendChild(e);
+    if(it.hist&&it.hist.length){ const hb=document.createElement("button"); hb.className="link"; hb.type="button"; hb.textContent="🕘 גרסאות"; hb.onclick=()=>showHistory(it,true); acts.appendChild(hb); }
     const ag=document.createElement("button"); ag.className="link"; ag.type="button"; ag.textContent="🔁 שוב"; ag.onclick=()=>again(it,true); acts.prepend(ag);
     acts.appendChild(delBtn(()=>delItem(it,true)));
     r.appendChild(acts);
@@ -1582,8 +1584,12 @@ async function save(){
   const data={rIls:(editingId&&editOrig&&editOrig.cur===cur.fCur&&editOrig.rIls>0)?editOrig.rIls:rateNow(cur.fCur),kind:"expense",desc:$("fDesc").value.trim(),amount,cur:cur.fCur,payer:form.payer,among:pcts?null:[...form.among],pcts,cat:form.cat||"other",catLabel:form.cat==="other"?$("fCatLabel").value.trim():"",loc:form.loc||defLoc(),pm:form.pm||"cash",date:$("fDate").value||todayStr(),...((form.town||editingId)?{town:form.town||null}:{})};
   const id=editingId||uid("e");
   let patch=data;
-  if(editingId&&editOrig){ patch={}; for(const k of Object.keys(data)){ if(JSON.stringify(data[k]??null)!==JSON.stringify(editOrig[k]??null)) patch[k]=data[k]; } }
+  /* an empty text and a missing one are the same: no change */
+  if(editingId&&editOrig){ patch={}; const z=v=>v===""||v===undefined?null:v; for(const k of Object.keys(data)){ if(JSON.stringify(z(data[k]))!==JSON.stringify(z(editOrig[k]))) patch[k]=data[k]; } }
   if(editingId&&!Object.keys(patch).length){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; closeSheet("addSheet"); toast("לא שונה כלום"); return; }
+  /* every edit keeps what it replaced (the last 10), so a wrong edit can be put back */
+  let undoOld=null;
+  if(editingId&&editOrig){ undoOld={}; for(const k of Object.keys(patch)) undoOld[k]=editOrig[k]??null; patch.hist=histPush(editOrig.hist,undoOld); }
   const job=run(()=> editingId ? EXP().doc(id).update(patch) : EXP().doc(id).set({...data,createdAt:Date.now(),tz:hereTz(),by:me||null,trip:curTrip}));
   /* optimistic: the sheet goes away at once; if saving fails it comes back with everything still filled in */
   const fromBtn=$("saveBtn").getBoundingClientRect().width?$("saveBtn"):null, label=catEmoji(data)+" "+fmt(amount,data.cur);
@@ -1592,6 +1598,7 @@ async function save(){
   if(!ok&&canWrite){ setTimeout(()=>{ openAdd(); showErr("fErr","לא נשמר. בדקו את החיבור ונסו שוב."); },400); return; }
   if(ok&&!editingId) notifyOthers("🧾 "+nm(me||active()[0]?.id)+" "+(fem(me||active()[0]?.id)?"הוסיפה":"הוסיף")+": "+data.desc+" "+fmt(amount,data.cur));
   if(ok&&!editingId) toast((/^⏳/.test($("status").textContent)?"⏳ נשמר בטלפון, יעלה כשתחזור קליטה · ":"✓ נוסף: ")+label,"ביטול",()=>run(()=>EXP().doc(id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null})),6000);
+  if(ok&&undoOld) toast("✏️ השינויים נשמרו","ביטול",()=>restoreVersion(id,false,undoOld),10000);
   if(ok){ done($("saveBtn")); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
@@ -1637,12 +1644,15 @@ async function pSave(){
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
   /* the rate of the day is kept with it, like the shared ones, so its value in shekels stays what it cost */
   data.rIls=(old&&old.cur===data.cur&&old.rIls>0)?old.rIls:rateNow(data.cur);
+  let undoOldP=null;
+  if(old){ const ch={}; for(const k of Object.keys(data)) if(JSON.stringify(data[k]??null)!==JSON.stringify(old[k]??null)) ch[k]=old[k]??null; if(Object.keys(ch).length){ undoOldP=ch; data.hist=histPush(old.hist,ch); } else if(old.hist) data.hist=old.hist; }
   const doc=await encFor(c,{...data,createdAt:old?.createdAt||Date.now(),tz:old?.tz||hereTz()});
   const job=run(()=>EXP().doc(id).set(doc));
   if(!$("addSheet").hidden){ buzz(10); flyToTotal($("pSave"),catEmoji(data)+" "+fmt(amount,data.cur)); closeSheet("addSheet"); }
   const ok=await job;
   if(!ok&&canWrite){ setTimeout(()=>{ openAdd(); showErr("pErr","לא נשמר. בדקו את החיבור ונסו שוב."); },400); return; }
   if(ok&&!old) toast((/^⏳/.test($("status").textContent)?"⏳ נשמר בטלפון, יעלה כשתחזור קליטה · ":"✓ נוסף: ")+catEmoji(data)+" "+fmt(amount,data.cur),"ביטול",()=>run(()=>EXP().doc(id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null})),6000);
+  if(ok&&undoOldP) toast("✏️ השינויים נשמרו","ביטול",()=>restoreVersion(id,true,undoOldP),10000);
   if(ok){ done($("pSave")); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
@@ -2439,6 +2449,37 @@ keypad("pAmt",()=>cur.pCur||S.localCur,"pDesc");
   document.addEventListener("click",e=>{ if(fired){ fired=false; e.stopPropagation(); e.preventDefault(); } },true);
   document.addEventListener("contextmenu",e=>{ if(e.target.closest("#ledger .row, #pLedger .row")) e.preventDefault(); });
 })();
+/* ================= versions: what each edit replaced =================
+   Kept inside the expense itself (for a personal one, inside its encryption). Restoring is itself kept,
+   so a restore can be undone too. */
+const HIST_KEEP=10;
+function histPush(h,old){ return [...(Array.isArray(h)?h:[]),{at:Date.now(),by:me||null,old}].slice(-HIST_KEEP); }
+const HIST_LBL={desc:"שם",amount:"סכום",cur:"מטבע",payer:"מי שילם",among:"מי מתחלק",pcts:"אחוזים",cat:"קטגוריה",catLabel:"תיאור",date:"תאריך",loc:"מדינה",town:"עיר",pm:"תשלום"};
+function histVal(k,v,it){ if(v==null||v==="") return "—"; if(k==="amount") return fmt(+v,(it&&it.cur)||"ILS"); if(k==="payer") return v===EACH?"כל אחד על עצמו":nm(v); if(k==="among") return (v||[]).map(nm).join(", ");
+  if(k==="pcts") return Object.entries(v||{}).map(([a,b])=>nm(a)+" "+b+"%").join(", "); if(k==="cat") return catName(v); if(k==="date"){ const [y,m,d]=String(v).split("-"); return +d+"."+(+m); } if(k==="loc") return locName(v); if(k==="pm") return v==="card"?"כרטיס":"מזומן"; return String(v); }
+async function restoreVersion(id,personal,old){
+  const it=(personal?P:S.items).find(x=>x.id===id); if(!it){ toast("ההוצאה לא נמצאה"); return; }
+  const now={}; for(const k of Object.keys(old)) now[k]=it[k]??null;   /* what is there now, so this restore can be undone */
+  let ok;
+  if(personal){ const c=await loadAcct(); if(!c) return; const {id:_i,_mine,_alone,...rest}=it; const next={...rest,...old,hist:histPush(it.hist,now)}; for(const k of Object.keys(next)) if(next[k]===null&&k!=="town") delete next[k];
+    ok=await run(async()=>EXP().doc(id).set(await encFor(c,next))); }
+  else { const patch={...old,hist:histPush(it.hist,now)}; ok=await run(()=>EXP().doc(id).update(patch)); }
+  if(ok){ buzz(8); toast("↩️ שוחזר: "+(old.desc||it.desc||"הוצאה"),"ביטול",()=>restoreVersion(id,personal,now),10000); }
+}
+function showHistory(it,personal){
+  const h=(Array.isArray(it.hist)?it.hist:[]).slice().reverse(); const o=document.createElement("div"); o.className="hist-bg"; o.setAttribute("role","dialog"); o.setAttribute("aria-label","גרסאות קודמות");
+  const box=document.createElement("div"); box.className="hist"; o.appendChild(box);
+  const head=document.createElement("div"); head.className="hist-h"; const t=document.createElement("b"); t.textContent="🕘 גרסאות קודמות · "+(it.desc||"הוצאה"); const x=document.createElement("button"); x.type="button"; x.className="btn small"; x.textContent="סגירה"; head.append(t,x); box.appendChild(head);
+  const close=()=>o.remove(); x.onclick=close; o.addEventListener("click",e=>{ if(e.target===o) close(); });
+  if(!h.length){ const e=document.createElement("p"); e.className="hint"; e.textContent="עוד לא נערכה. מעכשיו כל עריכה נשמרת כאן ואפשר לחזור אליה."; box.appendChild(e); }
+  for(const v of h){ const row=document.createElement("div"); row.className="hist-r";
+    const when=document.createElement("small"); const d=new Date(v.at||0); when.textContent=(v.by?nm(v.by)+(fem(v.by)?" ערכה":" ערך")+" · ":"")+d.getDate()+"."+(d.getMonth()+1)+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+    const ch=document.createElement("div"); ch.className="hist-c";
+    for(const [k,ov] of Object.entries(v.old||{})){ if(k==="rIls"||k==="hist"||((ov==null||ov==="")&&(it[k]==null||it[k]===""))) continue; const l=document.createElement("div"); l.textContent=(HIST_LBL[k]||k)+": היה "+histVal(k,ov,{...it,...v.old}); ch.appendChild(l); }
+    const b=document.createElement("button"); b.type="button"; b.className="btn small primary"; b.textContent="↩️ להחזיר לזה"; b.onclick=()=>{ close(); restoreVersion(it.id,personal,v.old); };
+    row.append(when,ch,b); box.appendChild(row); }
+  document.body.appendChild(o);
+}
 function peek(r){
   const id=r.dataset.id, personal=!!r.closest("#pLedger"); const it=(personal?P:S.items).find(x=>x.id===id); if(!it||it._fee) return;
   buzz([8,20,10]); sound("tick");
@@ -2448,7 +2489,7 @@ function peek(r){
   const menu=document.createElement("div"); menu.className="peek-menu";
   const close=()=>{ o.classList.add("out"); setTimeout(()=>o.remove(),220); };
   const item=(ic,label,fn,danger)=>{ const b=document.createElement("button"); b.type="button"; b.className="peek-i"+(danger?" danger":""); const t=document.createElement("span"); t.textContent=label; const i=document.createElement("span"); i.textContent=ic; b.append(t,i); b.onclick=()=>{ close(); setTimeout(fn,120); }; menu.appendChild(b); };
-  if(it.kind!=="transfer"){ item("✏️","עריכה",()=>personal?pStartEdit(it):startEdit(it)); item("🔁","שוב להיום",()=>again(it,personal)); }
+  if(it.kind!=="transfer"){ item("✏️","עריכה",()=>personal?pStartEdit(it):startEdit(it)); item("🔁","שוב להיום",()=>again(it,personal)); item("🕘","גרסאות קודמות"+(it.hist&&it.hist.length?" ("+it.hist.length+")":""),()=>showHistory(it,personal)); }
   item("📤","שיתוף",()=>{ const txt=(it.kind==="transfer"?"💸 "+nm(it.payer)+" ← "+nm(it.to):catEmoji(it)+" "+(it.desc||"הוצאה"))+" · "+fmt(+it.amount,it.cur)+" · "+dayLabel(it.date); if(navigator.share) navigator.share({text:txt}).catch(()=>{}); else { try{ navigator.clipboard.writeText(txt); toast("📋 הועתק"); }catch(e){} } });
   item("🗑","מחיקה",()=>delItem(it,personal),true);
   o.append(card,menu); document.body.appendChild(o);
