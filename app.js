@@ -109,6 +109,10 @@ function store(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 function person(id){ return S.people.find(p=>p.id===id); }
 function active(){ return S.people.filter(p=>!p.archived); }
 function nm(id){ return person(id)?.name||"מישהו"; }
+/* "each paid their own part": a shared expense (it counts in every total) that leaves no debt between you */
+const EACH="each";
+function paidShare(it,id){ if(!it) return 0; if(it.payer===EACH&&it.kind!=="transfer") return sharesOf(it)[id]||0; return it.payer===id?1:0; }
+function payName(it){ return it.payer===EACH ? "כל אחד על עצמו" : nm(it.payer); }
 function pidx(id){ const i=S.people.findIndex(p=>p.id===id); return i<0?0:i%6; }
 function fem(id){ return person(id)?.g==="f"; }
 const g={
@@ -192,11 +196,11 @@ function compute(){
     /* older settle-ups (before rates were frozen) recorded what they closed per currency */
     if(it.kind==="transfer"&&!(it.rIls>0)&&it.vec&&typeof it.vec==="object"){ for(const c in it.vec){ const v=+it.vec[c]||0, b=conv(v,c,"ILS"); add(it.payer,c,v,b); add(it.to,c,-v,-b); } continue; }
     const c=it.cur||"ILS", vb=ils(it), sh=sharesOf(it), f=1+feeRate(it), v=(+it.amount||0)*f, vf=vb*f;
-    add(it.payer,c,v,vf);
+    if(it.payer===EACH&&it.kind!=="transfer"){ for(const k in sh) add(k,c,v*sh[k],vf*sh[k]); } else add(it.payer,c,v,vf);
     for(const k in sh) add(k,c,-v*sh[k],-vf*sh[k]);
     if(it.kind==="transfer") continue;
     const sv=spend(it); total+=sv;   /* shown totals: the same value as every other total (the 1% stays in the balance only) */
-    paid[it.payer]=(paid[it.payer]||0)+sv;
+    if(it.payer===EACH){ for(const k in sh) paid[k]=(paid[k]||0)+sv*sh[k]; } else paid[it.payer]=(paid[it.payer]||0)+sv;
     for(const k in sh) share[k]=(share[k]||0)+sv*sh[k];
     const ck=it.cat||"other"; cats[ck]=(cats[ck]||0)+sv;
   }
@@ -521,13 +525,13 @@ function renderConv(){
 
 function renderForm(){
   const ids=active().map(p=>p.id);
-  if(!form.payer||!person(form.payer)) form.payer=me||ids[0];
+  if(!form.payer||(form.payer!==EACH&&!person(form.payer))) form.payer=me||ids[0];
   if(!form.among) form.among=[...ids];
   form.among=form.among.filter(person);
   if(!cur.fCur) cur.fCur=S.localCur; setCurBtn("fCur",cur.fCur);
   const payers=active(); if(form.payer&&!payers.find(p=>p.id===form.payer)&&person(form.payer)) payers.push(person(form.payer));
   seg($("fPm"),[["cash","💵 מזומן"],["card","💳 כרטיס"]],v=>v===(form.pm||"cash"),v=>{form.pm=v;renderForm();});
-  seg($("fPayer"),payers.map(p=>[p.id,p.name+" "+g.paid(p.id)]),v=>v===form.payer,v=>{form.payer=v;renderForm();});
+  seg($("fPayer"),[...payers.map(p=>[p.id,p.name+" "+g.paid(p.id)]),...(ids.length>1?[[EACH,"👫 כל אחד על עצמו"]]:[])],v=>v===form.payer,v=>{form.payer=v;renderForm(); if(v===EACH) toast("👫 כל אחד שילם את החלק שלו: נספר כהוצאה משותפת, בלי חוב ביניכם");});
   seg($("fAmong"),active().map(p=>[p.id,p.name]),v=>form.among.includes(v),v=>{ form.among=form.among.includes(v)?form.among.filter(x=>x!==v):[...form.among,v]; renderForm(); });
   seg($("fMode"),[["equal","בחלקים שווים"],["pct","באחוזים"]],v=>v===form.mode,v=>{form.mode=v;renderForm();});
   const Pc=$("fPcts"); Pc.hidden=form.mode!=="pct"; Pc.innerHTML="";
@@ -588,7 +592,7 @@ function matches(it,q){
   const place= loc==="prep" ? "לפני הטיול הכנות הכנה" : loc==="?" ? "לא ידוע" : (CTRY[loc]||locName(loc));
   const town= it.town || (()=>{ const k=PC.stayOf(it); return k>=0&&PC.stays[k] ? PC.stays[k].n : ""; })();
   const dates= it.date ? [+d+"."+(+m),+d+"/"+(+m),+d+"."+(+m)+"."+y.slice(2),it.date,monthName(y+"-"+m,true)].join(" ") : "";
-  const hay=norm([it.desc,pmText(it),it.pm==="card"?"כרטיס אשראי":it.pm==="cash"?"מזומן":"",catName(catKey(it)),it.catLabel||"",nm(it.payer),it.to?nm(it.to):"",it.kind==="transfer"?"העברה":"",it.cur,CUR[it.cur]?.name,String(it.amount),dayLabel(it.date),dates,place,town].join(" "));
+  const hay=norm([it.desc,pmText(it),it.pm==="card"?"כרטיס אשראי":it.pm==="cash"?"מזומן":"",catName(catKey(it)),it.catLabel||"",payName(it),it.payer===EACH?active().map(p=>p.name).join(" "):"",it.to?nm(it.to):"",it.kind==="transfer"?"העברה":"",it.cur,CUR[it.cur]?.name,String(it.amount),dayLabel(it.date),dates,place,town].join(" "));
   const val=spend(it);
   return q.split(" ").filter(Boolean).every(w=>{
     let r=w.match(/^([<>])=?(\d+(?:\.\d+)?)$/); if(r) return r[1]===">" ? val>=+r[2] : val<=+r[2];
@@ -696,7 +700,7 @@ function renderLedger_(){
   seg($("filter"),[["all","הכול"],...active().map(p=>[p.id,p.name]),["transfers","💸 העברות"]],v=>v===filter,v=>{filter=v;listLim.shared=LIST_STEP;renderLedger();});
   const L=$("ledger"); L.innerHTML="";
   const q=norm($("lSearch").value);
-  const list=S.items.filter(it=>(filter==="all"||(filter==="transfers"?it.kind==="transfer":it.payer===filter))&&matches(it,q)).sort((x,y)=>(y.date||"").localeCompare(x.date||"")||(y.createdAt||0)-(x.createdAt||0));
+  const list=S.items.filter(it=>(filter==="all"||(filter==="transfers"?it.kind==="transfer":paidShare(it,filter)>0))&&matches(it,q)).sort((x,y)=>(y.date||"").localeCompare(x.date||"")||(y.createdAt||0)-(x.createdAt||0));
   if(!loaded){ for(let i=0;i<3;i++){ const s=document.createElement("div"); s.className="row skelrow"; s.innerHTML='<span class="skel dotsk"></span><span><span class="skel" style="width:60%"></span><br><span class="skel" style="width:40%;height:.7em"></span></span><span class="skel" style="width:3.5em"></span>'; L.appendChild(s); } return; }
   if(!list.length){ const e=document.createElement("div");
     if(loaded&&!q&&!S.items.length){ richEmpty(e,"🧳","עוד אין הוצאות בטיול","הקפה הראשון, המונית מהשדה, הכול מתחיל כאן.","➕ הוצאה ראשונה",openAdd); }
@@ -716,16 +720,16 @@ function renderLedger_(){
       skip=fold&&!st.day(it.date); if(fold) dayFold(box,h,it.date,byDay.get(it.date),!skip,"shared",renderLedger); }
     if(skip) continue;
     const r=document.createElement("div"); r.className="row"+(it.kind==="transfer"?" transfer":"")+(FRESH.has(it.id)?" fresh":"")+(PENDING.has(it.id)?" pending":"")+(isNew(it.id)?" enter":""); r.dataset.id=it.id;
-    const dot=catTile(it, it.kind==="transfer"?null:it.payer);
+    const dot=catTile(it, it.kind==="transfer"||it.payer===EACH?null:it.payer);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; const m=document.createElement("div"); m.className="m";
     if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent=withTime(it,"סגירת חשבון"+(it.pm==="cash"?" · 💵 מזומן":it.pm==="bank"?" · 🏦 העברה לחשבון":"")); }
-    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,nm(it.payer)+" "+g.paid(it.payer)+" · "+pmText(it)+(feeRate(it)?"\u00a0מתחלקת":"")+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
+    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,(it.payer===EACH?"👫 כל אחד שילם על עצמו":nm(it.payer)+" "+g.paid(it.payer))+" · "+pmText(it)+(feeRate(it)?"\u00a0מתחלקת":"")+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
     if(it.cur!=="ILS"){ const s=document.createElement("span"); s.className="m num"; s.textContent="≈ "+fmt(ils(it),"ILS"); right.appendChild(s); }
-    if(me&&it.kind!=="transfer"){ const sh=sharesOf(it); const fa=(+it.amount)*(1+feeRate(it)); const d=(it.payer===me?fa:0)-fa*(sh[me]||0); if(Math.abs(d)>0.0001){ const s=document.createElement("span"); s.className="mine num "+(d>0?"plus":"minus"); s.textContent=(d>0?"מגיע לך ":"עליך ")+fmt(Math.abs(d),it.cur); right.appendChild(s); } }
+    if(me&&it.kind!=="transfer"){ const sh=sharesOf(it); const fa=(+it.amount)*(1+feeRate(it)); const d=fa*paidShare(it,me)-fa*(sh[me]||0); if(Math.abs(d)>0.0001){ const s=document.createElement("span"); s.className="mine num "+(d>0?"plus":"minus"); s.textContent=(d>0?"מגיע לך ":"עליך ")+fmt(Math.abs(d),it.cur); right.appendChild(s); } }
     if(canWrite){
       const acts=document.createElement("div"); acts.className="acts";
       if(it.kind!=="transfer"){ const e=document.createElement("button"); e.className="link"; e.type="button"; e.textContent="עריכה"; e.onclick=()=>startEdit(it); acts.appendChild(e); }
@@ -1071,7 +1075,7 @@ function recapData(loc,range){
   const byDay={}; for(const it of items){ (byDay[it.date]=byDay[it.date]||[]).push(it); }
   const bigDay=Object.entries(byDay).map(([d,l])=>[d,l.reduce((s,it)=>s+V(it),0),l]).sort((x,y)=>y[1]-x[1])[0];
   const bigOne=[...items].sort((x,y)=>V(y)-V(x))[0];
-  const paid={}; for(const it of items){ paid[it.payer]=(paid[it.payer]||0)+V(it); }
+  const paid={}; for(const it of items){ if(it.payer===EACH){ const sh=sharesOf(it); for(const k in sh) paid[k]=(paid[k]||0)+V(it)*sh[k]; } else paid[it.payer]=(paid[it.payer]||0)+V(it); }
   const share=me? myShareItems().filter(inLoc).reduce((s,it)=>s+spend(it,"ILS"),0) : 0;
   const alone=me&&acct&&acctFor===me ? P.filter(inLoc).reduce((s,it)=>s+V(it),0) : null;
   const transfers=S.items.filter(it=>it.kind==="transfer"&&inLoc(it)).length;
@@ -1423,7 +1427,7 @@ function renderSofar(){
     const its=S.items.filter(it=>it.kind!=="transfer"&&inScope(it));
     const total=its.reduce((a,it)=>a+V(it),0);
     const mine= me ? its.reduce((a,it)=>a+V(it)*(sharesOf(it)[me]||0),0) : 0;
-    const paid= me ? its.filter(it=>it.payer===me).reduce((a,it)=>a+V(it),0) : 0;
+    const paid= me ? its.reduce((a,it)=>a+V(it)*paidShare(it,me),0) : 0;
     $("sfKick").textContent=(scope==="town"?"הוצאנו ":"הוצאנו עד עכשיו ")+scopeWord;
     money($("sfBig"),total,showCur,"sf");
     const all2=S.items.filter(it=>it.kind!=="transfer");
@@ -1586,7 +1590,7 @@ async function save(){
   if(!$("addSheet").hidden){ buzz(10); flyToTotal(fromBtn,label); closeSheet("addSheet"); }
   const ok=await job;
   if(!ok&&canWrite){ setTimeout(()=>{ openAdd(); showErr("fErr","לא נשמר. בדקו את החיבור ונסו שוב."); },400); return; }
-  if(ok&&!editingId) notifyOthers("🧾 "+nm(me||form.payer)+" "+(fem(me||form.payer)?"הוסיפה":"הוסיף")+": "+data.desc+" "+fmt(amount,data.cur));
+  if(ok&&!editingId) notifyOthers("🧾 "+nm(me||active()[0]?.id)+" "+(fem(me||active()[0]?.id)?"הוסיפה":"הוסיף")+": "+data.desc+" "+fmt(amount,data.cur));
   if(ok&&!editingId) toast((/^⏳/.test($("status").textContent)?"⏳ נשמר בטלפון, יעלה כשתחזור קליטה · ":"✓ נוסף: ")+label,"ביטול",()=>run(()=>EXP().doc(id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null})),6000);
   if(ok){ done($("saveBtn")); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
@@ -2326,7 +2330,7 @@ function renderStats(){
   /* who paid (whole trip only) */
   $("stPayersCard").hidden= stScope!=="trip";
   if(stScope==="trip"){
-    const pay={}; for(const it of inM){ pay[it.payer]=(pay[it.payer]||0)+spend(it); }
+    const pay={}; for(const it of inM){ if(it.payer===EACH){ const sh=sharesOf(it); for(const k in sh) pay[k]=(pay[k]||0)+spend(it)*sh[k]; } else pay[it.payer]=(pay[it.payer]||0)+spend(it); }
     const Pp=$("stPayers"); Pp.innerHTML=""; const pe=Object.entries(pay).sort((x,y)=>y[1]-x[1]); const pmax=pe[0]?.[1]||1;
     if(!pe.length) Pp.innerHTML='<div class="hint">אין הוצאות בחודש הזה.</div>';
     for(const [id,v] of pe){
@@ -2728,7 +2732,7 @@ function shortDay(s){ if(s===todayStr()) return "היום"; const [y,m,d]=s.spli
 /* ---- cash wallet (personal): withdrawals in, cash payments out ---- */
 function cashPaidByMe(){
   const out=[];
-  for(const it of S.items){ if(it.kind==="transfer"||it.payer!==me||it.pm!=="cash") continue; out.push(it); }
+  for(const it of S.items){ if(it.kind==="transfer"||it.pm!=="cash") continue; const f=paidShare(it,me); if(!f) continue; out.push(f===1?it:{...it,amount:(+it.amount||0)*f}); }
   for(const it of P){ if(it.pm==="cash") out.push(it); }
   return out;
 }
@@ -3041,7 +3045,7 @@ $("exportBtn").onclick=async()=>{
   const head=["סוג","תאריך","שעה","שם","קטגוריה","סכום","מטבע","בשקלים","מי שילם","בין מי","מדינה"];
   const rows=[head];
   const line=(type,it,payer,among)=>rows.push([type,it.date,timeOf(it),it.kind==="transfer"?"העברה ל"+nm(it.to):(it.desc||""),it.kind==="transfer"?"":catName(catKey(it)),it.amount,it.cur,Math.round(conv(+it.amount||0,it.cur,"ILS")*100)/100,payer,among,locName(locOf(it))]);
-  for(const it of [...S.items].sort((x,y)=>(x.date||"").localeCompare(y.date||""))) line(it.kind==="transfer"?"העברה":"משותף",it,nm(it.payer),it.kind==="transfer"?"":splitText(it));
+  for(const it of [...S.items].sort((x,y)=>(x.date||"").localeCompare(y.date||""))) line(it.kind==="transfer"?"העברה":"משותף",it,payName(it),it.kind==="transfer"?"":splitText(it));
   if(me&&acct&&acctFor===me) for(const it of [...P].sort((x,y)=>(x.date||"").localeCompare(y.date||""))) line("אישי של "+nm(me),it,nm(me),"");
   if(me&&acct&&acctFor===me){
     const lab={withdraw:"משיכה מכספומט",adjust:"עדכון ידני",reset:"איפוס ארנק",exchange:"החלפת מטבע",bring:"מזומן מהבית",gift:"התקבל במזומן"};
@@ -3194,7 +3198,7 @@ function budgetCalc(){
   for(const it of P) if(!it._fee&&it.pm==="card"&&inc(it)){ add("cardP",C(it.amount,it.cur),it); if(payFee(it)) add("fx",C(payFee(it),it.cur),it); }
   for(const it of S.items){ if(!inc(it)) continue;
     if(it.kind==="transfer"){ if(it.pm==="cash") continue; if(it.payer===me) add("tr",C(it.amount,it.cur),it); else if(it.to===me) add("tr",-C(it.amount,it.cur),it); }
-    else if(it.payer===me&&it.pm==="card"){ add("cardS",C(it.amount,it.cur),it); if(payFee(it)) add("fx",C(payFee(it),it.cur),it); } }
+    else if(it.pm==="card"&&paidShare(it,me)>0){ const f=paidShare(it,me); add("cardS",C(it.amount,it.cur)*f,it); if(payFee(it)) add("fx",C(payFee(it),it.cur)*f,it); } }
   const adj=+B.adj||0;
   const used=parts.atm+parts.home+parts.cardP+parts.cardS+parts.fx+parts.tr-adj, gifts=-parts.gift, amount=+B.amount, left=amount+gifts-used;
   let pace=null, perDay=null;
