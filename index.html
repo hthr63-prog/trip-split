@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261123092446"></script>
+<script src="theme.js?v=20261123155655"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -232,6 +232,21 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .hero-visa.hot{background:#FFC93C;color:#1E1640;border-color:transparent;font-weight:700}
 .row.vpart{opacity:.88;background:color-mix(in srgb,var(--brand) 5%,transparent);border-style:dashed}
 .row.vpart .t{font-weight:600}
+.siri-steps{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:6px;font-size:.92rem}
+.siri-link{font:inherit;font-size:.78rem;direction:ltr;width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)}
+.note-badge{font:inherit;font-size:.78rem;font-weight:700;margin-inline-start:6px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);cursor:pointer;vertical-align:middle}
+.note-badge.new{background:var(--hot,#FF4D8D);color:#fff;border-color:transparent}
+.note{align-self:flex-start;max-width:85%;background:var(--surface-2);border-radius:14px 14px 14px 4px;padding:8px 12px;display:flex;flex-direction:column;gap:2px}
+.note.mine{align-self:flex-end;background:color-mix(in srgb,var(--brand) 16%,var(--surface));border-radius:14px 14px 4px 14px}
+.note small{color:var(--muted);font-size:.75rem}
+.note-new{display:flex;gap:8px;align-items:center}
+.note-new input{flex:1;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--ink)}
+.money-rows{display:flex;flex-direction:column;gap:2px}
+.money-row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.money-row small{grid-column:1/-1;color:var(--muted);font-size:.8rem}
+.money-row b.minus{color:var(--bad,#E5484D)}
+.money-total{display:flex;justify-content:space-between;align-items:baseline;padding-top:10px;font-weight:700}
+.money-total b{font:800 1.5rem var(--display,inherit)}
 .locrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .locrow .curbtn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .curbtn.town small{opacity:.7;font-weight:500}
@@ -1415,6 +1430,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       </section>
 
       <div class="bighead" data-tone="sand"><small>בכיס</small><h2>המזומן<br>שלך.</h2></div>
+      <section class="card money" id="moneyCard" hidden aria-labelledby="moneyTitle"><div class="card-head"><h2 id="moneyTitle">💼 איפה הכסף שלי</h2><span class="hint">כל מה שיש לך עכשיו, במקום אחד</span></div><div id="moneyRows" class="money-rows"></div><div class="money-total"><span>סה״כ השווי שלך עכשיו</span><b class="num" id="moneyTotal"></b></div><small class="hint" id="moneyNote"></small></section>
       <section class="card" id="cashCard">
         <div class="card-head"><h2>💵 ארנק מזומן</h2><span class="hint" id="cashFees"></span></div>
         <div id="cashBal" class="cashbal"></div>
@@ -1684,6 +1700,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       <h3>עיצוב</h3>
       <div class="seg" id="themeSeg"></div>
       <div class="seg" id="soundSeg" style="margin-top:8px"></div>
+      <button class="btn small" id="siriBtn" type="button" style="margin-top:8px">🎙️ הוספה בקול עם סירי</button>
       <button class="btn small" id="motionBtn" type="button" style="margin-top:8px">🫨 הפעלת חיישן התנועה: ניעור לביטול והטיית כרטיס המאזן</button>
     </div>
 
@@ -1775,11 +1792,11 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261123092446">
-<script src="config.js?v=20261123092446"></script>
-<script src="motion.js?v=20261123092446"></script>
-<script src="fx.js?v=20261123092446"></script>
-<script src="cinema.js?v=20261123092446"></script>
-<script src="app.js?v=20261123092446"></script>
+<meta name="app-v" content="20261123155655">
+<script src="config.js?v=20261123155655"></script>
+<script src="motion.js?v=20261123155655"></script>
+<script src="fx.js?v=20261123155655"></script>
+<script src="cinema.js?v=20261123155655"></script>
+<script src="app.js?v=20261123155655"></script>
 </body>
 </html>
