@@ -149,6 +149,15 @@ function conv(v,from,to){ if(from===to) return v; return v/perUsd(from)*perUsd(t
 /* what an expense cost, in the currency shown: one rule for every total in the app.
    Its own amount when shown in its own currency; otherwise at the rate saved when it was entered
    (what it really cost then), so totals don't drift as rates move and always equal the rows they sum. */
+/* ================= not part of the trip: subscriptions and bills at home =================
+   A personal expense can be "not of the trip" (Spotify, Disney+, a bill at home): it comes out of the bank
+   (the budget) but is left out of every trip number. "Every month" repeats it on the same day each month. */
+function recurDates(it,upto){ upto=upto||todayStr(); const out=[]; if(!it.date) return out; const [y,m,d]=it.date.split("-").map(Number);
+  for(let k=0;k<240;k++){ const t=new Date(y,m-1+k,1), last=new Date(t.getFullYear(),t.getMonth()+1,0).getDate(); const ds=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(Math.min(d,last)).padStart(2,"0"); if(ds>upto) break; out.push(ds); }
+  return out; }
+function expandRecur(list,upto){ const out=[]; for(const it of list||[]){ if(it.recur!=="month"){ out.push(it); continue; } recurDates(it,upto).forEach((ds,k)=>out.push(k?{...it,date:ds,_of:it.id,_occ:k}:it)); } return out; }
+/* my personal expenses that belong to the trip (every month's charge counted) */
+function PT(){ return expandRecur(P).filter(it=>!it.offTrip); }
 /* ================= spreading: one payment, many nights =================
    An expense with spread {n,from} is counted as n equal daily parts from "from" (its date if not set).
    Days, averages, towns and months see only the parts up to today; the balance, the budget and the list
@@ -613,7 +622,7 @@ function timeOf(it){
 }
 function withTime(it,txt){ const t=timeOf(it); return t? "🕒 "+t+" · "+txt : txt; }
 /* how it was paid, on every expense row; old entries without a mark count as cash, so they say so */
-function pmText(it){ if(!it||it.kind==="transfer"||it._fee) return ""; return it.pm==="card" ? "💳 כרטיס"+(feeRate(it)?" · עמלה\u00a01%":"") : "💵 מזומן"; }
+function pmText(it){ if(!it||it.kind==="transfer"||it._fee) return ""; if(it.pm==="bank") return "🏦 מהבנק"; return it.pm==="card" ? "💳 כרטיס"+(feeRate(it)?" · עמלה\u00a01%":"") : "💵 מזומן"; }
 /* the search: every word must match something about the expense — what, who, category, how paid, amount,
    date (29.10, 29/10, October, a weekday), country (or "הכנות" / "לפני הטיול"), town, currency.
    A word like >500 or <100 compares the amount (in the currency shown); 200-500 is a range. */
@@ -650,7 +659,7 @@ function monthName(ym,long){ const [y,m]=ym.split("-").map(Number); return new D
 /* totals shown beside each day heading */
 function sharedDay(d){ const v=S.items.filter(it=>it.date===d&&it.kind!=="transfer").reduce((s,it)=>s+spend(it),0); return v>0?"סה״כ "+fmt(v,showCur):""; }
 function mineDay(d){
-  const alone=P.filter(it=>it.date===d).reduce((s,it)=>s+spend(it),0);
+  const alone=PT().filter(it=>it.date===d).reduce((s,it)=>s+spend(it),0);
   const tog=myShareItems().filter(it=>it.date===d).reduce((s,it)=>s+spend(it),0);
   return "לבד "+fmt(alone,showCur)+" · ביחד "+fmt(tog,showCur)+" · משולב "+fmt(alone+tog,showCur);
 }
@@ -896,7 +905,11 @@ function myShareItems(){
 function renderPForm(){
   if(!cur.pCur) cur.pCur=S.localCur; setCurBtn("pCur",cur.pCur);
   $("pLoc").textContent=locName(pform.loc||defLoc()); renderSpread("p",pform); moreSum();
-  seg($("pPm"),[["cash","💵 מזומן"],["card","💳 כרטיס"]],v=>v===(pform.pm||"cash"),v=>{pform.pm=v;renderPForm();});
+  seg($("pPm"),[["cash","💵 מזומן"],["card","💳 כרטיס"],["bank","🏦 מהבנק"]],v=>v===(pform.pm||"cash"),v=>{pform.pm=v;renderPForm();});
+  /* of the trip, or not (a subscription or a bill at home): comes out of the bank, stays out of the trip */
+  seg($("pOff"),[["trip","✈️ של הטיול"],["home","🏠 לא קשור לטיול"]],v=>v===(pform.offTrip?"home":"trip"),v=>{ pform.offTrip=v==="home"; if(pform.offTrip&&(pform.pm||"cash")==="cash") pform.pm="card"; if(!pform.offTrip) pform.recur=null; renderPForm(); });
+  { const R=$("pRecur"); R.hidden=!pform.offTrip; seg(R,[["once","פעם אחת"],["month","🔁 כל חודש"]],v=>v===(pform.recur==="month"?"month":"once"),v=>{ pform.recur=v==="month"?"month":null; renderPForm(); });
+    const d=$("pDate").value||todayStr(); $("pOffInfo").textContent= !pform.offTrip ? "" : (pform.recur==="month" ? "🔁 ירד מהבנק ב-"+(+d.slice(8))+" בכל חודש · " : "")+"לא נספר בהוצאות הטיול, רק בעו״ש"; }
   seg($("pCat"),CATS,v=>v===pform.cat,v=>{pform.cat=v;pform.catSet=true;renderPForm(); if(v==="other") $("pCatLabel").focus();});
   $("pCatAuto").hidden=!(pform.cat&&!pform.catSet);
   $("pCatLabel").hidden=pform.cat!=="other";
@@ -911,7 +924,7 @@ function renderPersonal_(){
   const shared=myShareItems();
   let own=0, share=0, today=0; const cats={}; const td=todayStr();
   const ym=thisMonth();
-  for(const it of P){ const v=spend(it); own+=v; if(monthOf(it)===ym){ const k=catKey(it); cats[k]=(cats[k]||0)+v; } if(it.date===td) today+=v; }
+  for(const it of PT()){ const v=spend(it); own+=v; if(monthOf(it)===ym){ const k=catKey(it); cats[k]=(cats[k]||0)+v; } if(it.date===td) today+=v; }
   for(const it of shared){ const v=spend(it); share+=v; if(monthOf(it)===ym){ const k=catKey(it); cats[k]=(cats[k]||0)+v; } if(it.date===td) today+=v; }
   $("pCatTitle").textContent="📊 לאן הלך הכסף שלך ב"+monthName(ym,true).split(" ")[0];
   $("pLbl").textContent="ההוצאות של "+nm(me)+" בטיול · רק "+(fem(me)?"את רואה":"אתה רואה")+" את המסך הזה";
@@ -933,7 +946,7 @@ function renderPersonal_(){
   for(const it of shown){
     const ym=(it.date||"").slice(0,7);
     if(fold&&ym!==curMon){ curMon=ym; skipMon=false; if(ym!==tm){ const mi=list.filter(x=>(x.date||"").slice(0,7)===ym); skipMon=!st.month(ym);
-        monthFold(L,ym,mi,!skipMon,"mine",renderPersonal,mi.reduce((a,x)=>a+spend(x),0)); } }
+        monthFold(L,ym,mi,!skipMon,"mine",renderPersonal,mi.filter(x=>!x.offTrip).reduce((a,x)=>a+spend(x),0)); } }
     if(skipMon) continue;
     if(it.date!==curDay){ curDay=it.date; box=document.createElement("div"); box.className="day"; const h=document.createElement("h3"); dayHead(h,it.date,(()=>{ const v=list.filter(x=>x.date===it.date).reduce((a,x)=>a+spend(x),0); return v>0?"סה״כ "+fmt(v,showCur):""; })()); box.appendChild(h); L.appendChild(box);
       skip=fold&&!st.day(it.date); if(fold) dayFold(box,h,it.date,byDay.get(it.date),!skip,"mine",renderPersonal); }
@@ -942,7 +955,7 @@ function renderPersonal_(){
     const dot=catTile(it,null);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; t.textContent=it.desc||"הוצאה";
-    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(it,"אישי · "+(spreadN(it)>1?"🗓️ "+spreadN(it)+" ימים · ":"")+(it._fee?"":pmText(it)+" · ")+catName(catKey(it)).replace(/^\S+\s/,""));
+    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(it,"אישי · "+(it.offTrip?"🏠 לא מהטיול · "+(it.recur==="month"?"🔁 כל חודש ("+recurDates(it).length+" חיובים) · ":""):"")+(spreadN(it)>1?"🗓️ "+spreadN(it)+" ימים · ":"")+(it._fee?"":pmText(it)+" · ")+catName(catKey(it)).replace(/^\S+\s/,""));
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
@@ -1112,7 +1125,7 @@ function recapData(loc,range){
   const bigOne=[...items].sort((x,y)=>V(y)-V(x))[0];
   const paid={}; for(const it of items){ if(it.payer===EACH){ const sh=sharesOf(it); for(const k in sh) paid[k]=(paid[k]||0)+V(it)*sh[k]; } else paid[it.payer]=(paid[it.payer]||0)+V(it); }
   const share=me? myShareItems().filter(inLoc).reduce((s,it)=>s+spend(it,"ILS"),0) : 0;
-  const alone=me&&acct&&acctFor===me ? P.filter(inLoc).reduce((s,it)=>s+V(it),0) : null;
+  const alone=me&&acct&&acctFor===me ? PT().filter(inLoc).reduce((s,it)=>s+V(it),0) : null;
   const transfers=S.items.filter(it=>it.kind==="transfer"&&inLoc(it)).length;
   return {loc,week:range||null,items,total,dates,days:range?7:days,countries,topCat,cats,bigDay,bigOne,paid,share,alone,transfers,avg: (range?7:days)? total/(range?7:days) : 0};
 }
@@ -1386,7 +1399,7 @@ function renderSofar(){
   if(box.hidden) return;
   const td=todayStr(), ym=thisMonth();
   /* long stays spread over their nights: the card counts each night on its day, up to today */
-  const SI=spreadAll(S.items), SP=personal?spreadAll(P):[], SMS=personal||me?spreadAll(myShareItems()):[];
+  const SI=spreadAll(S.items), SP=personal?spreadAll(PT()):[], SMS=personal||me?spreadAll(myShareItems()):[];
   /* the place you are in now: what it has cost so far, every visit (an expense marked with a town counts there) */
   const stays=tripStops(), ownD=stayDays(stays), townAt=d=>{ const k=ownD.get(d); return k!=null?stays[k].n:""; };
   const onTripNow= tripStart()&&tripStart()<=td, town= onTripNow ? townAt(td) : "", townOfIt=it=>it.town||townAt(it.date||"");
@@ -1661,13 +1674,13 @@ function toast(msg,actLabel,act,ms){
 $("pCur").onclick=()=>openCurPicker("באיזה מטבע שילמת?",cur.pCur,c=>{ cur.pCur=c; renderPersonal(); });
 function pStartEdit(it){
   if(!$("addSheet").hidden) closeSheet("addSheet");
-  pEditingId=it.id; pform.cat=it.cat||"other"; pform.catSet=true; pform.loc=locOf(it); pform.town=it.town||null; pform.spread=it.spread&&it.spread.n>1?{...it.spread}:null; pform.pm=it.pm||"cash"; cur.pCur=it.cur;
+  pEditingId=it.id; pform.cat=it.cat||"other"; pform.catSet=true; pform.loc=locOf(it); pform.town=it.town||null; pform.offTrip=!!it.offTrip; pform.recur=it.recur||null; pform.spread=it.spread&&it.spread.n>1?{...it.spread}:null; pform.pm=it.pm||"cash"; cur.pCur=it.cur;
   $("pDesc").value=it.desc||""; $("pCatLabel").value=it.catLabel||""; $("pAmt").value=group(String(it.amount)); $("pDate").value=it.date||todayStr();
   $("pFormTitle").textContent="✏️ עריכת הוצאה אישית"; $("pSave").textContent="שמירת שינויים"; $("pCancel").hidden=false; saveLabel(); renderPersonal();
   if(!$("addSlot").contains($("pForm"))) openAdd(); else $("pForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function pReset(){
-  pEditingId=null; pform.cat=null; pform.catSet=false; $("pDesc").value=""; $("pCatLabel").value=""; $("pAmt").value=""; cur.pCur=S.localCur; pform.loc=null; pform.town=null; pform.spread=null;
+  pEditingId=null; pform.cat=null; pform.catSet=false; $("pDesc").value=""; $("pCatLabel").value=""; $("pAmt").value=""; cur.pCur=S.localCur; pform.loc=null; pform.town=null; pform.offTrip=false; pform.recur=null; pform.spread=null;
   $("pFormTitle").textContent="➕ הוצאה אישית"; $("pSave").textContent="הוספה"; $("pCancel").hidden=true; renderPersonal(); saveLabel();
 }
 async function pSave(){
@@ -1676,7 +1689,7 @@ async function pSave(){
   if(!(amount>0)) return showErr("pErr","צריך להזין סכום גדול מאפס",$("pAmt"));
   if(!$("pDesc").value.trim()) return showErr("pErr","צריך לתת שם להוצאה, למשל: קפה",$("pDesc"));
   const c=await loadAcct(); if(!c) return showErr("pErr","צריך להיכנס לחשבון האישי קודם.");
-  const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat||"other",catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||defLoc(),pm:pform.pm||"cash",date:$("pDate").value||todayStr(),trip:curTrip,...(pform.town?{town:pform.town}:{}),...(pform.spread?{spread:pform.spread}:{})};
+  const data={desc:$("pDesc").value.trim(),amount,cur:cur.pCur,cat:pform.cat||"other",catLabel:pform.cat==="other"?$("pCatLabel").value.trim():"",loc:pform.loc||defLoc(),pm:pform.pm||"cash",date:$("pDate").value||todayStr(),trip:curTrip,...(pform.offTrip?{offTrip:true}:{}),...(pform.offTrip&&pform.recur==="month"?{recur:"month"}:{}),...(pform.town?{town:pform.town}:{}),...(pform.spread?{spread:pform.spread}:{})};
   const id=pEditingId||uid("m"); const old=P.find(x=>x.id===id);
   /* the rate of the day is kept with it, like the shared ones, so its value in shekels stays what it cost */
   data.rIls=(old&&old.cur===data.cur&&old.rIls>0)?old.rIls:rateNow(data.cur);
@@ -1723,7 +1736,7 @@ $("catMore").onclick=()=>{ stScope="trip"; stMonth=thisMonth(); goView("stats");
 $("pCatMore").onclick=()=>{ stScope="mine"; stMonth=thisMonth(); goView("stats"); };
 function statItems(){
   /* [{date,cur,amount,cat,catLabel,payer}] in the chosen scope */
-  if(stScope==="mine"&&me){ return spreadAll([...myShareItems(), ...(acct&&acctFor===me?P:[])]); }
+  if(stScope==="mine"&&me){ return spreadAll([...myShareItems(), ...(acct&&acctFor===me?PT():[])]); }
   return spreadAll(S.items.filter(it=>it.kind!=="transfer"));
 }
 /* ================= the journey: where you were, day by day (private) =================
@@ -1765,7 +1778,7 @@ function stayDays(stays){
 }
 /* the money of a day, for the couple (shared) or for me (mine alone + my share of the shared) */
 function dayItems(mode){
-  if(mode==="mine") return spreadAll([...(acct&&acctFor===me?P:[]).map(it=>({...it,_alone:true})), ...myShareItems()]);
+  if(mode==="mine") return spreadAll([...(acct&&acctFor===me?PT():[]).map(it=>({...it,_alone:true})), ...myShareItems()]);
   return spreadAll(S.items.filter(it=>it.kind!=="transfer"));
 }
 /* where an expense really was, one rule for the town, the country and the globe:
@@ -1774,7 +1787,7 @@ function dayItems(mode){
    an expense marked with another country, or as "before the trip", is not part of the town */
 function placeCtx(){
   const stays=tripStops(), own=stayDays(stays), cnt=stays.map(()=>({}));
-  for(const it of [...S.items,...(acct&&acctFor===me?P:[])]){ if(it.kind==="transfer") continue; const k=it.town ? stays.findIndex(s=>s.n===it.town) : own.get(it.date||""); if(k==null||k<0) continue;
+  for(const it of [...S.items,...(acct&&acctFor===me?PT():[])]){ if(it.kind==="transfer") continue; const k=it.town ? stays.findIndex(s=>s.n===it.town) : own.get(it.date||""); if(k==null||k<0) continue;
     const l=locOf(it); if(l==="prep"||l==="?") continue; cnt[k][l]=(cnt[k][l]||0)+1; }
   const major=cnt.map(c=>(Object.entries(c).sort((a,b)=>b[1]-a[1])[0]||[null])[0]);
   const stayOf=it=> it.town ? (()=>{ let k=-1; stays.forEach((x,i)=>{ if(x.n===it.town&&(k<0||x.d<=(it.date||""))) k=i; }); return k; })() : (own.has(it.date||"")?own.get(it.date):-1);
@@ -2350,7 +2363,7 @@ function renderStats(){
   /* the country card has its own switch: couple (shared expenses) or personal (only my own) */
   const canMine=!!me; if(!canMine) locScope="couple";
   seg($("stLocScope"),canMine?[["couple","👫 זוגי"],["mine","🙋 אישי"],["both","💜 משולב"]]:[["couple","👫 זוגי"]],v=>v===locScope,v=>{locScope=v;renderStats();});
-  const mineP= acct&&acctFor===me ? P : [];
+  const mineP= acct&&acctFor===me ? PT() : [];
   /* both: my own expenses plus my part of the shared ones */
   const locItems=spreadAll( locScope==="mine" ? mineP : locScope==="both" ? [...myShareItems(),...mineP] : S.items.filter(it=>it.kind!=="transfer") );
   $("stLocNote").hidden=!((locScope==="mine"||locScope==="both")&&!(acct&&acctFor===me));
@@ -2490,9 +2503,9 @@ keypad("pAmt",()=>cur.pCur||S.localCur,"pDesc");
    so a restore can be undone too. */
 const HIST_KEEP=10;
 function histPush(h,old){ return [...(Array.isArray(h)?h:[]),{at:Date.now(),by:me||null,old}].slice(-HIST_KEEP); }
-const HIST_LBL={desc:"שם",amount:"סכום",cur:"מטבע",payer:"מי שילם",among:"מי מתחלק",pcts:"אחוזים",cat:"קטגוריה",catLabel:"תיאור",date:"תאריך",loc:"מדינה",town:"עיר",pm:"תשלום",spread:"פריסה"};
+const HIST_LBL={desc:"שם",amount:"סכום",cur:"מטבע",payer:"מי שילם",among:"מי מתחלק",pcts:"אחוזים",cat:"קטגוריה",catLabel:"תיאור",date:"תאריך",loc:"מדינה",town:"עיר",pm:"תשלום",spread:"פריסה",offTrip:"של הטיול",recur:"חוזר"};
 function histVal(k,v,it){ if(v==null||v==="") return "—"; if(k==="amount") return fmt(+v,(it&&it.cur)||"ILS"); if(k==="payer") return v===EACH?"כל אחד על עצמו":nm(v); if(k==="among") return (v||[]).map(nm).join(", ");
-  if(k==="pcts") return Object.entries(v||{}).map(([a,b])=>nm(a)+" "+b+"%").join(", "); if(k==="cat") return catName(v); if(k==="date"){ const [y,m,d]=String(v).split("-"); return +d+"."+(+m); } if(k==="loc") return locName(v); if(k==="pm") return v==="card"?"כרטיס":"מזומן"; if(k==="spread") return v&&v.n>1?v.n+" ימים":"בלי"; return String(v); }
+  if(k==="pcts") return Object.entries(v||{}).map(([a,b])=>nm(a)+" "+b+"%").join(", "); if(k==="cat") return catName(v); if(k==="date"){ const [y,m,d]=String(v).split("-"); return +d+"."+(+m); } if(k==="loc") return locName(v); if(k==="pm") return v==="card"?"כרטיס":"מזומן"; if(k==="spread") return v&&v.n>1?v.n+" ימים":"בלי"; if(k==="offTrip") return v?"לא קשור לטיול":"של הטיול"; if(k==="recur") return v==="month"?"כל חודש":"פעם אחת"; return String(v); }
 async function restoreVersion(id,personal,old){
   const it=(personal?P:S.items).find(x=>x.id===id); if(!it){ toast("ההוצאה לא נמצאה"); return; }
   const now={}; for(const k of Object.keys(old)) now[k]=it[k]??null;   /* what is there now, so this restore can be undone */
@@ -2791,7 +2804,7 @@ function renderDaily(){
   $("dShowin").hidden=true; dayCur=showCur;   /* one currency choice for the whole page: the card above */
   const share=spreadAll(myShareItems()); const days=new Map();
   const add=(it,k,v)=>{ if(!it.date) return; const o=days.get(it.date)||{alone:0,tog:0}; o[k]+=v; days.set(it.date,o); };
-  for(const it of spreadAll(P)) add(it,"alone",spend(it,dayCur));
+  for(const it of spreadAll(PT())) add(it,"alone",spend(it,dayCur));
   for(const it of share) add(it,"tog",spend(it,dayCur));
   const T=$("dTable"); T.innerHTML="";
   const list=[...days.entries()].sort((x,y)=>y[0].localeCompare(x[0]));
@@ -2811,7 +2824,7 @@ function shortDay(s){ if(s===todayStr()) return "היום"; const [y,m,d]=s.spli
 function cashPaidByMe(){
   const out=[];
   for(const it of S.items){ if(it.kind==="transfer"||it.pm!=="cash") continue; const f=paidShare(it,me); if(!f) continue; out.push(f===1?it:{...it,amount:(+it.amount||0)*f}); }
-  for(const it of P){ if(it.pm==="cash") out.push(it); }
+  for(const it of expandRecur(P)){ if(it.pm==="cash") out.push(it); }
   return out;
 }
 /* settle-ups paid in cash between me and someone else */
@@ -2829,7 +2842,7 @@ function payFee(it){ return it&&it.pm==="card"&&!it._fee&&it.kind!=="transfer"&&
 function syncCardFees(){
   if(!pLoaded||!me) return; const days=new Map();
   const add=(it,v)=>{ if(!(v>0)||!it.date) return; const k=it.date+"|"+it.cur; const o=days.get(k)||{date:it.date,cur:it.cur,v:0,n:0,loc:it.loc,tz:it.tz,createdAt:0}; o.v+=v; o.n++; o.createdAt=Math.max(o.createdAt,(it.createdAt||0)+1); days.set(k,o); };
-  for(const it of P) if(!it._pfx) add(it,payFee(it));
+  for(const it of P) if(!it._pfx&&!it.offTrip) add(it,payFee(it));
   /* shared: my share of the 1%, whoever paid (the fee is split with the expense) */
   for(const it of S.items) if(!it.deleted){ const sh=sharesOf(it)[me]||0; if(sh>0) add(it,payFee(it)*sh); }
   const out=[...days.values()].map(o=>({id:"pfee-"+o.date+"-"+o.cur,_fee:true,_pfx:true,desc:"עמלת כרטיס 1%"+(o.n>1?" · "+o.n+" תשלומים":""),amount:r2(o.v),cur:o.cur,cat:"other",catLabel:"עמלות כרטיס",pm:"fee",date:o.date,createdAt:o.createdAt,tz:o.tz,loc:o.loc}));
@@ -3263,22 +3276,24 @@ function worthCalc(r){
 function budgetCalc(){
   const B=BUDGET; if(!B||!(+B.amount>0)) return null;
   const cur=B.cur||"ILS", st=tripStart(), td=todayStr();
-  const onTrip=it=> locOf(it)!=="prep" && (!st||(it.date||"")>=st);
-  const inc=it=> B.prep!==false || onTrip(it);
+  const onTrip=it=> !it.offTrip && locOf(it)!=="prep" && (!st||(it.date||"")>=st);
+  const inc=it=> B.prep!==false || onTrip(it) || it.offTrip;
   const C=(a,c)=>conv(+a||0,c||cur,cur);
-  const parts={atm:0,home:0,cardP:0,cardS:0,fx:0,tr:0,gift:0}; let usedTrip=0;
+  const parts={atm:0,home:0,cardP:0,cardS:0,fx:0,tr:0,gift:0,off:0}; let usedTrip=0;
   const add=(k,v,it)=>{ parts[k]+=v; if(onTrip(it)) usedTrip+=v; };
   for(const x of CASH) if(x.sub==="withdraw"&&inc(x)) add("atm",C(x.amount,x.cur)+C(x.fee||0,x.feeCur||x.cur)+C(cardFee(x),x.cur),x);
   /* cash bought from the bank counts only if bought after the budget was set: a budget is "what is in the bank now" */
   const since=+B.since||+B.createdAt||0;
   for(const x of CASH) if(x.sub==="bring"&&x.bank&&(x.createdAt||0)>since) add("home",C(x.amount,x.cur),x);
   for(const x of INCOME) add("gift",-C(x.amount,x.cur),x);
-  for(const it of P) if(!it._fee&&it.pm==="card"&&inc(it)){ add("cardP",C(it.amount,it.cur),it); if(payFee(it)) add("fx",C(payFee(it),it.cur),it); }
+  for(const it of expandRecur(P)){ if(it._fee||!inc(it)) continue;
+    if(it.offTrip){ if(it.pm!=="cash") add("off",C(it.amount,it.cur)+C(payFee(it),it.cur),it); continue; }   /* subscriptions and bills at home, from the bank */
+    if(it.pm==="card"||it.pm==="bank"){ add("cardP",C(it.amount,it.cur),it); if(payFee(it)) add("fx",C(payFee(it),it.cur),it); } }
   for(const it of S.items){ if(!inc(it)) continue;
     if(it.kind==="transfer"){ if(it.pm==="cash") continue; if(it.payer===me) add("tr",C(it.amount,it.cur),it); else if(it.to===me) add("tr",-C(it.amount,it.cur),it); }
     else if(it.pm==="card"&&paidShare(it,me)>0){ const f=paidShare(it,me); add("cardS",C(it.amount,it.cur)*f,it); if(payFee(it)) add("fx",C(payFee(it),it.cur)*f,it); } }
   const adj=+B.adj||0;
-  const used=parts.atm+parts.home+parts.cardP+parts.cardS+parts.fx+parts.tr-adj, gifts=-parts.gift, amount=+B.amount, left=amount+gifts-used;
+  const used=parts.atm+parts.home+parts.cardP+parts.cardS+parts.fx+parts.tr+parts.off-adj, gifts=-parts.gift, amount=+B.amount, left=amount+gifts-used;
   let pace=null, perDay=null;
   if(st&&st<=td){ const days=Math.round((new Date(td+"T12:00")-new Date(st+"T12:00"))/864e5)+1; perDay=usedTrip/days; if(perDay>0) pace=Math.floor(left/perDay); }
   return {cur,amount,gifts,used,left,parts,adj,adjAt:B.adjAt||null,pace,perDay,pct:Math.max(0,Math.min(1,used/(amount+gifts))),prep:B.prep!==false};
@@ -3289,7 +3304,7 @@ function runwayCalc(r){
   if(!r) return null; const st=tripStart(), td=todayStr(); if(!st||st>td) return null;
   const W=worthCalc(r), days=Math.round((new Date(td+"T12:00")-new Date(st+"T12:00"))/864e5)+1;
   const onTrip=it=> locOf(it)!=="prep" && (it.date||"")>=st && (it.date||"")<=td;
-  const spent=spreadAll(P).filter(onTrip).reduce((a,it)=>a+spend(it,r.cur),0)+spreadAll(myShareItems()).filter(onTrip).reduce((a,it)=>a+spend(it,r.cur),0);   /* the share is already in the amount */
+  const spent=spreadAll(PT()).filter(onTrip).reduce((a,it)=>a+spend(it,r.cur),0)+spreadAll(myShareItems()).filter(onTrip).reduce((a,it)=>a+spend(it,r.cur),0);   /* the share is already in the amount */
   const perDay=spent/days; if(!(perDay>0)||!(W.total>0)) return {total:W.total,perDay,days:null,cur:r.cur};
   const left=Math.floor(W.total/perDay), end=new Date(Date.now()+left*864e5);
   return {total:W.total,perDay,days:left,cur:r.cur,until:end.getDate()+"."+(end.getMonth()+1)+(end.getFullYear()!==new Date().getFullYear()?"."+String(end.getFullYear()).slice(2):"")};
@@ -3339,6 +3354,7 @@ function renderBudget(){
   row("🏧","משיכות מכספומט ועמלות",r.parts.atm);
   if(r.parts.home>0.004) row("💼","מזומן שנקנה מהבית",r.parts.home);
   row("💳","כרטיס · אישי",r.parts.cardP);
+  row("🏠","לא מהטיול: מנויים וחשבונות בבית",r.parts.off);
   row("💳","כרטיס · משותף ששילמת",r.parts.cardS);
   row("💳","עמלת כרטיס 1% על תשלומים במט״ח",r.parts.fx);
   if(Math.abs(r.parts.tr)>0.004) row("💸","העברות בהתחשבנות (בנק)",r.parts.tr);
