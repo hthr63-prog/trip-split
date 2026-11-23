@@ -565,6 +565,23 @@ function renderSpread(k,f){
   else info.textContent="";
   moreSum();
 }
+/* ================= "how much did we pay last time?" =================
+   While a name is typed: what the same thing cost before, in this country, in the form's currency;
+   a warning when the amount typed is well above that. */
+function priceHint(k){
+  const el=$(k+"PriceHint"); if(!el) return; const q=catNorm($(k+"Desc").value).trim(); el.hidden=true; el.className="pricehint"; if(q.length<2) return;
+  const f= k==="f"?form:pform, loc=f.loc||defLoc(), c=(k==="f"?cur.fCur:cur.pCur)||S.localCur, skip= k==="f"?editingId:pEditingId;
+  const pool=[...S.items.filter(it=>it.kind!=="transfer"),...(acct&&acctFor===me?P:[])].filter(it=>!it._fee&&it.id!==skip&&!it.offTrip&&locOf(it)===loc);
+  const same=pool.filter(it=>{ const d=catNorm(it.desc).trim(); return d&&(d===q||(q.length>=3&&(d.startsWith(q)||q.startsWith(d))&&Math.min(d.length,q.length)>=3)); });
+  if(!same.length) return;
+  const v=same.map(it=>spend(it,c)).sort((a,b)=>a-b), lo=v[0], hi=v[v.length-1], mid=v[Math.floor(v.length/2)];
+  const last=same.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0))[0], sd=x=>{ const [y,m,d]=(x||"").split("-"); return +d+"."+(+m); };
+  const where=CTRY[loc]?" ב"+CTRY[loc].split(" ").slice(1).join(" "):"";
+  let t= v.length===1 ? "💬 פעם קודמת"+where+": "+fmt(lo,c)+" ("+sd(last.date)+")" : "💬 שילמתם "+v.length+" פעמים"+where+": "+(Math.abs(hi-lo)<0.5?fmt(lo,c):fmt(lo,c)+"–"+fmt(hi,c))+" · בדרך כלל "+fmt(mid,c);
+  const amt=parseFloat(String($(k+"Amt").value).replace(/,/g,""))||0;
+  if(amt>0&&amt>hi*1.3){ t+=" · ⚠️ יקר מהרגיל"; el.classList.add("hi"); } else if(amt>0&&amt<lo*0.75){ t+=" · 👍 זול מהרגיל"; el.classList.add("lo"); }
+  el.textContent=t; el.hidden=false;
+}
 function renderForm(){
   const ids=active().map(p=>p.id);
   if(!form.payer||(form.payer!==EACH&&!person(form.payer))) form.payer=me||ids[0];
@@ -585,7 +602,7 @@ function renderForm(){
       i.oninput=()=>{ form.pcts[id]=i.value; }; l.appendChild(i); Pc.appendChild(l);
     }
   }
-  $("fLoc").textContent=locName(form.loc||defLoc()); renderSpread("f",form); moreSum();
+  $("fLoc").textContent=locName(form.loc||defLoc()); renderSpread("f",form); moreSum(); priceHint("f");
   seg($("fCat"),CATS,v=>v===form.cat,v=>{form.cat=v;form.catSet=true;renderForm(); if(v==="other") $("fCatLabel").focus();});
   $("fCatAuto").hidden=!(form.cat&&!form.catSet);
   $("fCatLabel").hidden=form.cat!=="other";
@@ -904,7 +921,7 @@ function myShareItems(){
 }
 function renderPForm(){
   if(!cur.pCur) cur.pCur=S.localCur; setCurBtn("pCur",cur.pCur);
-  $("pLoc").textContent=locName(pform.loc||defLoc()); renderSpread("p",pform); moreSum();
+  $("pLoc").textContent=locName(pform.loc||defLoc()); renderSpread("p",pform); moreSum(); priceHint("p");
   seg($("pPm"),[["cash","💵 מזומן"],["card","💳 כרטיס"],["bank","🏦 מהבנק"]],v=>v===(pform.pm||"cash"),v=>{pform.pm=v;renderPForm();});
   /* of the trip, or not (a subscription or a bill at home): comes out of the bank, stays out of the trip */
   seg($("pOff"),[["trip","✈️ של הטיול"],["home","🏠 לא קשור לטיול"]],v=>v===(pform.offTrip?"home":"trip"),v=>{ pform.offTrip=v==="home"; if(pform.offTrip&&(pform.pm||"cash")==="cash") pform.pm="card"; if(!pform.offTrip) pform.recur=null; renderPForm(); });
@@ -1307,6 +1324,56 @@ async function askHere(force){
 }
 setTimeout(askHere,1500);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") askHere(); });
+/* ================= the visa: days left in the country =================
+   Days allowed are set once per country (the rules for an Israeli passport change, so they are asked, not guessed);
+   the day of entry comes from the journey (the first day of the trip in that country), and can be changed.
+   Kept with the trip, so both of you see it. */
+function visaOf(c){ const T=tripById(curTrip)||{}; return (T.visa||{})[c]||null; }
+function visaEntry(c){
+  const v=visaOf(c); if(v&&v.entry) return {date:v.entry,auto:false};
+  const st=tripStart(); if(!st) return null; const PC=placeCtx(); let first=null;
+  /* a stop with no expenses of its own takes the country of the stop before it (or after) */
+  const mj=PC.major.slice(); for(let i=0;i<mj.length;i++) if(!mj[i]) mj[i]=mj[i-1]||null; for(let i=mj.length-1;i>=0;i--) if(!mj[i]) mj[i]=mj[i+1]||null;
+  for(const [d,k] of PC.own) if(mj[k]===c&&(!first||d<first)) first=d;
+  if(!first) for(const it of S.items) if(it.kind!=="transfer"&&it.date>=st&&PC.effLoc(it)===c&&(!first||it.date<first)) first=it.date;
+  if(!first&&c===S.localCur&&st<=todayStr()) first=st;
+  return first?{date:first,auto:true}:null; }
+function visaInfo(c){ const v=visaOf(c), e=visaEntry(c); if(!e) return null; const days=v&&+v.days>0?+v.days:0; if(!days) return {entry:e.date,auto:e.auto,days:0};
+  const last=dayAdd(e.date,days-1); return {entry:e.date,auto:e.auto,days,last,left:daysBetween(todayStr(),last)}; }
+function visaChip(c){ const i=visaInfo(c), n=(CTRY[c]||"").split(" ").slice(1).join(" "); if(!i) return null;
+  if(!i.days) return ["🛂 ויזה ל"+n+"?",false];
+  if(i.left<0) return ["⛔ חרגתם מהוויזה ב-"+(-i.left)+" ימים",true];
+  if(i.left===0) return ["🛂 היום היום האחרון בוויזה!",true];
+  return ["🛂 עוד "+i.left+" "+(i.left===1?"יום":"ימים")+" בוויזה",i.left<=7]; }
+function openVisa(c){
+  c=c||S.localCur; const n=(CTRY[c]||c).split(" ").slice(1).join(" ")||c; const v=visaOf(c)||{}; let days=+v.days||0; let entry=(visaEntry(c)||{}).date||todayStr(), entrySet=!!v.entry;
+  const o=document.createElement("div"); o.className="hist-bg"; o.setAttribute("role","dialog"); o.setAttribute("aria-label","ויזה");
+  const box=document.createElement("div"); box.className="hist"; o.appendChild(box); const close=()=>o.remove(); o.addEventListener("click",e=>{ if(e.target===o) close(); });
+  const draw=()=>{ box.innerHTML="";
+    const h=document.createElement("div"); h.className="hist-h"; const t=document.createElement("b"); t.textContent="🛂 ויזה · "+(CTRY[c]||n); const x=document.createElement("button"); x.type="button"; x.className="btn small"; x.textContent="סגירה"; x.onclick=close; h.append(t,x); box.appendChild(h);
+    const q=document.createElement("div"); q.className="hint"; q.textContent="כמה ימים מותר לכם להיות ב"+n+"?"; box.appendChild(q);
+    const sg=document.createElement("div"); sg.className="seg"; box.appendChild(sg);
+    const opts=[[15,"15"],[30,"30"],[45,"45"],[60,"60"],[90,"90"]]; if(days&&!opts.some(o=>o[0]===days)) opts.push([days,String(days)]); opts.push(["x","אחר…"]);
+    seg(sg,opts.map(o=>[String(o[0]),o[1]]),k=>+k===days,k=>{ if(k==="x"){ const a=parseInt(prompt("כמה ימים?",days||"30"),10); if(!(a>0)) return; k=String(Math.min(a,365)); } days=+k; draw(); });
+    const lab=document.createElement("label"); lab.className="j-lab"; const sp=document.createElement("span"); sp.textContent="🛬 נכנסתם ב־"+(entrySet?"":" (לפי המסלול)"); const inp=document.createElement("input"); inp.type="date"; inp.value=entry; inp.onchange=()=>{ if(/^\d{4}-\d{2}-\d{2}$/.test(inp.value)){ entry=inp.value; entrySet=true; draw(); } }; lab.append(sp,inp); box.appendChild(lab);
+    const info=document.createElement("p"); info.className="here-now";
+    if(days){ const last=dayAdd(entry,days-1), left=daysBetween(todayStr(),last), sd=x=>{ const [y,m,d]=x.split("-"); return +d+"."+(+m)+"."+y.slice(2); }; info.textContent="יום אחרון: "+sd(last)+" · "+(left>=0?"עוד "+left+" ימים":"⛔ חרגתם ב-"+(-left)+" ימים")+" · תזכורת שבוע לפני"; }
+    else info.textContent="בוחרים מספר ימים, והאפליקציה סופרת לאחור ומזכירה שבוע לפני.";
+    box.appendChild(info);
+    const tip=document.createElement("small"); tip.className="here-tip"; tip.textContent="הכללים לדרכון ישראלי משתנים. כדאי לוודא באתר הרשמי של המדינה או אצל הקונסוליה, ולעדכן כאן אם הארכתם."; box.appendChild(tip);
+    const row=document.createElement("div"); row.className="actions";
+    const save=document.createElement("button"); save.type="button"; save.className="btn primary small"; save.textContent="שמירה";
+    save.onclick=async()=>{ const T=tripById(curTrip)||{}; const all={...(T.visa||{})}; all[c]= days ? {days,...(entrySet?{entry}:{})} : null; if(!all[c]) delete all[c];
+      const ok=await patchTrip(curTrip,{visa:all}); if(ok!==false){ if(T) T.visa=all; close(); renderHero(); toast(days?"🛂 נשמר: "+days+" ימים ב"+n:"🛂 הוויזה הוסרה"); } };
+    row.appendChild(save);
+    if(v.days){ const del=document.createElement("button"); del.type="button"; del.className="btn small"; del.textContent="הסרה"; del.onclick=()=>{ days=0; save.onclick(); }; row.appendChild(del); }
+    box.appendChild(row); };
+  draw(); document.body.appendChild(o);
+}
+/* once a day, from a week before the last day */
+function visaNudge(){ if(!loaded||S.home) return; const c=S.localCur, i=visaInfo(c); if(!i||!i.days||i.left>7) return; const k="trip-visa-"+c+"-"+todayStr(); if(load(k)) return; store(k,"1");
+  const n=(CTRY[c]||"").split(" ").slice(1).join(" "), [y,m,d]=i.last.split("-");
+  setTimeout(()=>toast(i.left<0?"⛔ חרגתם מהוויזה ב"+n+" ב-"+(-i.left)+" ימים":"🛂 עוד "+i.left+" ימים לוויזה ב"+n+" · יום אחרון "+(+d)+"."+(+m),"פרטים",()=>openVisa(c),9000),2500); }
 function renderHero(){
   const H=$("hero"); H.hidden= !loaded || view==="stats";
   if(H.hidden) return;
@@ -1327,6 +1394,9 @@ function renderHero(){
   const sk=streak(); if(sk>=2) chip("🔥 "+sk+" ימים ברצף",true);
   chip("🌏 "+countries+" "+(countries===1?"מדינה":"מדינות"));
   chip("🧾 "+S.items.filter(it=>it.kind!=="transfer").length+" הוצאות");
+  /* the visa: days left in this country (tap to set) */
+  if(!S.home&&CTRY[S.localCur]){ const vc=visaChip(S.localCur); if(vc){ const el=document.createElement("button"); el.type="button"; el.className="hero-visa"+(vc[1]?" hot":""); el.textContent=vc[0]; el.onclick=()=>{ buzz(5); openVisa(S.localCur); }; C.appendChild(el); } }
+  visaNudge();
 }
 let insIdx=0, insTimer=null;
 function insights(){
@@ -3510,6 +3580,7 @@ $("saveBtn").onclick=save; $("cancelEdit").onclick=resetForm;
 $("fAmt").addEventListener("input",()=>convHint("fAmt",cur.fCur,"fConv"));
 $("fAmt").addEventListener("keydown",e=>{ if(e.key==="Enter") save(); });
 $("fDesc").addEventListener("keydown",e=>{ if(e.key==="Enter") $("fAmt").focus(); });
+for(const k of ["f","p"]){ $(k+"Desc").addEventListener("input",()=>priceHint(k)); $(k+"Amt").addEventListener("input",()=>priceHint(k)); }
 $("cA").addEventListener("input",()=>{ cLast="A"; renderConv(); });
 $("cB").addEventListener("input",()=>{ cLast="B"; renderConv(); });
 $("cSwap").onclick=()=>{ const f=cur.cFrom; cur.cFrom=cur.cTo; cur.cTo=f; const a=$("cA").value; $("cA").value=$("cB").value; $("cB").value=a; $("cSwap").classList.toggle("spin"); renderConv(); };

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261123073750"></script>
+<script src="theme.js?v=20261123081413"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -225,6 +225,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .sprange input{font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:6px 8px}
 .spinfo{color:var(--muted);font-size:.82rem}
 .spinfo:empty{display:none}
+.pricehint{display:block;margin-top:6px;font-size:.85rem;font-weight:600;color:var(--muted)}
+.pricehint.hi{color:var(--bad,#E5484D)}
+.pricehint.lo{color:var(--good,#14B8A6)}
+.hero-visa{font:inherit;font-size:.8rem;font-weight:600;white-space:nowrap;color:inherit;background:rgba(20,8,60,.32);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:3px 10px;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.hero-visa.hot{background:#FFC93C;color:#1E1640;border-color:transparent;font-weight:700}
 .locrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .locrow .curbtn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .curbtn.town small{opacity:.7;font-weight:500}
@@ -1293,7 +1298,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       <div class="amount"><input id="fAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="fCur" type="button" aria-label="מטבע"></button></div>
       <div class="hint num" id="fConv"></div>
       <div class="grid">
-        <label>שם ההוצאה *<input id="fDesc" required maxlength="60" placeholder="ארוחת ערב, סליפר לצ׳יאנג מאי…" autocomplete="off"><span class="seg suggest" id="fSuggest" hidden></span></label>
+        <label>שם ההוצאה *<input id="fDesc" required maxlength="60" placeholder="ארוחת ערב, סליפר לצ׳יאנג מאי…" autocomplete="off"><span class="seg suggest" id="fSuggest" hidden></span><small class="pricehint" id="fPriceHint" hidden></small></label>
       </div>
       <div class="fieldset"><span class="hint">קטגוריה <span class="cat-auto" id="fCatAuto" hidden>🪄 לפי השם · אפשר לשנות</span></span><div class="seg" id="fCat"></div><input id="fCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
       <details class="more-f" id="fMore"><summary><span id="fMoreSum">📅 היום</span><em></em></summary>
@@ -1378,7 +1383,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
         <div class="amount"><input id="pAmt" class="num" inputmode="decimal" placeholder="0" aria-label="סכום"><button class="curbtn" id="pCur" type="button" aria-label="מטבע"></button></div>
         <div class="hint num" id="pConv"></div>
         <div class="grid">
-          <label>שם ההוצאה *<input id="pDesc" required maxlength="60" placeholder="מזכרת, קפה, עיסוי…" autocomplete="off"><span class="seg suggest" id="pSuggest" hidden></span></label>
+          <label>שם ההוצאה *<input id="pDesc" required maxlength="60" placeholder="מזכרת, קפה, עיסוי…" autocomplete="off"><span class="seg suggest" id="pSuggest" hidden></span><small class="pricehint" id="pPriceHint" hidden></small></label>
         </div>
         <div class="fieldset"><span class="hint">קטגוריה <span class="cat-auto" id="pCatAuto" hidden>🪄 לפי השם · אפשר לשנות</span></span><div class="seg" id="pCat"></div><input id="pCatLabel" maxlength="24" placeholder="מה זה? למשל: כביסה, ויזה, טיפ" hidden></div>
         <details class="more-f" id="pMore"><summary><span id="pMoreSum">📅 היום</span><em></em></summary>
@@ -1768,11 +1773,11 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261123073750">
-<script src="config.js?v=20261123073750"></script>
-<script src="motion.js?v=20261123073750"></script>
-<script src="fx.js?v=20261123073750"></script>
-<script src="cinema.js?v=20261123073750"></script>
-<script src="app.js?v=20261123073750"></script>
+<meta name="app-v" content="20261123081413">
+<script src="config.js?v=20261123081413"></script>
+<script src="motion.js?v=20261123081413"></script>
+<script src="fx.js?v=20261123081413"></script>
+<script src="cinema.js?v=20261123081413"></script>
+<script src="app.js?v=20261123081413"></script>
 </body>
 </html>
