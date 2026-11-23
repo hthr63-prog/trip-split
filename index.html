@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261121082418"></script>
+<script src="theme.js?v=20261123070512"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -220,8 +220,9 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .hist-r small{color:var(--muted)}
 .hist-c{font-size:.92rem;display:flex;flex-direction:column;gap:2px}
 .spreadrow .seg button{min-width:44px}
-.spfrom{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--muted);margin-top:6px}
-.spfrom input{font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+.sprange{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.sprange label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted)}
+.sprange input{font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:6px 8px}
 .spinfo{color:var(--muted);font-size:.82rem}
 .spinfo:empty{display:none}
 .locrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -1298,7 +1299,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       <details class="more-f" id="fMore"><summary><span id="fMoreSum">📅 היום</span><em></em></summary>
         <div class="datefield"><span class="dlab" id="fDateLab">תאריך</span><div class="seg datechips" id="fDateChips" role="group" aria-labelledby="fDateLab"></div><span class="datebox"><input id="fDate" type="date" aria-labelledby="fDateLab"></span></div>
         <div class="fieldset"><span class="hint">איפה?</span><div class="locrow"><button class="curbtn wide" id="fLoc" type="button"></button><button class="curbtn wide town" id="fTown" type="button" aria-label="עיר"></button></div></div>
-        <div class="fieldset spreadrow"><span class="hint">🗓️ לפרוס על כמה לילות? <small>(מלון לשבוע לא יקפיץ את הממוצע היומי)</small></span><div class="seg" id="fSpread"></div><label class="spfrom" id="fSpreadFromL" hidden>החל מ־<input type="date" id="fSpreadFrom"></label><small class="spinfo" id="fSpreadInfo"></small></div>
+        <div class="fieldset spreadrow"><span class="hint">🗓️ לפרוס על כמה ימים? <small>(מלון לשבוע או אופנוע ששילמתם בסוף לא יקפיצו את הממוצע היומי)</small></span><div class="seg" id="fSpread"></div><div class="sprange" id="fSpreadFromL" hidden><label>מתאריך<input type="date" id="fSpreadFrom"></label><label>עד תאריך<input type="date" id="fSpreadTo"></label></div><small class="spinfo" id="fSpreadInfo"></small></div>
       </details>
       <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="fPm"></div></div>
       <div class="fieldset"><span class="hint">מי שילם?</span><div class="seg" id="fPayer"></div></div>
@@ -1383,7 +1384,7 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
         <details class="more-f" id="pMore"><summary><span id="pMoreSum">📅 היום</span><em></em></summary>
           <div class="datefield"><span class="dlab" id="pDateLab">תאריך</span><div class="seg datechips" id="pDateChips" role="group" aria-labelledby="pDateLab"></div><span class="datebox"><input id="pDate" type="date" aria-labelledby="pDateLab"></span></div>
           <div class="fieldset"><span class="hint">איפה?</span><div class="locrow"><button class="curbtn wide" id="pLoc" type="button"></button><button class="curbtn wide town" id="pTown" type="button" aria-label="עיר"></button></div></div>
-        <div class="fieldset spreadrow"><span class="hint">🗓️ לפרוס על כמה לילות? <small>(מלון לשבוע לא יקפיץ את הממוצע היומי)</small></span><div class="seg" id="pSpread"></div><label class="spfrom" id="pSpreadFromL" hidden>החל מ־<input type="date" id="pSpreadFrom"></label><small class="spinfo" id="pSpreadInfo"></small></div>
+        <div class="fieldset spreadrow"><span class="hint">🗓️ לפרוס על כמה ימים? <small>(מלון לשבוע או אופנוע ששילמתם בסוף לא יקפיצו את הממוצע היומי)</small></span><div class="seg" id="pSpread"></div><div class="sprange" id="pSpreadFromL" hidden><label>מתאריך<input type="date" id="pSpreadFrom"></label><label>עד תאריך<input type="date" id="pSpreadTo"></label></div><small class="spinfo" id="pSpreadInfo"></small></div>
         </details>
         <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="pPm"></div></div>
         <div class="actions">
@@ -1766,11 +1767,11 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261121082418">
-<script src="config.js?v=20261121082418"></script>
-<script src="motion.js?v=20261121082418"></script>
-<script src="fx.js?v=20261121082418"></script>
-<script src="cinema.js?v=20261121082418"></script>
-<script src="app.js?v=20261121082418"></script>
+<meta name="app-v" content="20261123070512">
+<script src="config.js?v=20261123070512"></script>
+<script src="motion.js?v=20261123070512"></script>
+<script src="fx.js?v=20261123070512"></script>
+<script src="cinema.js?v=20261123070512"></script>
+<script src="app.js?v=20261123070512"></script>
 </body>
 </html>

@@ -537,14 +537,22 @@ function renderConv(){
 
 /* the "spread over nights" row of a form (k = "f" shared, "p" personal) */
 function renderSpread(k,f){
-  const n=f.spread&&f.spread.n>1?f.spread.n:1, opts=[["1","לא"],["2","2"],["3","3"],["4","4"],["5","5"],["7","7"]];
-  if(n>1&&!opts.some(o=>+o[0]===n)) opts.push([String(n),String(n)]); opts.push(["x","אחר…"]);
-  seg($(k+"Spread"),opts,v=>+v===n,v=>{ if(v==="x"){ const a=parseInt(prompt("על כמה לילות לפרוס?",n>1?n:"10"),10); if(!(a>1)) return; v=String(Math.min(a,366)); }
-    const m=+v; f.spread= m>1 ? {n:m,from:(f.spread&&f.spread.from)||$(k+"Date").value||todayStr()} : null; renderSpread(k,f); });
-  const L=$(k+"SpreadFromL"), I=$(k+"SpreadFrom"), info=$(k+"SpreadInfo"); L.hidden=n<2;
-  if(n>1){ I.value=f.spread.from||$(k+"Date").value||todayStr(); I.onchange=()=>{ if(/^\d{4}-\d{2}-\d{2}$/.test(I.value)){ f.spread.from=I.value; renderSpread(k,f); } };
-    const amt=parseFloat(String($(k+"Amt").value).replace(/,/g,""))||0, c=(k==="f"?cur.fCur:cur.pCur)||S.localCur, end=dayAdd(I.value,n-1), sd=x=>{ const [y,m,d]=x.split("-"); return +d+"."+(+m); };
-    info.textContent=(amt>0?"≈ "+fmt(amt/n,c)+" ללילה · ":"")+sd(I.value)+"–"+sd(end)+" · בממוצע היומי כל לילה נספר ביום שלו"; }
+  /* a range of days, picked from the calendar (backwards too: a motorbike paid on the last day);
+     the quick choices count forward from the expense's date */
+  const n=f.spread&&f.spread.n>1?f.spread.n:1, base=$(k+"Date").value||todayStr();
+  const quick=[2,3,4,5,7], custom=n>1&&!(quick.includes(n)&&f.spread.from===base);
+  const opts=[["1","לא"],...quick.map(q=>[String(q),String(q)]),["r","📅 מתאריך עד תאריך"]];
+  seg($(k+"Spread"),opts,v=>v==="r"?custom:(!custom&&+v===n),v=>{
+    if(v==="r"){ const to= f.spread ? dayAdd(f.spread.from,f.spread.n-1) : base; f.spread={from:f.spread?f.spread.from:dayAdd(base,-6),n:0}; f.spread.n=daysBetween(f.spread.from,to)+1; if(f.spread.n<2){ f.spread.from=dayAdd(to,-1); f.spread.n=2; } }
+    else { const m=+v; f.spread= m>1 ? {n:m,from:base} : null; }
+    renderSpread(k,f); });
+  const L=$(k+"SpreadFromL"), A=$(k+"SpreadFrom"), B=$(k+"SpreadTo"), info=$(k+"SpreadInfo"); L.hidden=n<2;
+  if(n>1){ const to=dayAdd(f.spread.from,n-1); A.value=f.spread.from; B.value=to; A.max=B.value; B.min=A.value;
+    const set=(from,end)=>{ if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(end)) return; if(end<from){ const t=from; from=end; end=t; }
+      const m=Math.min(366,daysBetween(from,end)+1); f.spread= m>1 ? {n:m,from} : null; renderSpread(k,f); };
+    A.onchange=()=>set(A.value,B.value); B.onchange=()=>set(A.value,B.value);
+    const amt=parseFloat(String($(k+"Amt").value).replace(/,/g,""))||0, c=(k==="f"?cur.fCur:cur.pCur)||S.localCur, sd=x=>{ const [y,m,d]=x.split("-"); return +d+"."+(+m); };
+    info.textContent=(amt>0?"≈ "+fmt(amt/n,c)+" ליום · ":"")+n+" ימים · "+sd(f.spread.from)+"–"+sd(to)+" · כל יום נספר בממוצע היומי ביום שלו"; }
   else info.textContent="";
   moreSum();
 }
@@ -749,7 +757,7 @@ function renderLedger_(){
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; const m=document.createElement("div"); m.className="m";
     if(it.kind==="transfer"){ t.textContent="💸 "+nm(it.payer)+" "+g.transferred(it.payer)+" ל"+nm(it.to); m.textContent=withTime(it,"סגירת חשבון"+(it.pm==="cash"?" · 💵 מזומן":it.pm==="bank"?" · 🏦 העברה לחשבון":"")); }
-    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,(spreadN(it)>1?"🗓️ "+spreadN(it)+" לילות · ":"")+(it.payer===EACH?"👫 כל אחד שילם על עצמו":nm(it.payer)+" "+g.paid(it.payer))+" · "+pmText(it)+(feeRate(it)?"\u00a0מתחלקת":"")+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
+    else{ t.textContent=(PENDING.has(it.id)?"⏳ ":"")+(it.desc||"הוצאה"); m.textContent=withTime(it,(spreadN(it)>1?"🗓️ "+spreadN(it)+" ימים · ":"")+(it.payer===EACH?"👫 כל אחד שילם על עצמו":nm(it.payer)+" "+g.paid(it.payer))+" · "+pmText(it)+(feeRate(it)?"\u00a0מתחלקת":"")+" · "+splitText(it)+" · "+catName(catKey(it)).replace(/^\S+\s/,"")); }
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
@@ -934,7 +942,7 @@ function renderPersonal_(){
     const dot=catTile(it,null);
     const main=document.createElement("div"); main.className="main";
     const t=document.createElement("div"); t.className="t"; t.textContent=it.desc||"הוצאה";
-    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(it,"אישי · "+(spreadN(it)>1?"🗓️ "+spreadN(it)+" לילות · ":"")+(it._fee?"":pmText(it)+" · ")+catName(catKey(it)).replace(/^\S+\s/,""));
+    const m=document.createElement("div"); m.className="m"; m.textContent=withTime(it,"אישי · "+(spreadN(it)>1?"🗓️ "+spreadN(it)+" ימים · ":"")+(it._fee?"":pmText(it)+" · ")+catName(catKey(it)).replace(/^\S+\s/,""));
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+it.amount,it.cur); right.appendChild(b);
@@ -1580,7 +1588,7 @@ function showErr(id,msg,field){ const e=$(id); e.textContent=msg||""; e.hidden=!
     field.addEventListener("input",clear,{once:true}); field.addEventListener("click",clear,{once:true}); } }
 function dayWord(v){ const t=todayStr(); if(!v||v===t) return "היום"; const y=new Date(Date.now()-864e5), ys=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0"); if(v===ys) return "אתמול"; const a=v.split("-").map(Number); return a[2]+"."+a[1]; }
 /* the folded "date · place" line of both forms; it turns amber when the date is not today */
-function moreSum(){ for(const [k,f] of [["f",form],["p",pform]]){ const el=$(k+"MoreSum"); if(!el) continue; const v=$(k+"Date").value; const tw=f.town||autoTown(v||todayStr()); if($(k+"Town")) townBtn($(k+"Town"),f.town,v||todayStr()); el.textContent="📅 "+dayWord(v)+" · "+locName(f.loc||defLoc())+(tw?" · "+tw:"")+(f.spread&&f.spread.n>1?" · 🗓️ "+f.spread.n+" לילות":""); $(k+"More").classList.toggle("off",!!v&&v!==todayStr()); } }
+function moreSum(){ for(const [k,f] of [["f",form],["p",pform]]){ const el=$(k+"MoreSum"); if(!el) continue; const v=$(k+"Date").value; const tw=f.town||autoTown(v||todayStr()); if($(k+"Town")) townBtn($(k+"Town"),f.town,v||todayStr()); el.textContent="📅 "+dayWord(v)+" · "+locName(f.loc||defLoc())+(tw?" · "+tw:"")+(f.spread&&f.spread.n>1?" · 🗓️ "+f.spread.n+" ימים":""); $(k+"More").classList.toggle("off",!!v&&v!==todayStr()); } }
 /* texts that speak to one person, in his or her gender */
 function applyG(){ if(!me) return; const f=fem(me); document.querySelectorAll("[data-gm]").forEach(e=>{ const t=f?e.dataset.gf:e.dataset.gm; if(e.textContent!==t) e.textContent=t; }); }
 function done(btn){ if(!btn) return; buzz(10); if(calm()) return; btn.classList.add("ok"); setTimeout(()=>btn.classList.remove("ok"),900); }
@@ -2484,7 +2492,7 @@ const HIST_KEEP=10;
 function histPush(h,old){ return [...(Array.isArray(h)?h:[]),{at:Date.now(),by:me||null,old}].slice(-HIST_KEEP); }
 const HIST_LBL={desc:"שם",amount:"סכום",cur:"מטבע",payer:"מי שילם",among:"מי מתחלק",pcts:"אחוזים",cat:"קטגוריה",catLabel:"תיאור",date:"תאריך",loc:"מדינה",town:"עיר",pm:"תשלום",spread:"פריסה"};
 function histVal(k,v,it){ if(v==null||v==="") return "—"; if(k==="amount") return fmt(+v,(it&&it.cur)||"ILS"); if(k==="payer") return v===EACH?"כל אחד על עצמו":nm(v); if(k==="among") return (v||[]).map(nm).join(", ");
-  if(k==="pcts") return Object.entries(v||{}).map(([a,b])=>nm(a)+" "+b+"%").join(", "); if(k==="cat") return catName(v); if(k==="date"){ const [y,m,d]=String(v).split("-"); return +d+"."+(+m); } if(k==="loc") return locName(v); if(k==="pm") return v==="card"?"כרטיס":"מזומן"; if(k==="spread") return v&&v.n>1?v.n+" לילות":"בלי"; return String(v); }
+  if(k==="pcts") return Object.entries(v||{}).map(([a,b])=>nm(a)+" "+b+"%").join(", "); if(k==="cat") return catName(v); if(k==="date"){ const [y,m,d]=String(v).split("-"); return +d+"."+(+m); } if(k==="loc") return locName(v); if(k==="pm") return v==="card"?"כרטיס":"מזומן"; if(k==="spread") return v&&v.n>1?v.n+" ימים":"בלי"; return String(v); }
 async function restoreVersion(id,personal,old){
   const it=(personal?P:S.items).find(x=>x.id===id); if(!it){ toast("ההוצאה לא נמצאה"); return; }
   const now={}; for(const k of Object.keys(old)) now[k]=it[k]??null;   /* what is there now, so this restore can be undone */
