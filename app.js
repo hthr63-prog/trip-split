@@ -3898,7 +3898,7 @@ function landing(back){
   const Q=([q,a])=>'<details class="lp-q"><summary>'+esc(q)+'</summary><p>'+esc(a)+'</p></details>';
   L.innerHTML=
    '<header class="lp-hero">'+
-    '<div class="lp-top">'+(back?'<button class="lp-back" id="lpBack" type="button">'+T.back+'</button>':'<span></span>')+'<button class="lp-lang" id="lpLang" type="button">'+T.switch+'</button></div>'+
+    '<div class="lp-top">'+(back?'<button class="lp-back" id="lpBack" type="button">'+T.back+'</button>':'<span></span>')+'<div class="lp-lang" id="lpLang" role="group" aria-label="שפה · Language"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg><button type="button" id="lpHe" data-l="he" lang="he" aria-pressed="'+(lang()!=="en")+'">עב</button><button type="button" id="lpEn" data-l="en" lang="en" aria-pressed="'+(lang()==="en")+'">EN</button></div></div>'+
     '<div class="lp-logo">🧳</div><h1>'+T.h1+'</h1><p class="lp-sub">'+esc(T.sub)+'</p>'+
     '<div class="lp-cta"><button class="lp-btn main" id="lpNew" type="button">'+T.new+'</button><button class="lp-btn" id="lpHave" type="button">'+T.have+'</button></div>'+
     '<p class="lp-mini">'+T.mini+'</p></header>'+
@@ -3910,7 +3910,7 @@ function landing(back){
   document.body.appendChild(L); document.body.style.overflow="hidden";
   for(const id of ["lpNew","lpNew2"]) L.querySelector("#"+id).onclick=()=>newTripForm(true);
   for(const id of ["lpHave","lpHave2"]) L.querySelector("#"+id).onclick=()=>askForLink(lang()==="en"?"Your trip link":"הקישור של הטיול");
-  L.querySelector("#lpLang").onclick=()=>{ store("trip-lang",lang()==="en"?"he":"en"); landing(back); };
+  L.querySelectorAll("#lpLang button").forEach(b=>b.onclick=()=>{ if(b.dataset.l===lang()) return; store("trip-lang",b.dataset.l); landing(back); });
   const b=L.querySelector("#lpBack"); if(b) b.onclick=()=>{ location.replace(PAGE_URL); };
 }
 function welcome(){
