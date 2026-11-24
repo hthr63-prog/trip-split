@@ -146,8 +146,11 @@ function rateNow(c){ return c==="ILS" ? 1 : conv(1,c,"ILS"); }
 /* a shared expense paid by card in a foreign currency costs the payer 1% more (card fee, Max "Backpacker").
    That 1% is part of the expense, so it is split like the expense: nobody pays a fee for the other. */
 /* the 1% foreign-card fee is Yair & Gali's card (Max Backpacker); a new trip starts without it */
-function feeOn(){ try{ return isOurs()||!!(META&&META.cardFee); }catch(e){ return true; } }
-function feeRate(it){ return feeOn()&&it&&it.kind!=="transfer"&&it.pm==="card"&&!it._fee&&it.cur&&it.cur!=="ILS" ? 0.01 : 0; }
+/* the card's fee on foreign-currency charges, set per trip (settings); Yair & Gali's trip keeps its 1% */
+function feeR(){ try{ const v=META&&META.cardFee; if(typeof v==="number"&&v>=0&&v<0.1) return v; return isOurs()?0.01:0; }catch(e){ return 0.01; } }
+function feePct(){ return +(feeR()*100).toFixed(2)+"%"; }
+function feeOn(){ return feeR()>0; }
+function feeRate(it){ return feeOn()&&it&&it.kind!=="transfer"&&it.pm==="card"&&!it._fee&&it.cur&&it.cur!=="ILS" ? feeR() : 0; }
 function ils(it){ const v=+it.amount||0; return it.rIls>0 ? v*it.rIls : conv(v,it.cur||"ILS","ILS"); }
 function conv(v,from,to){ if(from===to) return v; return v/perUsd(from)*perUsd(to); }
 /* what an expense cost, in the currency shown: one rule for every total in the app.
@@ -274,6 +277,10 @@ function applyTheme(t){
   else { document.documentElement.dataset.theme=t; store("trip-theme",t); }
   $("themeBtn").setAttribute("aria-checked",String(isDark())); $("themeBtn").dataset.mode=themePref(); $("themeBtn").setAttribute("aria-label","מצב תצוגה: "+({auto:"אוטומטי לפי השקיעה",light:"בהיר",dark:"כהה"})[themePref()]);
   if($("motionBtn")) $("motionBtn").onclick=()=>window.askMotion&&window.askMotion(true);
+  if($("jsonBtn")) $("jsonBtn").onclick=()=>backupJson();
+  if($("delTripBtn")) $("delTripBtn").onclick=()=>deleteTrip();
+  if($("tourBtn")) $("tourBtn").onclick=()=>{ closeSheet("setSheet"); setTimeout(()=>tour(false),250); };
+  if($("inviteBtn")) $("inviteBtn").onclick=()=>{ if(!me){ toast("קודם בוחרים מי אתם"); return; } inviteSheet(); };
   if($("siriBtn")) $("siriBtn").onclick=()=>{ if(!me){ toast("קודם בוחרים מי אתם"); return; } siriHelp(); };
   if($("soundSeg")) seg($("soundSeg"),[["on","🔔 צלילים"],["off","🔕 בלי"]],v=>v===(load("trip-sound")==="off"?"off":"on"),v=>{ store("trip-sound",v); applyTheme(themePref()); if(v==="on") sound("coin"); });
   if($("themeSeg")) seg($("themeSeg"),[["auto","🌅 אוטומטי"],["light","☀️ בהיר"],["dark","🌙 כהה"]],v=>v===themePref(),v=>applyTheme(v));
@@ -667,7 +674,7 @@ function timeOf(it){
 }
 function withTime(it,txt){ const t=timeOf(it); return t? "🕒 "+t+" · "+txt : txt; }
 /* how it was paid, on every expense row; old entries without a mark count as cash, so they say so */
-function pmText(it){ if(!it||it.kind==="transfer"||it._fee) return ""; if(it.pm==="bank") return "🏦 מהבנק"; return it.pm==="card" ? "💳 כרטיס"+(feeRate(it)?" · עמלה\u00a01%":"") : "💵 מזומן"; }
+function pmText(it){ if(!it||it.kind==="transfer"||it._fee) return ""; if(it.pm==="bank") return "🏦 מהבנק"; return it.pm==="card" ? "💳 כרטיס"+(feeRate(it)?" · עמלה\u00a0"+feePct():"") : "💵 מזומן"; }
 /* the search: every word must match something about the expense — what, who, category, how paid, amount,
    date (29.10, 29/10, October, a weekday), country (or "הכנות" / "לפני הטיול"), town, currency.
    A word like >500 or <100 compares the amount (in the currency shown); 200-500 is a range. */
@@ -888,7 +895,7 @@ async function refreshPersonal(){
     CASH=mine.filter(x=>x.type==="cash");
     const fees=CASH.filter(x=>(x.sub==="withdraw"||x.sub==="exchange")&&+x.fee>0).map(x=>{ const st=tripStart(), early= x.sub==="exchange"&&st&&(x.date||"")<st;   /* rate loss on money changed before the flight counts as trip spending */
       return {id:"fee-"+x.id,_wid:x.id,_fee:true,desc:x.sub==="exchange"?"הפרשי שער בצ׳יינג׳":"עמלת משיכה",amount:+x.fee,cur:x.feeCur||x.cur,cat:"other",catLabel:x.sub==="exchange"?"הפרשי שער":"עמלות משיכה",pm:"fee",date:early?st:x.date,createdAt:x.createdAt,tz:x.tz,loc:early?(S.dest||x.loc):x.loc}; });
-    for(const x of CASH){ const v=cardFee(x); if(v>0) fees.push({id:"cfee-"+x.id,_wid:x.id,_fee:true,desc:"עמלת כרטיס 1% על משיכה",amount:v,cur:x.cur,cat:"other",catLabel:"עמלות משיכה",pm:"fee",date:x.date,createdAt:(x.createdAt||0)+1,tz:x.tz,loc:x.loc}); }
+    for(const x of CASH){ const v=cardFee(x); if(v>0) fees.push({id:"cfee-"+x.id,_wid:x.id,_fee:true,desc:"עמלת כרטיס "+feePct()+" על משיכה",amount:v,cur:x.cur,cat:"other",catLabel:"עמלות משיכה",pm:"fee",date:x.date,createdAt:(x.createdAt||0)+1,tz:x.tz,loc:x.loc}); }
     INCOME=mine.filter(x=>x.type==="budget-in");
     BUDGET=mine.filter(x=>x.type==="budget").sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||null;
     STOPS=mine.filter(x=>x.type==="stop");
@@ -1179,6 +1186,52 @@ function recapData(loc,range){
   const transfers=S.items.filter(it=>it.kind==="transfer"&&inLoc(it)).length;
   return {loc,week:range||null,items,total,dates,days:range?7:days,countries,topCat,cats,bigDay,bigOne,paid,share,alone,transfers,avg: (range?7:days)? total/(range?7:days) : 0};
 }
+/* ================= the trip book: one page to keep (print / save as PDF) ================= */
+function tripBook(){
+  const st=tripStart(), td=todayStr(); const PC=placeCtx(), V=it=>spend(it,"ILS");
+  const orig=S.items.filter(it=>it.kind!=="transfer"&&PC.effLoc(it)!=="prep"), parts=spreadAll(orig);
+  const sd=x=>{ const [y,m,d]=x.split("-"); return +d+"."+(+m)+"."+y.slice(2); }, esc=t=>String(t==null?"":t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const total=parts.reduce((a,it)=>a+V(it),0), days= st&&st<=td ? daysBetween(st,td)+1 : 0, prep=S.items.filter(it=>it.kind!=="transfer"&&PC.effLoc(it)==="prep").reduce((a,it)=>a+V(it),0);
+  const byC={}; for(const it of parts){ const k=PC.effLoc(it); if(!CTRY[k]) continue; const o=byC[k]||(byC[k]={v:0,min:null,max:null}); o.v+=V(it); if(!o.min||it.date<o.min) o.min=it.date; if(!o.max||it.date>o.max) o.max=it.date; }
+  const cats={}; for(const it of parts) cats[catKey(it)]=(cats[catKey(it)]||0)+V(it);
+  const c=compute(), people=active();
+  const stops=tripStops(), legs=(()=>{ try{ return journeyLegs("shared"); }catch(e){ return []; } })();
+  let globe=""; try{ const g=GLOBE; if(g&&g.cv){ drawGlobe(g); globe=g.cv.toDataURL("image/png"); } }catch(e){}
+  const rec=tripRecords()||[];
+  const o=document.createElement("div"); o.id="book"; o.setAttribute("dir","rtl");
+  o.innerHTML='<div class="bk-bar"><button type="button" class="btn small" id="bkClose">סגירה</button><button type="button" class="btn primary small" id="bkPrint">🖨️ שמירה כ-PDF</button></div>'+
+   '<article class="bk"><header><div class="bk-kick">📕 ספר הטיול</div><h1>'+esc(S.trip||"הטיול שלנו")+'</h1><p>'+(st?sd(st)+" – "+sd(td)+" · ":"")+days+" ימים · "+esc(people.map(p=>p.name).join(", "))+'</p></header>'+
+   (globe?'<img class="bk-globe" alt="המסלול על הגלובוס" src="'+globe+'">':'')+
+   '<section><h2>במספרים</h2><div class="bk-nums"><div><b>'+fmt(total,"ILS")+'</b><small>הוצאנו בטיול</small></div><div><b>'+fmt(days?total/days:0,"ILS")+'</b><small>ממוצע ליום</small></div><div><b>'+nUniq(parts)+'</b><small>הוצאות</small></div><div><b>'+Object.keys(byC).length+'</b><small>מדינות</small></div></div>'+
+     (prep>0.5?'<p class="bk-note">ועוד '+fmt(prep,"ILS")+' לפני הטיול (טיסות, ביטוח, ציוד)</p>':'')+'</section>'+
+   (Object.keys(byC).length?'<section><h2>לפי מדינה</h2><table>'+Object.entries(byC).sort((a,b)=>b[1].v-a[1].v).map(([k,o])=>{ const from=st&&o.min<st?st:o.min, end=k===S.localCur&&!S.home?td:o.max, n=daysBetween(from,end)+1; return '<tr><td>'+esc(CTRY[k])+'</td><td>'+n+' ימים</td><td>'+fmt(o.v,"ILS")+'</td><td>'+fmt(o.v/Math.max(1,n),"ILS")+' ליום</td></tr>'; }).join("")+'</table></section>':'')+
+   (legs.length?'<section><h2>המסלול</h2><table>'+legs.map(l=>'<tr><td>📍 '+esc(l.name)+'</td><td>'+(l.from?sd(l.from):"")+(l.left?" – "+sd(l.left):l.last?" – היום":"")+'</td><td>'+l.days+' ימים</td><td>'+fmt(conv(l.spent,showCur,"ILS"),"ILS")+'</td></tr>').join("")+'</table></section>':'')+
+   (rec.length?'<section><h2>🏆 שיאים</h2><table>'+rec.map(([ic,t,v,sub])=>'<tr><td>'+ic+' '+esc(t)+'</td><td>'+fmt(v,"ILS")+'</td><td>'+esc(sub)+'</td></tr>').join("")+'</table></section>':'')+
+   '<section><h2>על מה הלך הכסף</h2><table>'+Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+esc(catName(k))+'</td><td>'+fmt(v,"ILS")+'</td><td>'+Math.round(v/Math.max(1,total)*100)+'%</td></tr>').join("")+'</table></section>'+
+   (people.length>1?'<section><h2>מי שילם</h2><table>'+people.map(p=>'<tr><td>'+esc(p.name)+'</td><td>שילם/ה '+fmt(conv(c.paid[p.id]||0,showCur,"ILS"),"ILS")+'</td><td>החלק '+fmt(conv(c.share[p.id]||0,showCur,"ILS"),"ILS")+'</td></tr>').join("")+'</table></section>':'')+
+   '<footer>נוצר ב-'+sd(td)+' · יומן הטיול</footer></article>';
+  document.body.appendChild(o); document.body.classList.add("book-open");
+  o.querySelector("#bkClose").onclick=()=>{ o.remove(); document.body.classList.remove("book-open"); };
+  o.querySelector("#bkPrint").onclick=()=>{ buzz(5); window.print(); };
+}
+/* ================= the trip's records ================= */
+function tripRecords(){
+  const st=tripStart(), td=todayStr(); if(!st||st>td) return null; const PC=placeCtx(), onTrip=it=>PC.effLoc(it)!=="prep";
+  const orig=S.items.filter(it=>it.kind!=="transfer"&&onTrip(it)), parts=spreadAll(orig), sd=x=>{ const [y,m,d]=x.split("-"); return +d+"."+(+m); };
+  if(orig.length<3) return null; const V=it=>spend(it,"ILS"), out=[];
+  const byDay={}; for(const it of parts){ if(it.date<st||it.date>td) continue; byDay[it.date]=(byDay[it.date]||0)+V(it); }
+  const days=Object.entries(byDay); if(days.length){ const hi=days.slice().sort((a,b)=>b[1]-a[1])[0]; out.push(["📈","היום הכי יקר",hi[1],sd(hi[0])]);
+    const full=days.filter(([d])=>d<td); if(full.length>=2){ const lo=full.slice().sort((a,b)=>a[1]-b[1])[0]; out.push(["🪶","היום הכי חסכוני",lo[1],sd(lo[0])]); } }
+  const meals=orig.filter(it=>catKey(it)==="food"&&+it.amount>0); if(meals.length>=2){ const m=meals.slice().sort((a,b)=>V(a)-V(b))[0]; out.push(["🍜","הארוחה הכי זולה",V(m),(m.desc||"")+" · "+sd(m.date)]); }
+  const big=orig.slice().sort((a,b)=>V(b)-V(a))[0]; if(big) out.push(["💸","ההוצאה הכי גדולה",V(big),(big.desc||"")+" · "+sd(big.date)]);
+  try{ const towns=journeyTowns(journeyLegs("shared")).filter(t=>t.days>=2); if(towns.length>=2){ const pd=t=>conv(t.spent,showCur,"ILS")/t.days; const s2=towns.slice().sort((a,b)=>pd(a)-pd(b)); out.push(["🏙️","העיר הכי משתלמת",pd(s2[0]),s2[0].name+" · ליום"]); out.push(["🏨","העיר הכי יקרה",pd(s2[s2.length-1]),s2[s2.length-1].name+" · ליום"]); } }catch(e){}
+  const cats={}; for(const it of parts) cats[catKey(it)]=(cats[catKey(it)]||0)+V(it); const tc=Object.entries(cats).sort((a,b)=>b[1]-a[1])[0], tot=Object.values(cats).reduce((a,b)=>a+b,0);
+  if(tc&&tot>0) out.push([catName(tc[0]).split(" ")[0],"הכי הרבה הלך על",tc[1],catName(tc[0]).split(" ").slice(1).join(" ")+" · "+Math.round(tc[1]/tot*100)+"%"]);
+  return out;
+}
+function renderRecords(){ const card=$("stRecCard"); if(!card) return; if($("bookBtn")) $("bookBtn").onclick=()=>tripBook(); const r=tripRecords(); card.hidden=!r||!r.length; if(card.hidden) return;
+  const G=$("stRecs"); G.innerHTML=""; for(const [ic,t,v,sub] of r){ const d=document.createElement("div"); d.className="rec"; d.innerHTML='<span class="ic"></span><small></small><b class="num"></b><span></span>';
+    d.children[0].textContent=ic; d.children[1].textContent=t; d.children[2].textContent=fmt(conv(v,"ILS",showCur),showCur); d.children[3].textContent=sub; G.appendChild(d); } }
 function recapSlides(d){
   const title= d.week ? "השבוע שלנו" : d.loc ? locName(d.loc) : (S.trip||"הטיול שלנו");
   const sd=s=>{ const [y,m,dd]=s.split("-").map(Number); return dd+"."+m; };
@@ -1187,14 +1240,15 @@ function recapSlides(d){
   const S2=[];
   S2.push({bg:"g1",kick:d.week?"שבוע שעבר בסיכום":d.loc?"הסיכום של":"הטיול שלנו בסיכום",h:title,p:range,big:"🎬"});
   if(!d.week) S2.push({bg:"g2",kick:"יצאנו לדרך",num:d.days,unit:d.days===1?"יום":"ימים",p:d.countries.length>1?d.countries.length+" מדינות: "+d.countries.map(c=>CTRY[c].split(" ")[0]).join(" "):(d.countries[0]?CTRY[d.countries[0]]:"")});
-  S2.push({bg:"g3",kick:"הוצאנו ביחד",money:d.total,p:"בממוצע "+fmt(d.avg,"ILS")+" ליום · "+d.items.length+" הוצאות"});
+  S2.push({bg:"g3",kick:"הוצאנו ביחד",money:d.total,p:"בממוצע "+fmt(d.avg,"ILS")+" ליום · "+nUniq(d.items)+" הוצאות"});
   if(d.topCat) S2.push({bg:"g4",kick:"הכי הרבה הלך על",big:catName(d.topCat[0]).split(" ")[0],h:catName(d.topCat[0]).split(" ").slice(1).join(" "),p:Math.round(d.topCat[1]/d.total*100)+"% מכל ההוצאות · "+fmt(d.topCat[1],"ILS")});
   if(d.bigDay) S2.push({bg:"g5",kick:"היום הכי יקר",h:dayLabel(d.bigDay[0]),money:d.bigDay[1],p:d.bigDay[2].slice().sort((x,y)=>conv(+y.amount,y.cur,"ILS")-conv(+x.amount,x.cur,"ILS")).slice(0,3).map(it=>it.desc).join(" · ")});
   if(d.bigOne) S2.push({bg:"g6",kick:"ההוצאה הכי גדולה",big:catEmoji(d.bigOne),h:d.bigOne.desc||"הוצאה",p:fmt(+d.bigOne.amount,d.bigOne.cur)+(d.bigOne.cur!=="ILS"?" ≈ "+fmt(conv(+d.bigOne.amount,d.bigOne.cur,"ILS"),"ILS"):"")});
   const pe=Object.entries(d.paid).sort((x,y)=>y[1]-x[1]);
   if(pe.length>1) S2.push({bg:"g2",kick:"מי פתח יותר את הארנק",bars:pe.map(([id,v])=>[nm(id),Math.round(v/d.total*100)]),p:nm(pe[0][0])+" "+g.paid(pe[0][0])+" "+Math.round(pe[0][1]/d.total*100)+"% מההוצאות"});
   if(me) S2.push({bg:"g3",kick:fem(me)?"ואת?":"ואתה?",money:d.share+(d.alone||0),p:(d.alone!=null?"🙋 לבד "+fmt(d.alone,"ILS")+" · ":"")+"👫 ביחד "+fmt(d.share,"ILS")});
-  S2.push({bg:"g4",kick:"בשורה התחתונה",h:d.items.length+" הוצאות · "+d.transfers+" העברות",p:"🔥 הרצף הכי ארוך שלכם: "+bestStreak(d)+" ימים של רישום"});
+  if(!d.week&&!d.loc){ const rr=tripRecords(); if(rr&&rr.length>=3){ const pick=rr.filter(x=>/זולה|משתלמת|חסכוני/.test(x[1])).slice(0,3); if(pick.length) S2.push({bg:"g5",kick:"🏆 שיאי הטיול",h:pick[0][1]+": "+fmt(pick[0][2],"ILS"),p:pick.map(x=>x[0]+" "+x[1]+" · "+x[3]).join("  ·  ")}); } }
+  S2.push({bg:"g4",kick:"בשורה התחתונה",h:nUniq(d.items)+" הוצאות · "+d.transfers+" העברות",p:"🔥 הרצף הכי ארוך שלכם: "+bestStreak(d)+" ימים של רישום"});
   S2.push({bg:"g1",end:true,kick:d.week?"שבוע טוב 💜":"היה שווה כל שקל 💜",h:title,p:"שתפו את הסיכום"});
   return S2;
 }
@@ -2448,6 +2502,7 @@ function renderMedals(){
 }
 
 function renderStats(){
+  try{ renderRecords(); }catch(e){}
   const mineOk=!!me;
   if(!mineOk) stScope="trip";
   try{ renderJourney("shared"); }catch(e){}
@@ -3010,8 +3065,8 @@ function cashTransfers(){ return me ? S.items.filter(it=>it.kind==="transfer"&&i
    Worked out from each entry, so it also covers what was recorded before this rule. */
 const CARD_FEE=0.01;
 const r2=v=>Math.round(v*100)/100;
-function cardFee(x){ if(!feeOn()||!x||x.sub!=="withdraw"||x.cur==="ILS") return 0; const atm=(x.feeCur||x.cur)===x.cur?(+x.fee||0):0; return r2(((+x.amount||0)+atm)*CARD_FEE); }
-function payFee(it){ return feeOn()&&it&&it.pm==="card"&&!it._fee&&it.kind!=="transfer"&&it.cur&&it.cur!=="ILS" ? r2((+it.amount||0)*CARD_FEE) : 0; }
+function cardFee(x){ if(!feeOn()||!x||x.sub!=="withdraw"||x.cur==="ILS") return 0; const atm=(x.feeCur||x.cur)===x.cur?(+x.fee||0):0; return r2(((+x.amount||0)+atm)*feeR()); }
+function payFee(it){ return feeOn()&&it&&it.pm==="card"&&!it._fee&&it.kind!=="transfer"&&it.cur&&it.cur!=="ILS" ? r2((+it.amount||0)*feeR()) : 0; }
 /* one line a day in the personal list for the 1% on card payments (mine, and shared ones I paid) */
 function syncCardFees(){
   if(!pLoaded||!me) return; const days=new Map();
@@ -3019,7 +3074,7 @@ function syncCardFees(){
   for(const it of P) if(!it._pfx&&!it.offTrip) add(it,payFee(it));
   /* shared: my share of the 1%, whoever paid (the fee is split with the expense) */
   for(const it of S.items) if(!it.deleted){ const sh=sharesOf(it)[me]||0; if(sh>0) add(it,payFee(it)*sh); }
-  const out=[...days.values()].map(o=>({id:"pfee-"+o.date+"-"+o.cur,_fee:true,_pfx:true,desc:"עמלת כרטיס 1%"+(o.n>1?" · "+o.n+" תשלומים":""),amount:r2(o.v),cur:o.cur,cat:"other",catLabel:"עמלות כרטיס",pm:"fee",date:o.date,createdAt:o.createdAt,tz:o.tz,loc:o.loc}));
+  const out=[...days.values()].map(o=>({id:"pfee-"+o.date+"-"+o.cur,_fee:true,_pfx:true,desc:"עמלת כרטיס "+feePct()+(o.n>1?" · "+o.n+" תשלומים":""),amount:r2(o.v),cur:o.cur,cat:"other",catLabel:"עמלות כרטיס",pm:"fee",date:o.date,createdAt:o.createdAt,tz:o.tz,loc:o.loc}));
   P=[...P.filter(x=>!x._pfx),...out];
 }
 function cashBalances(){
@@ -3135,9 +3190,9 @@ $("cwCur").onclick=()=>openCurPicker("באיזה מטבע משכת?",cur.cw||S.l
 /* live: what the card adds on top */
 function cwCardHint(){ const a=num("cwAmt"), el=$("cwCard"); if(!el) return; const c=cur.cw||S.localCur;
   const fee=num("cwFee")>0?num("cwFee"):0, fc=cur.cwFee||S.localCur, x={sub:"withdraw",amount:a,cur:c,fee,feeCur:fc}, k=cardFee(x);
-  el.textContent= !(a>0) ? "💳 הכרטיס לוקח 1% על כל משיכה במט״ח, גם על עמלת הכספומט. נרשם לבד כהוצאה"
-    : c==="ILS" ? "💳 משיכה בשקלים: בלי עמלת 1%"
-    : "💳 עמלת כרטיס 1%"+(fee>0&&fc===c?" (על המשיכה + עמלת הכספומט)":"")+": "+fmt(k,c)+" · יורד מהבנק בסך הכול "+fmt(a+(fc===c?fee:0)+k,c)+(fee>0&&fc!==c?" + "+fmt(fee,fc):""); }
+  el.textContent= !(a>0) ? (feeOn()?"💳 הכרטיס לוקח "+feePct()+" על כל משיכה במט״ח, גם על עמלת הכספומט. נרשם לבד כהוצאה":"")
+    : c==="ILS" ? (feeOn()?"💳 משיכה בשקלים: בלי עמלת "+feePct():"")
+    : !feeOn() ? "" : "💳 עמלת כרטיס "+feePct()+(fee>0&&fc===c?" (על המשיכה + עמלת הכספומט)":"")+": "+fmt(k,c)+" · יורד מהבנק בסך הכול "+fmt(a+(fc===c?fee:0)+k,c)+(fee>0&&fc!==c?" + "+fmt(fee,fc):""); }
 for(const id of ["cwAmt","cwFee"]) $(id).addEventListener("input",cwCardHint);
 $("cwFeeCur").onclick=()=>openCurPicker("באיזה מטבע העמלה?",cur.cwFee||S.localCur,c=>{ cur.cwFee=c; renderCash(); });
 $("caCur").onclick=()=>openCurPicker("איזה מטבע?",cur.ca||S.localCur,c=>{ cur.ca=c; renderCash(); });
@@ -3359,6 +3414,8 @@ $("ntSave").onclick=async()=>{
 $("tripBack").onclick=()=>switchTrip(activeTrip());
 function renderSettings(){
   renderTrips();
+  /* the card fee on foreign charges, for this space */
+  { const now=feeR(); seg($("feeSeg"),[[0,"בלי"],[0.005,"0.5%"],[0.01,"1%"],[0.015,"1.5%"],[0.02,"2%"],[0.025,"2.5%"],[0.03,"3%"]].map(([v,t])=>[String(v),t]),v=>Math.abs(+v-now)<1e-9,async v=>{ if(!canWrite) return; const ok=await run(()=>metaRef().update({cardFee:+v})); if(ok){ if(META) META.cardFee=+v; renderAll(); toast(+v?"💳 עמלת כרטיס: "+feePct():"💳 בלי עמלת כרטיס"); } }); }
   renderNotif(); renderBin();
   applyTheme(themePref());
   if(document.activeElement!==$("sTrip")) $("sTrip").value=S.trip||"";
@@ -3530,7 +3587,7 @@ function renderBudget(){
   row("💳","כרטיס · אישי",r.parts.cardP);
   row("🏠","לא מהטיול: מנויים וחשבונות בבית",r.parts.off);
   row("💳","כרטיס · משותף ששילמת",r.parts.cardS);
-  row("💳","עמלת כרטיס 1% על תשלומים במט״ח",r.parts.fx);
+  row("💳","עמלת כרטיס "+feePct()+" על תשלומים במט״ח",r.parts.fx);
   if(Math.abs(r.parts.tr)>0.004) row("💸","העברות בהתחשבנות (בנק)",r.parts.tr);
   if(Math.abs(r.adj)>0.004) row("🏦","עדכון לפי הבנק"+(r.adjAt?" · "+new Date(r.adjAt).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"}):""),-r.adj);
   $("budPace").textContent= r.left<0 ? "⚠️ עברת את התקציב ב-"+fmt(-r.left,r.cur)
@@ -3728,6 +3785,76 @@ function gate(html){
    Two ways in: paste the link you got, or start a new trip of your own (a fresh private space, nobody else's).
    Yair & Gali's trip is never touched: it has its own key, and their links and home-screen icons carry it. */
 /* the steps for a Siri Shortcut, with the link to paste into it */
+/* ================= language for newcomers: the home page, opening a trip and the tour =================
+   Hebrew by default; English when the phone is not in Hebrew, or when picked on the home page.
+   (The app itself is in Hebrew.) */
+function lang(){ const v=load("trip-lang"); if(v==="he"||v==="en") return v;
+  /* many Israelis keep the phone in English: Hebrew if it is among the phone's languages, or the phone is on Israel time */
+  try{ const ls=[...(navigator.languages||[]),navigator.language||""]; if(ls.some(l=>/^(he|iw)/i.test(l))) return "he"; if(/Jerusalem|Tel_Aviv/.test(Intl.DateTimeFormat().resolvedOptions().timeZone||"")) return "he"; return ls.length&&ls[0]?"en":"he"; }catch(e){ return "he"; } }
+const TOUR={
+  he:[["➕","רושמים הוצאה בשנייה","הכפתור הסגול למטה: סכום, שם, מי שילם. כל מטבע, וגם בקול. בלי קליטה? נשמר ועולה אחר כך."],
+      ["🤝","מי חייב למי","כרטיס המאזן במסך \"משותף\" מראה בכל רגע מי חייב למי. כשמתאים, סוגרים חשבון בלחיצה."],
+      ["🔐","הצד האישי שלך","לשונית \"אישי\": הוצאות שרק את/ה רואה, ארנק מזומן ותקציב. נעול בסיסמה שרק את/ה יודע/ת."],
+      ["🔗","מזמינים את מי שטס איתך","לכל אחד קישור משלו. וכדי שזה ייראה כמו אפליקציה: בספארי ← שיתוף ← \"הוספה למסך הבית\"."]],
+  en:[["➕","Add an expense in a second","The purple button at the bottom: amount, name, who paid. Any currency, even by voice. No signal? It's saved and syncs later."],
+      ["🤝","Who owes whom","The balance card on the shared screen always shows who owes whom. Settle up with one tap."],
+      ["🔐","Your private side","The personal tab: expenses only you see, a cash wallet and a budget, locked with your own password."],
+      ["🔗","Invite your travel mates","Everyone gets their own link. To make it feel like an app: Safari → Share → “Add to Home Screen”. (The app itself is in Hebrew for now.)"]]};
+function tour(first){
+  /* inside the app (which is in Hebrew) the tour is Hebrew, unless English was picked on the home page */
+  const L=load("trip-lang")==="en"?"en":"he", slides=TOUR[L], en=L==="en"; let i=0;
+  const o=document.createElement("div"); o.className="tour"; o.setAttribute("role","dialog"); o.setAttribute("aria-label",en?"Quick tour":"סיור קצר"); o.dir=en?"ltr":"rtl";
+  const draw=()=>{ const [ic,t,d]=slides[i], last=i===slides.length-1;
+    o.innerHTML='<div class="tour-card"><div class="tour-dots">'+slides.map((_,k)=>'<i'+(k===i?' class="on"':'')+'></i>').join("")+'</div><div class="tour-ic">'+ic+'</div><b></b><p></p><div class="tour-act"><button type="button" class="btn small" data-a="skip"></button><button type="button" class="btn primary" data-a="next"></button></div></div>';
+    o.querySelector("b").textContent=t; o.querySelector("p").textContent=d;
+    const sk=o.querySelector('[data-a="skip"]'), nx=o.querySelector('[data-a="next"]');
+    sk.textContent= last&&active().length>1 ? (en?"Send links":"🔗 שליחת קישורים") : (en?"Skip":"דילוג");
+    nx.textContent= last ? (en?"Let's go ✈️":"יוצאים לדרך ✈️") : (en?"Next":"הבא");
+    sk.onclick=()=>{ done(); if(last&&active().length>1) inviteSheet(); };
+    nx.onclick=()=>{ if(last){ done(); if(first&&active().length>1) inviteSheet(); } else { i++; buzz(5); draw(); } }; };
+  const done=()=>{ store("trip-tour","1"); o.remove(); };
+  draw(); document.body.appendChild(o);
+}
+/* ================= inviting: a link for each of the others ================= */
+function inviteSheet(){
+  const o=document.createElement("div"); o.className="hist-bg"; o.setAttribute("role","dialog"); o.setAttribute("aria-label","הזמנה");
+  const box=document.createElement("div"); box.className="hist"; o.appendChild(box); const close=()=>o.remove(); o.addEventListener("click",e=>{ if(e.target===o) close(); });
+  const h=document.createElement("div"); h.className="hist-h"; const t=document.createElement("b"); t.textContent="🔗 מזמינים את מי שטס איתך"; const x=document.createElement("button"); x.type="button"; x.className="btn small"; x.textContent="סגירה"; x.onclick=close; h.append(t,x); box.appendChild(h);
+  const q=document.createElement("p"); q.className="hint"; q.textContent="לכל אחד קישור משלו: נכנס ישר בתור עצמו, בלי הרשמה. שולחים בוואטסאפ."; box.appendChild(q);
+  const others=active().filter(p=>p.id!==me);
+  for(const p of others){ const r=document.createElement("div"); r.className="prow"; const n=document.createElement("b"); n.textContent=p.name; const sp=document.createElement("span"); const b=document.createElement("button"); b.type="button"; b.className="btn small primary"; b.textContent="שליחה ל"+p.name;
+    b.onclick=()=>{ const u=personalUrl(p.id), tx="היי "+p.name+"! הטיול \""+(S.trip||"")+"\" באפליקציה, הקישור שלך: "+u; if(navigator.share) navigator.share({text:tx}).catch(()=>{}); else { try{ navigator.clipboard.writeText(u); toast("🔗 הקישור של "+p.name+" הועתק"); }catch(e){} } };
+    r.append(n,sp,b); box.appendChild(r); }
+  if(!others.length){ const e=document.createElement("p"); e.className="hint"; e.textContent="עוד אין שותפים. אפשר לשלוח את הקישור הכללי (בהגדרות), ומי שנכנס בו מוסיף את עצמו."; box.appendChild(e); }
+  document.body.appendChild(o);
+}
+/* ================= backup to a file, and deleting a trip ================= */
+function backupJson(){
+  const mine= acct&&acctFor===me;
+  const data={app:"trip-split",kind:"full-backup",at:new Date().toISOString(),version:(document.querySelector('meta[name="app-v"]')||{}).content||"",
+    meta:META,items:ALL.map(({_mine,_alone,...x})=>x),
+    ...(mine?{personal:{who:me,expenses:P.filter(x=>!x._pfx&&!x._fee),cash:CASH,budget:BUDGET||null,income:typeof INCOME!=="undefined"?INCOME:[]}}:{})};
+  const blob=new Blob([JSON.stringify(data,null,1)],{type:"application/json"}), name="trip-backup-"+todayStr()+".json";
+  try{ const f=new File([blob],name,{type:"application/json"}); if(navigator.canShare&&navigator.canShare({files:[f]})){ navigator.share({files:[f],title:name}).catch(()=>{}); return; } }catch(e){}
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
+  toast("💾 הגיבוי נשמר: "+name);
+}
+async function deleteTrip(){
+  if(!canWrite) return; const T=tripById(curTrip)||{}, name=(T.name||S.trip||"").trim(), all=tripsList(), only=all.length<=1;
+  const typed=prompt("כדי למחוק את \""+name+"\" וכל ההוצאות שלו אצל כולם, כותבים כאן את שם הטיול בדיוק:","");
+  if(typed===null) return; if(typed.trim()!==name){ toast("השם לא תאם · לא נמחק כלום"); return; }
+  if(isOurs()&&!confirm("זה הטיול של יאיר וגלי. בטוח למחוק אותו לתמיד?")) return;
+  const mine=[...ALL.filter(x=>tripOf(x)===curTrip).map(x=>x.id),...P.filter(x=>!x._pfx&&!x._fee&&tripOf(x)===curTrip).map(x=>x.id),...CASH.filter(x=>tripOf(x)===curTrip).map(x=>x.id)];
+  /* the expenses first, then the trip off the list (one save at a time: run() does not nest) */
+  let ok=await run(async()=>{ let batch=db.batch(), n=0; const commits=[];
+    for(const id of [...new Set(mine)]){ batch.delete(EXP().doc(id)); if(++n%400===0){ commits.push(batch.commit()); batch=db.batch(); } }
+    if(only) batch.delete(metaRef());
+    commits.push(batch.commit()); await Promise.all(commits); });
+  if(ok&&!only) ok=await updateTrips(list=>{ const i=list.findIndex(x=>x.id===curTrip); if(i>=0) list.splice(i,1); });
+  if(!ok){ toast("המחיקה לא הצליחה · בדקו את החיבור"); return; }
+  if(only){ try{ localStorage.removeItem("trip-space"); localStorage.removeItem("trip-me"); }catch(e){} location.replace(PAGE_URL+"?welcome"); location.reload(); return; }
+  const next=tripsList().find(x=>x.id!==curTrip); toast("🗑 \""+name+"\" נמחק"); if(next&&typeof switchTrip==="function") switchTrip(next.id); else location.reload();
+}
 function siriHelp(){
   const o=document.createElement("div"); o.className="hist-bg"; o.setAttribute("role","dialog"); o.setAttribute("aria-label","הוספה עם סירי");
   const box=document.createElement("div"); box.className="hist"; o.appendChild(box); const close=()=>o.remove(); o.addEventListener("click",e=>{ if(e.target===o) close(); });
@@ -3748,51 +3875,42 @@ function siriHelp(){
 /* ================= the home page: what this is, for someone who has no trip yet =================
    A real page (not a pop-up): what it does, how it works, privacy, questions, and the two ways in.
    Open it any time with ?welcome — on a phone that already has a trip, a button leads back to it. */
+const LP={
+ he:{dir:"rtl",title:"יומן הטיול · כל הכסף של הטיול במקום אחד",switch:"English",back:"↩️ חזרה לטיול שלנו",h1:"כל הכסף של הטיול,<br>במקום אחד.",sub:"אפליקציה לזוגות וחברים שמטיילים ביחד: רושמים הוצאה בשנייה, בכל מטבע, ויודעים בכל רגע כמה הוצאתם, מי שילם, ומי חייב למי.",
+   new:"✨ פותחים טיול חדש",have:"🔗 קיבלתי קישור מחבר",have2:"🔗 קיבלתי קישור",mini:"חינם · בלי הרשמה ובלי סיסמה · עובד גם בלי קליטה",inside:"מה יש בפנים",how:"איך זה עובד",priv:"🔒 פרטי באמת",faq:"שאלות",end:"יוצאים לדרך?",
+   feats:[["🤝","מי חייב למי","כל הוצאה משותפת נכנסת לחשבון. בכל רגע רואים \"גלי חייבת לך ₪320\", וסוגרים בלחיצה."],["➗","חלוקה איך שנוח","חצי־חצי, באחוזים, לפי מנות, או \"כל אחד שילם על עצמו\". הכול נספר נכון."],["💱","כל מטבע","באט, דונג, דולר ושקלים. כל הוצאה נשמרת בשער של אותו יום, ורואים הכול בשקלים או במטבע המקומי."],["📊","כמה הוצאנו","היום, החודש, בכל עיר ובכל מדינה. ממוצע יומי, ואפשר לפרוס מלון לשבוע כדי שלא יקפיץ את הממוצע."],["🌍","המסע על גלובוס","כל היעדים על כדור הארץ עם יום ולילה, ולכל עיר כמה עלתה וכמה ימים הייתם בה."],["🔐","אישי ומוצפן","לכל אחד יש צד אישי עם סיסמה: הוצאות שלו, ארנק מזומן, תקציב, ו\"מספיק לעוד X ימים\". אף אחד אחר לא רואה."],["🛂","ויזה ותזכורות","כמה ימים נשארו בכל מדינה, ותזכורת שבוע לפני. לפני מעבר גבול: \"כדאי לסגור חשבון\"."],["💬","\"מה זה היה?\"","הערות על כל הוצאה, גרסאות קודמות לכל עריכה, וחיפוש לפי עיר, מדינה, תאריך או סכום."],["🎙️","בקול","\"היי סירי, הוצאה: קפה 60 באט\". או מקריאים לטלפון, והטופס מתמלא לבד."]],
+   steps:[["פותחים טיול.","השם שלך, עם מי טסים, לאן ומתי. לוקח חצי דקה."],["שולחים קישור למי שטס איתך.","הוא נכנס ישר, בלי הרשמה."],["רושמים הוצאות.","כל אחד מהטלפון שלו. הכול מתעדכן אצל כולם מיד."]],
+   privText:"כל טיול נשמר מאחורי מפתח אקראי ארוך שנמצא רק בקישור שלכם. בלי הקישור אי אפשר לראות או לשנות כלום, ואין רשימה של טיולים. הצד האישי מוצפן בסיסמה שרק אתם יודעים, והמיקום נשמר רק בטלפון.",
+   qs:[["זה עולה כסף?","לא. אין תשלום, אין פרסומות, ואין צורך להוריד משהו מהחנות."],["צריך להירשם?","לא. אין משתמש, מייל או סיסמה כדי להיכנס. הקישור הוא הכניסה. סיסמה יש רק לצד האישי, אם רוצים אותו."],["מה רואה מי שטס איתי?","את ההוצאות המשותפות ואת החשבון ביניכם. את ההוצאות האישיות שלך הוא לא רואה."],["ומה אם אין קליטה?","רושמים כרגיל. ההוצאה נשמרת בטלפון ועולה לבד כשחוזרת קליטה."],["איך זה נראה כמו אפליקציה?","באייפון: פותחים בספארי ← כפתור השיתוף ← \"הוספה למסך הבית\". מקבלים אייקון שנפתח במסך מלא."],["איבדתי את הקישור","מבקשים אותו ממי שטס איתך: אצלו בהגדרות יש קישור לכל אחד."]]},
+ en:{dir:"ltr",title:"Trip Journal · all the trip's money in one place",switch:"עברית",back:"↩️ Back to our trip",h1:"All the trip's money,<br>in one place.",sub:"For couples and friends travelling together: add an expense in a second, in any currency, and always know how much you've spent, who paid, and who owes whom.",
+   new:"✨ Start a new trip",have:"🔗 I got a link from a friend",have2:"🔗 I have a link",mini:"Free · no sign-up, no password · works offline",inside:"What's inside",how:"How it works",priv:"🔒 Private, for real",faq:"Questions",end:"Ready to go?",
+   feats:[["🤝","Who owes whom","Every shared expense goes into the account. See “Dana owes you ₪320” at any moment and settle up with one tap."],["➗","Split your way","Half-half, by percentages, by dishes, or “everyone paid their own”. It all adds up."],["💱","Any currency","Baht, dong, dollars and shekels. Each expense keeps the rate of its day; see everything in your currency or the local one."],["📊","How much we spent","Today, this month, per town and per country. A daily average, and you can spread a week's hotel so it doesn't skew it."],["🌍","Your trip on a globe","Every stop on a real globe with day and night, and for each town what it cost and how long you stayed."],["🔐","Private and encrypted","Everyone has a personal side with a password: own expenses, a cash wallet, a budget and “enough for N more days”. Nobody else sees it."],["🛂","Visa and reminders","Days left in each country and a reminder a week before. Before a border: “time to settle up”."],["💬","“What was this?”","Notes on any expense, earlier versions of every edit, and search by town, country, date or amount."],["🎙️","By voice","“Hey Siri, expense: coffee 60 baht”, or just speak and the form fills itself."]],
+   steps:[["Start a trip.","Your name, who's coming, where and when. Half a minute."],["Send a link to your travel mates.","They're in right away, no sign-up."],["Add expenses.","Everyone from their own phone; it updates for everyone instantly."]],
+   privText:"Every trip sits behind a long random key that exists only in your link. Without it nobody can see or change anything, and there is no list of trips. The personal side is encrypted with a password only you know, and your location stays on your phone.",
+   qs:[["Does it cost anything?","No. No payment, no ads, nothing to download from a store."],["Do I need to sign up?","No. No user, email or password to get in: the link is the way in. A password exists only for the personal side, if you want it."],["What do my travel mates see?","The shared expenses and the account between you. Not your personal ones."],["What if there's no signal?","Add as usual. It's saved on the phone and uploads by itself when you're back online."],["How do I make it look like an app?","On iPhone: open in Safari → Share → “Add to Home Screen”. You get an icon that opens full screen."],["I lost the link","Ask a travel mate: in their settings there's a link for everyone."],["Is the app in English?","The home page, opening a trip and the tour are. Inside, the app is in Hebrew for now."]]}};
 function landing(back){
-  document.title="יומן הטיול · כל הכסף של הטיול במקום אחד";
+  const T=LP[lang()];
+  document.title=T.title;
   const old=document.getElementById("landing"); if(old) old.remove();
-  const L=document.createElement("div"); L.id="landing"; L.setAttribute("dir","rtl");
-  const F=(ic,t,d)=>'<div class="lp-f"><span class="lp-ic">'+ic+'</span><b>'+t+'</b><p>'+d+'</p></div>';
-  const Q=(q,a)=>'<details class="lp-q"><summary>'+q+'</summary><p>'+a+'</p></details>';
+  const L=document.createElement("div"); L.id="landing"; L.setAttribute("dir",T.dir); L.lang=lang();
+  const esc=t=>String(t).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  const F=([ic,t,d])=>'<div class="lp-f"><span class="lp-ic">'+ic+'</span><b>'+esc(t)+'</b><p>'+esc(d)+'</p></div>';
+  const Q=([q,a])=>'<details class="lp-q"><summary>'+esc(q)+'</summary><p>'+esc(a)+'</p></details>';
   L.innerHTML=
    '<header class="lp-hero">'+
-    (back?'<button class="lp-back" id="lpBack" type="button">↩️ חזרה לטיול שלנו</button>':'')+
-    '<div class="lp-logo">🧳</div>'+
-    '<h1>כל הכסף של הטיול,<br>במקום אחד.</h1>'+
-    '<p class="lp-sub">אפליקציה לזוגות וחברים שמטיילים ביחד: רושמים הוצאה בשנייה, בכל מטבע, ויודעים בכל רגע כמה הוצאתם, מי שילם, ומי חייב למי.</p>'+
-    '<div class="lp-cta"><button class="lp-btn main" id="lpNew" type="button">✨ פותחים טיול חדש</button><button class="lp-btn" id="lpHave" type="button">🔗 קיבלתי קישור מחבר</button></div>'+
-    '<p class="lp-mini">חינם · בלי הרשמה ובלי סיסמה · עובד גם בלי קליטה</p>'+
-   '</header>'+
-   '<section class="lp-sec"><h2>מה יש בפנים</h2><div class="lp-grid">'+
-    F("🤝","מי חייב למי","כל הוצאה משותפת נכנסת לחשבון. בכל רגע רואים \"גלי חייבת לך ₪320\", וסוגרים בלחיצה.")+
-    F("➗","חלוקה איך שנוח","חצי־חצי, באחוזים, לפי מנות, או \"כל אחד שילם על עצמו\". הכול נספר נכון.")+
-    F("💱","כל מטבע","באט, דונג, דולר ושקלים. כל הוצאה נשמרת בשער של אותו יום, ורואים הכול בשקלים או במטבע המקומי.")+
-    F("📊","כמה הוצאנו","היום, החודש, בכל עיר ובכל מדינה. ממוצע יומי, ואפשר לפרוס מלון לשבוע כדי שלא יקפיץ את הממוצע.")+
-    F("🌍","המסע על גלובוס","כל היעדים על כדור הארץ עם יום ולילה, ולכל עיר כמה עלתה וכמה ימים הייתם בה.")+
-    F("🔐","אישי ומוצפן","לכל אחד יש צד אישי עם סיסמה: הוצאות שלו, ארנק מזומן, תקציב, ו\"מספיק לעוד X ימים\". אף אחד אחר לא רואה.")+
-    F("🛂","ויזה ותזכורות","כמה ימים נשארו בכל מדינה, ותזכורת שבוע לפני. לפני מעבר גבול: \"כדאי לסגור חשבון\".")+
-    F("💬","\"מה זה היה?\"","הערות על כל הוצאה, גרסאות קודמות לכל עריכה, וחיפוש לפי עיר, מדינה, תאריך או סכום.")+
-    F("🎙️","בקול","\"היי סירי, הוצאה: קפה 60 באט\". או מקריאים לטלפון, והטופס מתמלא לבד.")+
-   '</div></section>'+
-   '<section class="lp-sec"><h2>איך זה עובד</h2><ol class="lp-steps">'+
-    '<li><b>פותחים טיול.</b> השם שלך, עם מי טסים, לאן ומתי. לוקח חצי דקה.</li>'+
-    '<li><b>שולחים קישור למי שטס איתך.</b> הוא נכנס ישר, בלי הרשמה.</li>'+
-    '<li><b>רושמים הוצאות.</b> כל אחד מהטלפון שלו. הכול מתעדכן אצל כולם מיד.</li>'+
-   '</ol></section>'+
-   '<section class="lp-sec lp-priv"><h2>🔒 פרטי באמת</h2><p>כל טיול נשמר מאחורי מפתח אקראי ארוך שנמצא רק בקישור שלכם. בלי הקישור אי אפשר לראות או לשנות כלום, ואין רשימה של טיולים. הצד האישי מוצפן בסיסמה שרק אתם יודעים, והמיקום נשמר רק בטלפון.</p></section>'+
-   '<section class="lp-sec"><h2>שאלות</h2>'+
-    Q("זה עולה כסף?","לא. אין תשלום, אין פרסומות, ואין צורך להוריד משהו מהחנות.")+
-    Q("צריך להירשם?","לא. אין משתמש, מייל או סיסמה כדי להיכנס. הקישור הוא הכניסה. סיסמה יש רק לצד האישי, אם רוצים אותו.")+
-    Q("מה רואה מי שטס איתי?","את ההוצאות המשותפות ואת החשבון ביניכם. את ההוצאות האישיות שלך הוא לא רואה.")+
-    Q("ומה אם אין קליטה?","רושמים כרגיל. ההוצאה נשמרת בטלפון ועולה לבד כשחוזרת קליטה.")+
-    Q("איך זה נראה כמו אפליקציה?","באייפון: פותחים בספארי ← כפתור השיתוף ← \"הוספה למסך הבית\". מקבלים אייקון שנפתח במסך מלא.")+
-    Q("איבדתי את הקישור","מבקשים אותו ממי שטס איתך: אצלו בהגדרות יש קישור לכל אחד.")+
-   '</section>'+
-   '<footer class="lp-end"><h2>יוצאים לדרך?</h2><div class="lp-cta"><button class="lp-btn main" id="lpNew2" type="button">✨ פותחים טיול חדש</button><button class="lp-btn" id="lpHave2" type="button">🔗 קיבלתי קישור</button></div></footer>';
+    '<div class="lp-top">'+(back?'<button class="lp-back" id="lpBack" type="button">'+T.back+'</button>':'<span></span>')+'<button class="lp-lang" id="lpLang" type="button">'+T.switch+'</button></div>'+
+    '<div class="lp-logo">🧳</div><h1>'+T.h1+'</h1><p class="lp-sub">'+esc(T.sub)+'</p>'+
+    '<div class="lp-cta"><button class="lp-btn main" id="lpNew" type="button">'+T.new+'</button><button class="lp-btn" id="lpHave" type="button">'+T.have+'</button></div>'+
+    '<p class="lp-mini">'+T.mini+'</p></header>'+
+   '<section class="lp-sec"><h2>'+T.inside+'</h2><div class="lp-grid">'+T.feats.map(F).join("")+'</div></section>'+
+   '<section class="lp-sec"><h2>'+T.how+'</h2><ol class="lp-steps">'+T.steps.map(([a,b])=>'<li><b>'+esc(a)+'</b> '+esc(b)+'</li>').join("")+'</ol></section>'+
+   '<section class="lp-sec lp-priv"><h2>'+T.priv+'</h2><p>'+esc(T.privText)+'</p></section>'+
+   '<section class="lp-sec"><h2>'+T.faq+'</h2>'+T.qs.map(Q).join("")+'</section>'+
+   '<footer class="lp-end"><h2>'+T.end+'</h2><div class="lp-cta"><button class="lp-btn main" id="lpNew2" type="button">'+T.new+'</button><button class="lp-btn" id="lpHave2" type="button">'+T.have2+'</button></div></footer>';
   document.body.appendChild(L); document.body.style.overflow="hidden";
-  const go=fn=>()=>{ fn(); };
-  for(const id of ["lpNew","lpNew2"]) L.querySelector("#"+id).onclick=go(()=>newTripForm(true));
-  for(const id of ["lpHave","lpHave2"]) L.querySelector("#"+id).onclick=go(()=>askForLink("הקישור של הטיול"));
+  for(const id of ["lpNew","lpNew2"]) L.querySelector("#"+id).onclick=()=>newTripForm(true);
+  for(const id of ["lpHave","lpHave2"]) L.querySelector("#"+id).onclick=()=>askForLink(lang()==="en"?"Your trip link":"הקישור של הטיול");
+  L.querySelector("#lpLang").onclick=()=>{ store("trip-lang",lang()==="en"?"he":"en"); landing(back); };
   const b=L.querySelector("#lpBack"); if(b) b.onclick=()=>{ location.replace(PAGE_URL); };
 }
 function welcome(){
@@ -3803,39 +3921,49 @@ function welcome(){
   g.querySelector("#wHave").onclick=()=>askForLink("הקישור של הטיול");
   g.querySelector("#wNew").onclick=()=>newTripForm();
 }
+const NT={he:{dir:"rtl",m:"זכר",f:"נקבה",title:"✨ טיול חדש",me:"השם שלך",meP:"למשל: נועה",mates:"עם מי טסים? (אפשר להשאיר ריק, עד 5 חברים)",mate1:"למשל: איתי",mateN:"עוד חבר/ה",more:"➕ עוד מישהו",trip:"שם הטיול",tripP:"למשל: המזרח 2027",where:"לאן טסים קודם?",date:"תאריך הטיסה",go:"יוצאים לדרך ✈️",going:"פותחים את הטיול…",back:"חזרה",eName:"צריך את השם שלך",eSame:"יש שני שמות זהים · כדאי להוסיף אות כדי להבדיל",eDate:"צריך תאריך טיסה",eFail:"לא הצלחנו לפתוח את הטיול",eNet:"בדקו את החיבור ונסו שוב.",def:(a,o)=>"הטיול של "+a+(o.length===1?" ו"+o[0].name:o.length?" והחברים":"")},
+ en:{dir:"ltr",m:"male",f:"female",title:"✨ A new trip",me:"Your name",meP:"e.g. Noa",mates:"Who's coming? (optional, up to 5 friends)",mate1:"e.g. Itai",mateN:"another friend",more:"➕ Someone else",trip:"Trip name",tripP:"e.g. Asia 2027",where:"Where do you fly first?",date:"Flight date",go:"Let's go ✈️",going:"Opening the trip…",back:"Back",eName:"Your name, please",eSame:"Two names are the same · add a letter to tell them apart",eDate:"A flight date, please",eFail:"Couldn't open the trip",eNet:"Check the connection and try again.",def:(a,o)=>a+(o.length===1?" & "+o[0].name:o.length?" & friends":"")+"'s trip"}};
 function newTripForm(){
+  const N=NT[lang()];
   const inp='style="font:inherit;font-size:16px;padding:11px;border:1.5px solid #ddd6f5;border-radius:12px;width:100%;box-sizing:border-box;background:#fff;color:#1d1630;-webkit-appearance:none;appearance:none"';
   const ctry=Object.keys(CTRY).filter(k=>k!=="ILS").sort((a,b)=>CTRY[a].split(" ").slice(1).join(" ").localeCompare(CTRY[b].split(" ").slice(1).join(" "),"he")).map(k=>'<option value="'+k+'"'+(k==="THB"?" selected":"")+'>'+CTRY[k]+'</option>').join("");
-  const gsel=id=>'<select id="'+id+'" '+inp.replace('width:100%','width:auto')+'><option value="m">זכר</option><option value="f">נקבה</option></select>';
-  const g=gate('<b style="font-size:20px">✨ טיול חדש</b><style>#spaceGate label{color:#4a4360;font-size:14px}</style>'+
-    '<label style="display:flex;flex-direction:column;gap:6px">השם שלך<span style="display:flex;gap:8px"><input id="nMe" maxlength="20" '+inp+' placeholder="למשל: נועה">'+gsel("nMeG")+'</span></label>'+
-    '<label style="display:flex;flex-direction:column;gap:6px">עם מי טסים? (אפשר להשאיר ריק)<span style="display:flex;gap:8px"><input id="nYou" maxlength="20" '+inp+' placeholder="למשל: איתי">'+gsel("nYouG")+'</span></label>'+
-    '<label style="display:flex;flex-direction:column;gap:6px">שם הטיול<input id="nTrip" maxlength="40" '+inp+' placeholder="למשל: המזרח 2027"></label>'+
-    '<label style="display:flex;flex-direction:column;gap:6px">לאן טסים קודם?<select id="nCtry" '+inp+'>'+ctry+'</select></label>'+
-    '<label style="display:flex;flex-direction:column;gap:6px">תאריך הטיסה<input id="nDate" type="date" '+inp+'></label>'+
+  const gsel=id=>'<select id="'+id+'" '+inp.replace('width:100%','width:auto')+'><option value="m">'+N.m+'</option><option value="f">'+N.f+'</option></select>';
+  const g=gate('<b style="font-size:20px">'+N.title+'</b><style>#spaceGate label{color:#4a4360;font-size:14px}</style>'+
+    '<label style="display:flex;flex-direction:column;gap:6px">'+N.me+'<span style="display:flex;gap:8px"><input id="nMe" maxlength="20" '+inp+' placeholder="'+N.meP+'">'+gsel("nMeG")+'</span></label>'+
+    '<div style="display:flex;flex-direction:column;gap:6px"><span style="color:#4a4360;font-size:14px">'+N.mates+'</span><div id="nMates" style="display:flex;flex-direction:column;gap:8px"></div><button id="nMore" type="button" style="align-self:flex-start;font:inherit;font-size:14px;background:none;border:1.5px dashed #c9c0ee;border-radius:12px;padding:8px 12px;color:#4a4360;cursor:pointer">'+N.more+'</button></div>'+
+    '<label style="display:flex;flex-direction:column;gap:6px">'+N.trip+'<input id="nTrip" maxlength="40" '+inp+' placeholder="'+N.tripP+'"></label>'+
+    '<label style="display:flex;flex-direction:column;gap:6px">'+N.where+'<select id="nCtry" '+inp+'>'+ctry+'</select></label>'+
+    '<label style="display:flex;flex-direction:column;gap:6px">'+N.date+'<input id="nDate" type="date" '+inp+'></label>'+
     '<div id="nErr" style="color:#c0392b;font-size:14px"></div>'+
-    '<button id="nGo" type="button" style="font:inherit;font-size:16px;font-weight:700;padding:13px;border-radius:14px;border:0;background:linear-gradient(135deg,#6C4BFF,#FF4D8D);color:#fff;cursor:pointer">יוצאים לדרך ✈️</button>'+
-    '<button id="nBack" type="button" style="font:inherit;background:none;border:0;color:#6a6378;cursor:pointer">חזרה</button>');
+    '<button id="nGo" type="button" style="font:inherit;font-size:16px;font-weight:700;padding:13px;border-radius:14px;border:0;background:linear-gradient(135deg,#6C4BFF,#FF4D8D);color:#fff;cursor:pointer">'+N.go+'</button>'+
+    '<button id="nBack" type="button" style="font:inherit;background:none;border:0;color:#6a6378;cursor:pointer">'+N.back+'</button>');
+  { const c=g.querySelector("#spaceGate > div")||g.firstElementChild; if(c){ c.dir=N.dir; c.style.textAlign=N.dir==="ltr"?"left":"right"; } }
   g.querySelector("#nDate").value=todayStr();
+  const mates=g.querySelector("#nMates"), addMate=()=>{ const n=mates.children.length; if(n>=5) return; const row=document.createElement("span"); row.style.cssText="display:flex;gap:8px"; row.innerHTML='<input class="nMate" maxlength="20" '+inp+' placeholder="'+(n?N.mateN:N.mate1)+'">'+gsel("nMateG"+n).replace('id="nMateG'+n+'"','class="nMateG"'); mates.appendChild(row); g.querySelector("#nMore").hidden=mates.children.length>=5; if(n) row.querySelector("input").focus(); };
+  addMate(); g.querySelector("#nMore").onclick=addMate;
   g.querySelector("#nBack").onclick=()=>{ const x=document.getElementById("spaceGate"); if(document.getElementById("landing")&&x) x.remove(); else welcome(); };
   g.querySelector("#nGo").onclick=async()=>{
     const v=id=>g.querySelector("#"+id).value.trim(), err=t=>{ g.querySelector("#nErr").textContent=t; };
-    const a=v("nMe"), b=v("nYou"), date=v("nDate"), cur=v("nCtry"); if(!a) return err("צריך את השם שלך");
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return err("צריך תאריך טיסה");
-    const people=[{id:"p1",name:a,g:v("nMeG")},...(b?[{id:"p2",name:b,g:v("nYouG")}]:[])];
-    const name=v("nTrip")||("הטיול של "+a+(b?" ו"+b:"")), k=newKey();
-    const go=g.querySelector("#nGo"); go.disabled=true; go.textContent="פותחים את הטיול…";
+    const a=v("nMe"), date=v("nDate"), cur=v("nCtry"); if(!a) return err(N.eName);
+    const others=[...g.querySelectorAll("#nMates > span")].map(r=>({name:r.querySelector(".nMate").value.trim(),g:r.querySelector(".nMateG").value})).filter(x=>x.name);
+    if(new Set([a,...others.map(x=>x.name)]).size<others.length+1) return err(N.eSame);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return err(N.eDate);
+    const people=[{id:"p1",name:a,g:v("nMeG")},...others.map((x,i)=>({id:"p"+(i+2),name:x.name,g:x.g}))];
+    const name=v("nTrip")||N.def(a,others), k=newKey();
+    const go=g.querySelector("#nGo"); go.disabled=true; go.textContent=N.going;
     try{ await db.collection("spaces").doc(k).collection("trip").doc("meta").set({trip:name,localCur:cur,startDate:date,people,trips:[{id:"t1",name,localCur:cur,startDate:date}],createdAt:Date.now(),fresh:true});
       store("trip-space",k); store("trip-me","p1"); store("trip-invite","1");
       location.replace(PAGE_URL+"?u=p1#k="+k); location.reload(); }
-    catch(e){ console.error(e); go.disabled=false; go.textContent="יוצאים לדרך ✈️"; err("לא הצלחנו לפתוח את הטיול ("+(e.code||e.message||"שגיאה")+"). בדקו את החיבור ונסו שוב."); }
+    catch(e){ console.error(e); go.disabled=false; go.textContent=N.go; err(N.eFail+" ("+(e.code||e.message||"error")+"). "+N.eNet); }
   };
 }
 function askForLink(msg){
-  const g=gate('<div style="font-size:40px">🔒</div><b style="font-size:20px">'+msg+'</b><div style="color:#6a6378;font-size:15px">הדביקו כאן את הקישור שקיבלתם בוואטסאפ, ותיכנסו. צריך לעשות את זה רק פעם אחת בטלפון הזה.</div><input id="gateIn" type="url" inputmode="url" placeholder="הדביקו כאן את הקישור" style="font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:2px solid #e3dcf2;direction:ltr"><div id="gateErr" style="color:#c2185b;font-size:14px;min-height:1em"></div><button id="gateGo" type="button" class="btn">כניסה</button>');
+  const EN=lang()==="en";
+  const g=gate('<div style="font-size:40px">🔒</div><b style="font-size:20px">'+msg+'</b><div style="color:#6a6378;font-size:15px">'+(EN?"Paste the link you got on WhatsApp and you're in. Only once on this phone.":"הדביקו כאן את הקישור שקיבלתם בוואטסאפ, ותיכנסו. צריך לעשות את זה רק פעם אחת בטלפון הזה.")+'</div><input id="gateIn" type="url" inputmode="url" placeholder="'+(EN?"Paste the link here":"הדביקו כאן את הקישור")+'" style="font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:2px solid #e3dcf2;direction:ltr"><div id="gateErr" style="color:#c2185b;font-size:14px;min-height:1em"></div><button id="gateGo" type="button" class="btn">'+(EN?"Let me in":"כניסה")+'</button>');
+  { const c=g.firstElementChild; if(c&&EN){ c.dir="ltr"; c.style.textAlign="left"; } }
   g.querySelector("#gateGo").onclick=()=>{
     const v=g.querySelector("#gateIn").value.trim(); const m=/[#&]k=([a-z0-9]{32,64})/.exec(v);
-    if(!m){ g.querySelector("#gateErr").textContent="זה לא נראה כמו הקישור של הטיול. העתיקו את כל הקישור ונסו שוב."; return; }
+    if(!m){ g.querySelector("#gateErr").textContent=(EN?"That doesn't look like a trip link. Copy the whole link and try again.":"זה לא נראה כמו הקישור של הטיול. העתיקו את כל הקישור ונסו שוב."); return; }
     store("trip-space",m[1]); const u=/[?&]u=([^&#]+)/.exec(v);
     location.replace(PAGE_URL+(u?"?u="+u[1]:"")+"#k="+m[1]); location.reload(); /* a hash-only change does not reload by itself */
   };
@@ -3890,8 +4018,7 @@ const ready=()=>{
     if(me){ form.payer=me; refreshPersonal(); if(location.hash&&!readParam("u")) syncUrl(); setTimeout(sinceLastVisit,600); }
     if(load("trip-moved")==="1"){ try{ localStorage.removeItem("trip-moved"); }catch(e){} setTimeout(()=>{ toast("🔒 מאובטח! שלחו לכולם קישור חדש","לקישורים",()=>$("settingsBtn").click()); },900); }
     else view="shared";
-    if(load("trip-invite")==="1"){ try{ localStorage.removeItem("trip-invite"); }catch(e){} const other=active().find(p=>p.id!==me);
-      setTimeout(()=>{ toast("🎉 הטיול נפתח!"+(other?" עכשיו שולחים ל"+other.name+" את הקישור שלו/ה":" אפשר להוסיף שותפים בהגדרות"),other?"שליחה":null,other?()=>{ const u=personalUrl(other.id); const t="הצטרפות לטיול "+(S.trip||"")+": "+u; if(navigator.share) navigator.share({text:t}).catch(()=>{}); else { try{ navigator.clipboard.writeText(u); toast("🔗 הקישור הועתק"); }catch(e){} } }:null,12000); },900); }
+    if(load("trip-invite")==="1"){ try{ localStorage.removeItem("trip-invite"); }catch(e){} setTimeout(()=>tour(true),900); }
     /* opened from the quick-add icon or shortcut: straight to a new expense */
     if(QUICK&&canWrite&&me){
       view= QUICK==="me"&&me ? "personal" : "shared";

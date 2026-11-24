@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261124060713"></script>
+<script src="theme.js?v=20261124152520"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -249,7 +249,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .money-total b{font:800 1.5rem var(--display,inherit)}
 #landing{position:fixed;inset:0;z-index:990;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#0F0A26;color:#F2EFFF;font-family:var(--body,inherit)}
 #landing .lp-hero{position:relative;padding:calc(env(safe-area-inset-top) + 56px) 22px 40px;text-align:center;background:radial-gradient(120% 80% at 80% 0%,#FF4D8D55,transparent 60%),radial-gradient(120% 90% at 0% 20%,#6C4BFF77,transparent 60%),linear-gradient(180deg,#1B1240,#0F0A26)}
-#landing .lp-back{position:absolute;top:calc(env(safe-area-inset-top) + 12px);inset-inline-start:14px;font:inherit;font-size:.85rem;color:#fff;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:6px 12px}
+#landing .lp-top{position:absolute;top:calc(env(safe-area-inset-top) + 12px);inset-inline:14px;display:flex;justify-content:space-between;gap:8px}
+#landing .lp-back,#landing .lp-lang{font:inherit;font-size:.85rem;color:#fff;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:6px 12px;cursor:pointer}
 #landing .lp-logo{font-size:64px;line-height:1;margin-bottom:10px;filter:drop-shadow(0 10px 24px rgba(255,77,141,.45))}
 #landing h1{font:800 2.2rem/1.15 var(--display,inherit);margin:0 0 14px;background:linear-gradient(135deg,#fff,#FFC93C 55%,#FF8AB3);-webkit-background-clip:text;background-clip:text;color:transparent}
 #landing .lp-sub{font-size:1.05rem;line-height:1.55;color:#D6D0F5;max-width:520px;margin:0 auto 22px}
@@ -276,6 +277,37 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 #landing .lp-q[open] summary::after{content:"－"}
 #landing .lp-q p{margin:8px 0 0;color:#BDB6E0;line-height:1.55}
 #landing .lp-end{text-align:center;padding:30px 20px calc(env(safe-area-inset-bottom) + 50px)}
+.tour{position:fixed;inset:0;z-index:995;background:rgba(12,8,32,.72);display:flex;align-items:flex-end;justify-content:center;padding:16px 16px calc(env(safe-area-inset-bottom) + 16px)}
+.tour-card{background:var(--surface);color:var(--ink);width:min(460px,100%);border-radius:26px;padding:22px;display:flex;flex-direction:column;gap:10px;text-align:center;box-shadow:0 30px 60px -20px rgba(0,0,0,.6)}
+.tour-ic{font-size:54px;line-height:1.1}
+.tour-card b{font:800 1.3rem var(--display,inherit)}
+.tour-card p{margin:0;color:var(--muted);line-height:1.55}
+.tour-dots{display:flex;gap:6px;justify-content:center}
+.tour-dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.tour-dots i.on{background:var(--brand);width:20px;border-radius:4px}
+.tour-act{display:flex;justify-content:space-between;gap:10px;margin-top:6px}
+.rec-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rec{background:var(--surface-2);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.rec .ic{font-size:22px}
+.rec small{color:var(--muted);font-size:.78rem}
+.rec b{font:800 1.1rem var(--display,inherit)}
+.rec span{font-size:.82rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#book{position:fixed;inset:0;z-index:980;overflow-y:auto;background:#fff;color:#1d1630}
+#book .bk-bar{position:sticky;top:0;display:flex;justify-content:space-between;gap:8px;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid #eee}
+#book .bk{max-width:720px;margin:0 auto;padding:20px 18px 60px;font-size:15px;line-height:1.5}
+#book .bk-kick{color:#6C4BFF;font-weight:700}
+#book h1{font:800 2rem var(--display,inherit);margin:4px 0}
+#book h2{font:800 1.15rem var(--display,inherit);margin:22px 0 8px;border-bottom:2px solid #6C4BFF33;padding-bottom:4px}
+#book header p{color:#5a5375;margin:0}
+#book .bk-globe{display:block;width:100%;max-width:420px;margin:16px auto;border-radius:20px}
+#book .bk-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+#book .bk-nums b{display:block;font:800 1.2rem var(--display,inherit)}
+#book .bk-nums small{color:#6a6378}
+#book .bk-note{color:#6a6378;font-size:.9rem}
+#book table{width:100%;border-collapse:collapse}
+#book td{padding:6px 4px;border-bottom:1px solid #eee;vertical-align:top}
+#book footer{margin-top:28px;color:#9a93b5;font-size:.8rem;text-align:center}
+@media print{ body.book-open > *:not(#book){display:none!important} #book{position:static;overflow:visible} #book .bk-bar{display:none} #book section{break-inside:avoid} }
 .locrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .locrow .curbtn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .curbtn.town small{opacity:.7;font-weight:500}
@@ -1558,6 +1590,10 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       <h2 id="stCatTitle">📊 על מה</h2>
       <div class="cats" id="stCats"></div>
     </section>
+    <section class="card" id="stRecCard" hidden>
+      <div class="card-head"><h2>🏆 שיאי הטיול</h2><button class="btn small" id="bookBtn" type="button">📕 ספר הטיול</button></div>
+      <div class="rec-grid" id="stRecs"></div>
+    </section>
     <section class="card" id="stPayersCard">
       <h2>🙋 מי שילם</h2>
       <div class="cats" id="stPayers"></div>
@@ -1729,6 +1765,8 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       <h3>עיצוב</h3>
       <div class="seg" id="themeSeg"></div>
       <div class="seg" id="soundSeg" style="margin-top:8px"></div>
+      <button class="btn small" id="tourBtn" type="button" style="margin-top:8px">👋 סיור קצר באפליקציה</button>
+      <button class="btn small" id="inviteBtn" type="button" style="margin-top:8px">🔗 הזמנת מי שטס איתי</button>
       <button class="btn small" id="siriBtn" type="button" style="margin-top:8px">🎙️ הוספה בקול עם סירי</button>
       <button class="btn small" id="motionBtn" type="button" style="margin-top:8px">🫨 הפעלת חיישן התנועה: ניעור לביטול והטיית כרטיס המאזן</button>
     </div>
@@ -1754,6 +1792,11 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       <div class="actions"><input id="sTrip" maxlength="40" style="flex:1;width:auto"><button class="btn small" id="sTripSave" type="button">שמירה</button></div>
     </div>
 
+    <div class="sec" id="feeSec">
+      <h3>💳 עמלת כרטיס במט״ח</h3>
+      <div class="hint">כמה הכרטיס לוקח על כל תשלום ומשיכה במטבע זר. נכנס לחשבון ביניכם, לתקציב ולארנק.</div>
+      <div class="seg" id="feeSeg" style="margin-top:6px"></div>
+    </div>
     <div class="sec">
       <h3>📅 תאריך תחילת הטיול</h3>
       <div class="hint">ממנו נספר "יום X לטיול" בראש המסך.</div>
@@ -1809,7 +1852,13 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       <h3>💾 גיבוי</h3>
       <div class="hint">כל ההוצאות המשותפות, וההוצאות האישיות שלך אם נכנסת לחשבון, בקובץ שנפתח באקסל או ב-Google Sheets.</div>
       <div class="backup-state" id="backupState"></div>
-      <div class="actions"><button class="btn small" id="exportBtn" type="button">ייצוא לאקסל</button></div>
+      <div class="actions"><button class="btn small" id="exportBtn" type="button">ייצוא לאקסל</button><button class="btn small" id="jsonBtn" type="button">💾 גיבוי מלא לקובץ</button></div>
+      <div class="hint" style="margin-top:6px">הגיבוי המלא שומר את כל הטיולים, האנשים וההוצאות המשותפות, ואם האישי שלך פתוח גם את ההוצאות האישיות, הארנק והתקציב שלך (בקובץ הם לא מוצפנים, אז שומרים אותו במקום בטוח).</div>
+    </div>
+    <div class="sec" id="delSec">
+      <h3>🗑 מחיקת הטיול הזה</h3>
+      <div class="hint">מוחק את הטיול הנוכחי וכל ההוצאות שלו, אצל כולם. אי אפשר לבטל. כדאי לשמור קודם גיבוי מלא.</div>
+      <button class="btn small danger" id="delTripBtn" type="button" style="margin-top:6px;align-self:flex-start">מחיקת הטיול…</button>
     </div>
 
     <div class="sec">
@@ -1821,11 +1870,11 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261124060713">
-<script src="config.js?v=20261124060713"></script>
-<script src="motion.js?v=20261124060713"></script>
-<script src="fx.js?v=20261124060713"></script>
-<script src="cinema.js?v=20261124060713"></script>
-<script src="app.js?v=20261124060713"></script>
+<meta name="app-v" content="20261124152520">
+<script src="config.js?v=20261124152520"></script>
+<script src="motion.js?v=20261124152520"></script>
+<script src="fx.js?v=20261124152520"></script>
+<script src="cinema.js?v=20261124152520"></script>
+<script src="app.js?v=20261124152520"></script>
 </body>
 </html>
