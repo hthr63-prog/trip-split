@@ -3745,6 +3745,56 @@ function siriHelp(){
   cp.onclick=async()=>{ try{ await navigator.clipboard.writeText(link.value); toast("📋 הקישור הועתק · מדביקים בשלב 4"); }catch(e){ link.select(); toast("מסמנים ומעתיקים את הקישור"); } };
   draw(); document.body.appendChild(o);
 }
+/* ================= the home page: what this is, for someone who has no trip yet =================
+   A real page (not a pop-up): what it does, how it works, privacy, questions, and the two ways in.
+   Open it any time with ?welcome — on a phone that already has a trip, a button leads back to it. */
+function landing(back){
+  document.title="יומן הטיול · כל הכסף של הטיול במקום אחד";
+  const old=document.getElementById("landing"); if(old) old.remove();
+  const L=document.createElement("div"); L.id="landing"; L.setAttribute("dir","rtl");
+  const F=(ic,t,d)=>'<div class="lp-f"><span class="lp-ic">'+ic+'</span><b>'+t+'</b><p>'+d+'</p></div>';
+  const Q=(q,a)=>'<details class="lp-q"><summary>'+q+'</summary><p>'+a+'</p></details>';
+  L.innerHTML=
+   '<header class="lp-hero">'+
+    (back?'<button class="lp-back" id="lpBack" type="button">↩️ חזרה לטיול שלנו</button>':'')+
+    '<div class="lp-logo">🧳</div>'+
+    '<h1>כל הכסף של הטיול,<br>במקום אחד.</h1>'+
+    '<p class="lp-sub">אפליקציה לזוגות וחברים שמטיילים ביחד: רושמים הוצאה בשנייה, בכל מטבע, ויודעים בכל רגע כמה הוצאתם, מי שילם, ומי חייב למי.</p>'+
+    '<div class="lp-cta"><button class="lp-btn main" id="lpNew" type="button">✨ פותחים טיול חדש</button><button class="lp-btn" id="lpHave" type="button">🔗 קיבלתי קישור מחבר</button></div>'+
+    '<p class="lp-mini">חינם · בלי הרשמה ובלי סיסמה · עובד גם בלי קליטה</p>'+
+   '</header>'+
+   '<section class="lp-sec"><h2>מה יש בפנים</h2><div class="lp-grid">'+
+    F("🤝","מי חייב למי","כל הוצאה משותפת נכנסת לחשבון. בכל רגע רואים \"גלי חייבת לך ₪320\", וסוגרים בלחיצה.")+
+    F("➗","חלוקה איך שנוח","חצי־חצי, באחוזים, לפי מנות, או \"כל אחד שילם על עצמו\". הכול נספר נכון.")+
+    F("💱","כל מטבע","באט, דונג, דולר ושקלים. כל הוצאה נשמרת בשער של אותו יום, ורואים הכול בשקלים או במטבע המקומי.")+
+    F("📊","כמה הוצאנו","היום, החודש, בכל עיר ובכל מדינה. ממוצע יומי, ואפשר לפרוס מלון לשבוע כדי שלא יקפיץ את הממוצע.")+
+    F("🌍","המסע על גלובוס","כל היעדים על כדור הארץ עם יום ולילה, ולכל עיר כמה עלתה וכמה ימים הייתם בה.")+
+    F("🔐","אישי ומוצפן","לכל אחד יש צד אישי עם סיסמה: הוצאות שלו, ארנק מזומן, תקציב, ו\"מספיק לעוד X ימים\". אף אחד אחר לא רואה.")+
+    F("🛂","ויזה ותזכורות","כמה ימים נשארו בכל מדינה, ותזכורת שבוע לפני. לפני מעבר גבול: \"כדאי לסגור חשבון\".")+
+    F("💬","\"מה זה היה?\"","הערות על כל הוצאה, גרסאות קודמות לכל עריכה, וחיפוש לפי עיר, מדינה, תאריך או סכום.")+
+    F("🎙️","בקול","\"היי סירי, הוצאה: קפה 60 באט\". או מקריאים לטלפון, והטופס מתמלא לבד.")+
+   '</div></section>'+
+   '<section class="lp-sec"><h2>איך זה עובד</h2><ol class="lp-steps">'+
+    '<li><b>פותחים טיול.</b> השם שלך, עם מי טסים, לאן ומתי. לוקח חצי דקה.</li>'+
+    '<li><b>שולחים קישור למי שטס איתך.</b> הוא נכנס ישר, בלי הרשמה.</li>'+
+    '<li><b>רושמים הוצאות.</b> כל אחד מהטלפון שלו. הכול מתעדכן אצל כולם מיד.</li>'+
+   '</ol></section>'+
+   '<section class="lp-sec lp-priv"><h2>🔒 פרטי באמת</h2><p>כל טיול נשמר מאחורי מפתח אקראי ארוך שנמצא רק בקישור שלכם. בלי הקישור אי אפשר לראות או לשנות כלום, ואין רשימה של טיולים. הצד האישי מוצפן בסיסמה שרק אתם יודעים, והמיקום נשמר רק בטלפון.</p></section>'+
+   '<section class="lp-sec"><h2>שאלות</h2>'+
+    Q("זה עולה כסף?","לא. אין תשלום, אין פרסומות, ואין צורך להוריד משהו מהחנות.")+
+    Q("צריך להירשם?","לא. אין משתמש, מייל או סיסמה כדי להיכנס. הקישור הוא הכניסה. סיסמה יש רק לצד האישי, אם רוצים אותו.")+
+    Q("מה רואה מי שטס איתי?","את ההוצאות המשותפות ואת החשבון ביניכם. את ההוצאות האישיות שלך הוא לא רואה.")+
+    Q("ומה אם אין קליטה?","רושמים כרגיל. ההוצאה נשמרת בטלפון ועולה לבד כשחוזרת קליטה.")+
+    Q("איך זה נראה כמו אפליקציה?","באייפון: פותחים בספארי ← כפתור השיתוף ← \"הוספה למסך הבית\". מקבלים אייקון שנפתח במסך מלא.")+
+    Q("איבדתי את הקישור","מבקשים אותו ממי שטס איתך: אצלו בהגדרות יש קישור לכל אחד.")+
+   '</section>'+
+   '<footer class="lp-end"><h2>יוצאים לדרך?</h2><div class="lp-cta"><button class="lp-btn main" id="lpNew2" type="button">✨ פותחים טיול חדש</button><button class="lp-btn" id="lpHave2" type="button">🔗 קיבלתי קישור</button></div></footer>';
+  document.body.appendChild(L); document.body.style.overflow="hidden";
+  const go=fn=>()=>{ fn(); };
+  for(const id of ["lpNew","lpNew2"]) L.querySelector("#"+id).onclick=go(()=>newTripForm(true));
+  for(const id of ["lpHave","lpHave2"]) L.querySelector("#"+id).onclick=go(()=>askForLink("הקישור של הטיול"));
+  const b=L.querySelector("#lpBack"); if(b) b.onclick=()=>{ location.replace(PAGE_URL); };
+}
 function welcome(){
   document.title="יומן הטיול";
   const inp='style="font:inherit;font-size:16px;padding:12px;border:1.5px solid #ddd6f5;border-radius:12px;width:100%;box-sizing:border-box"';
@@ -3767,7 +3817,7 @@ function newTripForm(){
     '<button id="nGo" type="button" style="font:inherit;font-size:16px;font-weight:700;padding:13px;border-radius:14px;border:0;background:linear-gradient(135deg,#6C4BFF,#FF4D8D);color:#fff;cursor:pointer">יוצאים לדרך ✈️</button>'+
     '<button id="nBack" type="button" style="font:inherit;background:none;border:0;color:#6a6378;cursor:pointer">חזרה</button>');
   g.querySelector("#nDate").value=todayStr();
-  g.querySelector("#nBack").onclick=welcome;
+  g.querySelector("#nBack").onclick=()=>{ const x=document.getElementById("spaceGate"); if(document.getElementById("landing")&&x) x.remove(); else welcome(); };
   g.querySelector("#nGo").onclick=async()=>{
     const v=id=>g.querySelector("#"+id).value.trim(), err=t=>{ g.querySelector("#nErr").textContent=t; };
     const a=v("nMe"), b=v("nYou"), date=v("nDate"), cur=v("nCtry"); if(!a) return err("צריך את השם שלך");
@@ -3793,7 +3843,7 @@ function askForLink(msg){
 async function noSpace(){
   const legacyMeta=db.collection("trip").doc("meta");
   let snap=null; try{ snap=await legacyMeta.get(); }catch(e){}
-  if(!snap||!snap.exists||snap.data().migrated){ welcome(); return; }
+  if(!snap||!snap.exists||snap.data().migrated){ landing(false); return; }
   const g=gate('<div style="font-size:40px">🔐</div><b style="font-size:20px">הטיול עובר לקישור מאובטח</b><div style="color:#6a6378;font-size:15px">עד עכשיו כל מי שידע את שם הפרויקט יכול היה לראות ולשנות את ההוצאות. עכשיו רק מי שיש לו את הקישור יוכל להיכנס, בלי שום התחברות. כל ההוצאות עוברות כמו שהן, ואחרי זה תקבלו קישור חדש לשלוח לכולם.</div><div id="gateErr" style="color:#c2185b;font-size:14px;min-height:1em"></div><button id="gateGo" type="button" class="btn">יצירת קישור מאובטח</button>');
   g.querySelector("#gateGo").onclick=async()=>{
     const b=g.querySelector("#gateGo"); b.disabled=true; b.textContent="מעבירים את ההוצאות…";
@@ -3823,6 +3873,8 @@ if(!cfg||!window.firebase){
 firebase.initializeApp(cfg); db=firebase.firestore(); canWrite=true;
 /* transactions (people, trips, usernames, passwords) cannot wait offline the way plain saves can */
 { const rt=db.runTransaction.bind(db); db.runTransaction=f=> navigator.onLine===false ? Promise.reject(Object.assign(new Error("offline"),{code:"needs-network"})) : rt(f); }
+/* ?welcome shows the home page (on a phone with a trip, with a way back to it) */
+if(readParam("welcome")!==null){ landing(!!SPACE); return; }
 if(!SPACE){ noSpace(); return; }
 try{ const pr=db.enablePersistence&&db.enablePersistence({synchronizeTabs:true}); if(pr&&pr.catch) pr.catch(()=>{}); }catch(e){}
 if("serviceWorker" in navigator&&location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});

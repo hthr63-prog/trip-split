@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261123155655"></script>
+<script src="theme.js?v=20261124060713"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -247,6 +247,35 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .money-row b.minus{color:var(--bad,#E5484D)}
 .money-total{display:flex;justify-content:space-between;align-items:baseline;padding-top:10px;font-weight:700}
 .money-total b{font:800 1.5rem var(--display,inherit)}
+#landing{position:fixed;inset:0;z-index:990;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#0F0A26;color:#F2EFFF;font-family:var(--body,inherit)}
+#landing .lp-hero{position:relative;padding:calc(env(safe-area-inset-top) + 56px) 22px 40px;text-align:center;background:radial-gradient(120% 80% at 80% 0%,#FF4D8D55,transparent 60%),radial-gradient(120% 90% at 0% 20%,#6C4BFF77,transparent 60%),linear-gradient(180deg,#1B1240,#0F0A26)}
+#landing .lp-back{position:absolute;top:calc(env(safe-area-inset-top) + 12px);inset-inline-start:14px;font:inherit;font-size:.85rem;color:#fff;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:6px 12px}
+#landing .lp-logo{font-size:64px;line-height:1;margin-bottom:10px;filter:drop-shadow(0 10px 24px rgba(255,77,141,.45))}
+#landing h1{font:800 2.2rem/1.15 var(--display,inherit);margin:0 0 14px;background:linear-gradient(135deg,#fff,#FFC93C 55%,#FF8AB3);-webkit-background-clip:text;background-clip:text;color:transparent}
+#landing .lp-sub{font-size:1.05rem;line-height:1.55;color:#D6D0F5;max-width:520px;margin:0 auto 22px}
+#landing .lp-cta{display:flex;flex-direction:column;gap:10px;max-width:420px;margin:0 auto}
+#landing .lp-btn{font:inherit;font-size:1.05rem;font-weight:700;padding:15px;border-radius:16px;border:1.5px solid rgba(255,255,255,.28);background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
+#landing .lp-btn.main{border:0;background:linear-gradient(135deg,#6C4BFF,#FF4D8D);box-shadow:0 14px 30px -12px #FF4D8D}
+#landing .lp-mini{margin:14px 0 0;font-size:.85rem;color:#A9A2CF}
+#landing .lp-sec{padding:34px 20px;max-width:640px;margin:0 auto}
+#landing h2{font:800 1.45rem var(--display,inherit);margin:0 0 16px}
+#landing .lp-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:560px){#landing .lp-grid{grid-template-columns:1fr 1fr}}
+#landing .lp-f{background:#1B1538;border:1px solid #2E2756;border-radius:18px;padding:16px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:start}
+#landing .lp-f .lp-ic{grid-row:span 2;font-size:28px;line-height:1}
+#landing .lp-f b{font-size:1.02rem}
+#landing .lp-f p{margin:0;color:#BDB6E0;font-size:.92rem;line-height:1.5}
+#landing .lp-steps{margin:0;padding-inline-start:22px;display:flex;flex-direction:column;gap:12px;line-height:1.5;color:#D6D0F5}
+#landing .lp-steps b{color:#fff}
+#landing .lp-priv{background:linear-gradient(135deg,#1E1745,#2A1640);border-radius:22px}
+#landing .lp-priv p{margin:0;line-height:1.6;color:#D6D0F5}
+#landing .lp-q{border-bottom:1px solid #2E2756;padding:12px 0}
+#landing .lp-q summary{cursor:pointer;font-weight:700;list-style:none}
+#landing .lp-q summary::-webkit-details-marker{display:none}
+#landing .lp-q summary::after{content:"＋";float:left;color:#A9A2CF}
+#landing .lp-q[open] summary::after{content:"－"}
+#landing .lp-q p{margin:8px 0 0;color:#BDB6E0;line-height:1.55}
+#landing .lp-end{text-align:center;padding:30px 20px calc(env(safe-area-inset-bottom) + 50px)}
 .locrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .locrow .curbtn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .curbtn.town small{opacity:.7;font-weight:500}
@@ -1792,11 +1821,11 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261123155655">
-<script src="config.js?v=20261123155655"></script>
-<script src="motion.js?v=20261123155655"></script>
-<script src="fx.js?v=20261123155655"></script>
-<script src="cinema.js?v=20261123155655"></script>
-<script src="app.js?v=20261123155655"></script>
+<meta name="app-v" content="20261124060713">
+<script src="config.js?v=20261124060713"></script>
+<script src="motion.js?v=20261124060713"></script>
+<script src="fx.js?v=20261124060713"></script>
+<script src="cinema.js?v=20261124060713"></script>
+<script src="app.js?v=20261124060713"></script>
 </body>
 </html>
