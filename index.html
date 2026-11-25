@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261125083459"></script>
+<script src="theme.js?v=20261125120232"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -300,6 +300,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 #book h1{font:800 2rem var(--display,inherit);margin:4px 0}
 #book h2{font:800 1.15rem var(--display,inherit);margin:22px 0 8px;border-bottom:2px solid #6C4BFF33;padding-bottom:4px}
 #book header p{color:#5a5375;margin:0}
+#book .bk-stamps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:10px 0 6px}#book .bk-stamp{border:2.5px solid;border-radius:12px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;break-inside:avoid}#book .bk-stamp.home{border-radius:50%;aspect-ratio:1;justify-content:center;opacity:.7}#book .bk-stamp small{font-size:12px;font-weight:600}#book .bk-stamp .tw{font-weight:500;opacity:.85}
 #book .bk-globe{display:block;width:100%;max-width:420px;margin:16px auto;border-radius:20px}
 #book .bk-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
 #book .bk-nums b{display:block;font:800 1.2rem var(--display,inherit)}
@@ -640,6 +641,8 @@ html[data-tone="cream"]{--bg:var(--t-cream)} html[data-tone="sky"]{--bg:var(--t-
 .pass-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:6px 2px;align-items:center}
 .pass-s{border:2.5px solid var(--ink);color:var(--ink);border-radius:12px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;transform:rotate(var(--rot));background:color-mix(in srgb,var(--ink) 6%,var(--surface))}
 .pass-s b{font-size:1rem}.pass-s small{font-size:.78rem;font-weight:600}
+.pass-t{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-top:4px}.pass-t span{font-size:.7rem;font-weight:700;border:1.5px dashed var(--ink);border-radius:999px;padding:1px 7px}
+.pass-go{font:inherit;font-size:.75rem;font-weight:700;color:var(--ink);background:none;border:0;padding:6px 8px 0;cursor:pointer;min-height:32px}
 .pass-s.home{border-radius:50%;width:128px;height:128px;box-sizing:border-box;justify-self:center;justify-content:center;opacity:.75}
 .pass-s.soon{border-style:dashed;opacity:.75}
 .tstack{position:absolute;left:10px;bottom:6px;width:128px;height:160px;z-index:0;overflow:visible;filter:drop-shadow(0 10px 14px rgba(30,10,80,.35))}
@@ -1884,12 +1887,12 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261125083459">
-<script src="config.js?v=20261125083459"></script>
-<script src="i18n.js?v=20261125083459"></script>
-<script src="motion.js?v=20261125083459"></script>
-<script src="fx.js?v=20261125083459"></script>
-<script src="cinema.js?v=20261125083459"></script>
-<script src="app.js?v=20261125083459"></script>
+<meta name="app-v" content="20261125120232">
+<script src="config.js?v=20261125120232"></script>
+<script src="i18n.js?v=20261125120232"></script>
+<script src="motion.js?v=20261125120232"></script>
+<script src="fx.js?v=20261125120232"></script>
+<script src="cinema.js?v=20261125120232"></script>
+<script src="app.js?v=20261125120232"></script>
 </body>
 </html>

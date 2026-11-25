@@ -1218,7 +1218,9 @@ function recapData(loc,range){
   const share=me? myShareItems().filter(inLoc).reduce((s,it)=>s+spend(it,"ILS"),0) : 0;
   const alone=me&&acct&&acctFor===me ? PT().filter(inLoc).reduce((s,it)=>s+V(it),0) : null;
   const transfers=S.items.filter(it=>it.kind==="transfer"&&inLoc(it)).length;
-  return {loc,week:range||null,items,total,dates,days:range?7:days,countries,topCat,cats,bigDay,bigOne,paid,share,alone,transfers,avg: (range?7:days)? total/(range?7:days) : 0};
+  /* a range with a country is one stay in it (from the passport): its own days; a range alone is a week */
+  const nd= range ? (loc ? daysBetween(range.from,range.to)+1 : 7) : days;
+  return {loc,week:range&&!loc?range:null,rng:range&&loc?range:null,items,total,dates,days:nd,countries,topCat,cats,bigDay,bigOne,paid,share,alone,transfers,avg: nd? total/nd : 0};
 }
 /* ================= the trip book: one page to keep (print / save as PDF) ================= */
 function tripBook(){
@@ -1236,7 +1238,7 @@ function tripBook(){
   o.innerHTML=TX('<div class="bk-bar"><button type="button" class="btn small" id="bkClose">סגירה</button><button type="button" class="btn primary small" id="bkPrint">🖨️ שמירה כ-PDF</button></div>')+
    TX('<article class="bk"><header><div class="bk-kick">📕 ספר הטיול</div><h1>')+esc(S.trip||TX("הטיול שלנו"))+'</h1><p>'+(st?sd(st)+" – "+sd(td)+" · ":"")+days+TX(" ימים · ")+esc(people.map(p=>p.name).join(", "))+'</p></header>'+
    (globe?TX('<img class="bk-globe" alt="המסלול על הגלובוס" src="')+globe+'">':'')+
-   TX('<section><h2>במספרים</h2><div class="bk-nums"><div><b>')+fmt(total,"ILS")+TX('</b><small>הוצאנו בטיול</small></div><div><b>')+fmt(days?total/days:0,"ILS")+TX('</b><small>ממוצע ליום</small></div><div><b>')+nUniq(parts)+TX('</b><small>הוצאות</small></div><div><b>')+Object.keys(byC).length+TX('</b><small>מדינות</small></div></div>')+
+   bookPassport()+TX('<section><h2>במספרים</h2><div class="bk-nums"><div><b>')+fmt(total,"ILS")+TX('</b><small>הוצאנו בטיול</small></div><div><b>')+fmt(days?total/days:0,"ILS")+TX('</b><small>ממוצע ליום</small></div><div><b>')+nUniq(parts)+TX('</b><small>הוצאות</small></div><div><b>')+Object.keys(byC).length+TX('</b><small>מדינות</small></div></div>')+
      (prep>0.5?TX('<p class="bk-note">ועוד ')+fmt(prep,"ILS")+TX(' לפני הטיול (טיסות, ביטוח, ציוד)</p>'):'')+'</section>'+
    (Object.keys(byC).length?TX('<section><h2>לפי מדינה</h2><table>')+Object.entries(byC).sort((a,b)=>b[1].v-a[1].v).map(([k,o])=>{ const from=st&&o.min<st?st:o.min, end=k===S.localCur&&!S.home?td:o.max, n=daysBetween(from,end)+1; return '<tr><td>'+esc(CTRY[k])+'</td><td>'+n+TX(' ימים</td><td>')+fmt(o.v,"ILS")+'</td><td>'+fmt(o.v/Math.max(1,n),"ILS")+TX(' ליום</td></tr>'); }).join("")+'</table></section>':'')+
    (legs.length?TX('<section><h2>המסלול</h2><table>')+legs.map(l=>'<tr><td>📍 '+esc(l.name)+'</td><td>'+(l.from?sd(l.from):"")+(l.left?" – "+sd(l.left):l.last?TX(" – היום"):"")+'</td><td>'+l.days+TX(' ימים</td><td>')+fmt(conv(l.spent,showCur,"ILS"),"ILS")+'</td></tr>').join("")+'</table></section>':'')+
@@ -1269,8 +1271,8 @@ function renderRecords(){ const card=$("stRecCard"); if(!card) return; if($("boo
 function recapSlides(d){
   const title= d.week ? TX("השבוע שלנו") : d.loc ? locName(d.loc) : (S.trip||TX("הטיול שלנו"));
   const sd=s=>{ const [y,m,dd]=s.split("-").map(Number); return dd+"."+m; };
-  const range= d.week ? TX("מ-")+sd(d.week.from)+TX(" עד ")+sd(d.week.to) : d.dates.length ? TX("מ-")+sd(d.dates[0])+TX(" עד ")+sd(d.dates[d.dates.length-1]) : "";
-  if(d.items.length<3) return [{bg:"g1",big:"⏳",h:TX("עוד קצת סבלנות"),p:TX("הסיכום נבנה מההוצאות שלכם. אחרי כמה ימי טיול יהיה פה סיפור שלם.")}];
+  const range= d.week ? TX("מ-")+sd(d.week.from)+TX(" עד ")+sd(d.week.to) : d.rng ? TX("מ-")+sd(d.rng.from)+TX(" עד ")+sd(d.rng.to) : d.dates.length ? TX("מ-")+sd(d.dates[0])+TX(" עד ")+sd(d.dates[d.dates.length-1]) : "";
+  if(d.items.length<(d.loc?1:3)) return [{bg:"g1",big:"⏳",h:TX("עוד קצת סבלנות"),p:TX("הסיכום נבנה מההוצאות שלכם. אחרי כמה ימי טיול יהיה פה סיפור שלם.")}];
   const S2=[];
   S2.push({bg:"g1",kick:d.week?TX("שבוע שעבר בסיכום"):d.loc?TX("הסיכום של"):TX("הטיול שלנו בסיכום"),h:title,p:range,big:"🎬"});
   if(!d.week) S2.push({bg:"g2",kick:TX("יצאנו לדרך"),num:d.days,unit:d.days===1?TX("יום"):TX("ימים"),p:d.countries.length>1?d.countries.length+TX(" מדינות: ")+d.countries.map(c=>CTRY[c].split(" ")[0]).join(" "):(d.countries[0]?CTRY[d.countries[0]]:"")});
@@ -1535,8 +1537,21 @@ function renderHero(){
   chip("🧾 "+S.items.filter(it=>it.kind!=="transfer").length+TX(" הוצאות"));
   /* the visa: days left in this country (tap to set) */
   if(!S.home&&CTRY[S.localCur]){ const vc=visaChip(S.localCur); if(vc){ const el=document.createElement("button"); el.type="button"; el.className="hero-visa"+(vc[1]?" hot":""); el.textContent=vc[0]; el.onclick=()=>{ buzz(5); openVisa(S.localCur); }; C.appendChild(el); } }
-  visaNudge();
+  visaNudge(); cashNudge();
   renderPassport();
+}
+/* leaving a country within two days (the visa's last day, or the day you set to leave in the route):
+   how much of its money is still in the wallet. Once a day. */
+function cashNudge(){
+  if(!loaded||S.home||!CTRY[S.localCur]||S.localCur==="ILS") return; const c=S.localCur, today=todayStr(); let left=null;
+  const v=visaInfo(c); if(v&&v.days&&v.left>=0&&v.left<=2) left=v.left;
+  const PC=placeCtx(); PC.stays.forEach((x,i)=>{ const xc=(x.c&&CTRY[x.c])?x.c:PC.major[i]; if(xc!==c||!x.e||x.d>today||x.e<today) return; const nx=PC.stays[i+1], nc=nx?((nx.c&&CTRY[nx.c])?nx.c:PC.major[i+1]):null; if(nc===c) return; const l=daysBetween(today,x.e); if(l>=0&&l<=2&&(left===null||l<left)) left=l; });
+  if(left===null) return; const k="trip-cashnudge-"+c+"-"+today; if(load(k)) return; store(k,"1");
+  const bal= me&&acct&&acctFor===me&&CASH.length ? (cashBalances()[c]||0) : null, nm=PL(ctryName(c));
+  const when= left===0 ? TX("היום יוצאים מ")+nm : left===1 ? TX("מחר יוצאים מ")+nm : TX("עוד יומיים יוצאים מ")+nm;
+  const msg= bal>0 ? "🧳 "+when+TX(". נשארו ")+fmt(bal,c)+TX(" במזומן: כדאי לבזבז או להחליף") : bal===null ? "🧳 "+when+TX(". כדאי לבדוק כמה ")+CUR[c].name+TX(" נשאר במזומן") : null;
+  if(!msg) return;
+  setTimeout(()=>{ if(sheetOpen()) return; toast(msg,TX("לארנק"),()=>{ goView("personal"); setTimeout(()=>{ const w=$("cashCard"); if(w) w.scrollIntoView({behavior:"smooth",block:"center"}); },450); },11000); },17000);
 }
 
 /* ================= the passport in the top card: the stamp of the country you are in (its real entry day),
@@ -1578,7 +1593,7 @@ function passportData(){
   return {cur,prev:prevs[prevs.length-1],prevs,runs};
 }
 /* where the earlier stamps go on the page: the latest one up top, the older ones around it, each with its own shape */
-const SLOTS=[[104,46,14],[46,46,-12],[76,30,-4],[122,96,10],[118,154,-6],[44,156,12],[82,160,4]];
+const SLOTS=[[104,46,14],[46,46,-12],[122,96,10],[118,154,-6],[44,156,12],[82,160,4],[76,30,-4]];
 function oldStamp(r,k,n){
   const [x,y,rot]=SLOTS[k], ink=inkOf(r.c), nm=escX(PL(ctryName(r.c))), sz=k<2?(n>4?.88:1):.72, op=(k===0?.6:.42).toFixed(2), shape=["c","r","e"][(r.c.charCodeAt(0)+k)%3];
   const date=r.home? (r.from?stampDate(r.from)+" ✈":"✈") : stampDate(r.to)+" ✈";
@@ -1591,9 +1606,8 @@ function oldStamp(r,k,n){
     '<text x="0" y="'+(shape==="e"?0:-1)+'" text-anchor="middle" font-weight="800" font-size="'+fs+'" fill="'+ink+'">'+nm+'</text>'+
     '<text x="0" y="'+(shape==="e"?13:10)+'" text-anchor="middle" font-weight="700" font-size="7" fill="'+ink+'">'+date+'</text></g></g>';
 }
-function renderPassport(){
-  const P=$("pstamp"); if(!P) return; const d=passportData(), cur=d.cur, prev=d.prev;
-  const nmC=c=>escX(PL(ctryName(c)));
+function passportSVG(d){
+  const cur=d.cur, nmC=c=>escX(PL(ctryName(c)));
   /* the latest earlier stamp in the first slot; the ones before it in the next slots; the oldest drop off the page when it is full (all of them are in the passport) */
   const shown=d.prevs.slice(-SLOTS.length).reverse();
   const prevG=shown.map((r,k)=>oldStamp(r,k,shown.length)).reverse().join("");
@@ -1607,14 +1621,50 @@ function renderPassport(){
       '<text x="66" y="103" text-anchor="middle" font-size="15">'+ctryFlag(cur.c)+'</text>'+
       '<text x="66" y="122" text-anchor="middle" font-weight="800" font-size="'+fs+'" fill="'+ink+'">'+n+'</text>'+
       '<text x="66" y="135" text-anchor="middle" font-weight="700" font-size="8.5" fill="'+ink+'">'+escX(lbl)+'</text></g></g>'; }
+  return '<g class="ly" style="--i:0"><g transform="rotate(-7 75 92)"><rect x="8" y="14" width="134" height="160" rx="10" fill="#F6F0DE"/><rect x="8" y="14" width="134" height="160" rx="10" fill="none" stroke="#D9CFB4" stroke-width="1.5"/><path d="M18 32 H132 M18 160 H132" stroke="#E5DCC2"/></g></g>'+prevG+curG;
+}
+function renderPassport(){
+  const P=$("pstamp"); if(!P) return; const d=passportData(), cur=d.cur, prev=d.prev;
   const key=cur&&!d.soon ? cur.c+"|"+cur.from : "";
   const pk=d.prevs.map(r=>r.c+r.to).join(","); if(P.__key===key&&P.__prev===pk) return; P.__prev=pk;
-  P.querySelector("svg").innerHTML='<g class="ly" style="--i:0"><g transform="rotate(-7 75 92)"><rect x="8" y="14" width="134" height="160" rx="10" fill="#F6F0DE"/><rect x="8" y="14" width="134" height="160" rx="10" fill="none" stroke="#D9CFB4" stroke-width="1.5"/><path d="M18 32 H132 M18 160 H132" stroke="#E5DCC2"/></g></g>'+prevG+curG;
+  P.querySelector("svg").innerHTML=passportSVG(d);
   P.setAttribute("aria-label",cur? (d.soon? TX("הדרכון שלנו")+" · "+ctryName(cur.c)+" "+TX("בקרוב") : TX("הדרכון שלנו")+" · "+ctryName(cur.c)+", "+TX("כניסה")+" "+stampDate(cur.from)) : TX("הדרכון שלנו"));
   const first=P.__key===undefined; P.__key=key;
   /* a new country (or a new entry to it): the stamp comes down once, with a thud */
-  if(key&&loaded){ const sk="trip-stamped-"+curTrip+"-"+key; if(!load(sk)){ store(sk,"1"); setTimeout(()=>stampSlam(true),first?900:250); } }
+  if(key&&loaded){ const sk="trip-stamped-"+curTrip+"-"+key; if(!load(sk)){ store(sk,"1"); setTimeout(()=>stampSlam(true),first?900:250);
+    /* you just left a country: its story is ready */
+    if(prev&&!prev.home&&prev.to&&d.runs.length>1){ const days=daysBetween(prev.from,prev.to)+1;
+      setTimeout(()=>{ if(sheetOpen()) return; toast(TX("🎬 הסיכום של ")+PL(ctryName(prev.c))+" ("+(days===1?TX("יום אחד"):days+TX(" ימים"))+TX(") מוכן"),TX("לצפייה"),()=>openRecap(prev.c,{from:prev.from,to:prev.to}),10000); },first?3200:2400); } } }
 }
+/* the passport as a picture, to send: the page with all its stamps, the countries and the days */
+async function sharePassport(){
+  const d=passportData(), W=1080, H=1350, c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d");
+  try{ await document.fonts.ready; }catch(e){}
+  const gr=x.createLinearGradient(0,0,W,H); gr.addColorStop(0,"#2A1B6E"); gr.addColorStop(.6,"#5A3BE8"); gr.addColorStop(1,"#E83B7E"); x.fillStyle=gr; x.fillRect(0,0,W,H);
+  x.fillStyle="rgba(255,255,255,.08)"; x.beginPath(); x.arc(150,130,300,0,Math.PI*2); x.fill();
+  x.direction=EN?"ltr":"rtl"; x.textAlign="center"; x.fillStyle="#fff";
+  x.font="800 64px Assistant, sans-serif"; x.fillText(TX("🛂 הדרכון שלנו"),W/2,130);
+  x.font="600 40px Assistant, sans-serif"; x.fillStyle="rgba(255,255,255,.85)"; x.fillText(S.trip||TX("הטיול שלנו"),W/2,195);
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 180" width="660" height="792" font-family="Assistant, Arial, sans-serif">'+passportSVG(d)+'</svg>';
+  try{ const img=new Image(); img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg); await img.decode(); x.save(); x.shadowColor="rgba(10,4,40,.45)"; x.shadowBlur=40; x.shadowOffsetY=18; x.drawImage(img,(W-660)/2,235,660,792); x.restore(); }catch(e){}
+  const runs=d.runs, days=runs.length?daysBetween(tripStart(),todayStr())+1:0, n=new Set(runs.map(r=>r.c)).size;
+  x.fillStyle="#fff"; x.font="64px sans-serif"; x.fillText(["🇮🇱"].concat(runs.map(r=>ctryFlag(r.c))).join(" ➜ ").slice(0,120),W/2,1130);
+  x.font="700 46px Assistant, sans-serif"; x.fillText(n+" "+(n===1?TX("מדינה"):TX("מדינות"))+(days?" · "+days+TX(" ימים"):""),W/2,1215);
+  let blob=null; try{ blob=await new Promise(r=>c.toBlob(r,"image/png")); }catch(e){}
+  if(!blob){ toast(TX("השליחה נכשלה")); return; }
+  const file=new File([blob],"passport.png",{type:"image/png"});
+  try{ if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:TX("הדרכון שלנו")}); return; } }catch(e){ if(e&&e.name==="AbortError") return; }
+  const u=URL.createObjectURL(file); const l=document.createElement("a"); l.href=u; l.download="passport.png"; document.body.appendChild(l); l.click(); l.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000);
+}
+/* the passport page of the trip book: every stamp, with its towns */
+function bookPassport(){ const d=passportData(), st=tripStart(); const list=[{c:"ILS",from:st,home:1}].concat(d.runs); if(list.length<2) return "";
+  return '<section class="bk-pass"><h2>'+escX(TX("🛂 הדרכון שלנו"))+'</h2><div class="bk-stamps">'+list.map((r,i)=>{ const ink= i===list.length-1&&!r.home ? RED : inkOf(r.c), days=r.home?0:daysBetween(r.from,r.to)+1;
+    const sub= r.home ? TX("יציאה")+" · "+stampDate(r.from) : TX("כניסה")+" · "+stampDate(r.from)+" – "+stampDate(r.to)+" · "+(days===1?TX("יום אחד"):days+TX(" ימים"));
+    const towns=runTowns(r).map(t=>escX(PL(t.n))).join(" · ");
+    return '<div class="bk-stamp'+(r.home?' home':'')+'" style="color:'+ink+';border-color:'+ink+';transform:rotate('+(((i*37)%13)-6)+'deg)"><b>'+ctryFlag(r.c)+' '+escX(PL(ctryName(r.c)))+'</b><small>'+escX(sub)+'</small>'+(towns?'<small class="tw">📍 '+towns+'</small>':'')+'</div>'; }).join("")+'</div></section>'; }
+/* the towns of one country stay: the small stamps under it in the passport */
+function runTowns(r){ if(r.home||r.soon) return []; const PC=placeCtx();
+  return PC.stays.map((x,i)=>({x,c:(x.c&&CTRY[x.c])?x.c:PC.major[i]})).filter(o=>o.c===r.c&&o.x.d<=r.to&&(o.x.e||r.to)>=r.from).map(o=>({n:o.x.n,d:o.x.d<r.from?r.from:o.x.d})); }
 function stampSlam(big){
   const P=$("pstamp"); const g=P&&P.querySelector(".cur"); if(!g||calm()) return;
   g.classList.remove("slam"); void g.getBoundingClientRect(); g.classList.add("slam"); setTimeout(()=>g.classList.remove("slam"),900);
@@ -1635,9 +1685,13 @@ function openPassport(){
     if(r.home) s.textContent=r.from?TX("יציאה")+" · "+stampDate(r.from)+" ✈":TX("יציאה");
     else if(r.soon) s.textContent=TX("בקרוב");
     else { const days=daysBetween(r.from,r.to)+1, last=i===list.length-1; s.textContent=TX("כניסה")+" · "+stampDate(r.from)+(last?" · "+TX("עכשיו"):" – "+stampDate(r.to))+" · "+(days===1?TX("יום אחד"):days+TX(" ימים")); }
-    cell.append(n,s); grid.appendChild(cell); });
+    cell.append(n,s);
+    const towns=runTowns(r); if(towns.length){ const tw=document.createElement("div"); tw.className="pass-t"; for(const t of towns){ const e=document.createElement("span"); e.textContent="📍 "+PL(t.n)+" · "+stampDate(t.d).slice(0,-3); tw.appendChild(e); } cell.appendChild(tw); }
+    if(!r.home&&!r.soon){ const b=document.createElement("button"); b.type="button"; b.className="pass-go"; b.textContent=TX("🎬 סיכום"); b.onclick=()=>{ close(); openRecap(r.c,{from:r.from,to:r.to}); }; cell.appendChild(b); }
+    grid.appendChild(cell); });
   if(!d.runs.length&&!d.soon){ const e=document.createElement("p"); e.className="hint"; e.textContent=TX("החותמות מתמלאות מהמסלול ומההוצאות. \"📍 איפה אנחנו?\" מוסיף יעד."); box.appendChild(e); }
   else { const e=document.createElement("p"); e.className="hint"; e.textContent=TX("תאריך הכניסה לפי המסלול, ואם אין, לפי ההוצאה הראשונה במדינה. תיקון תאריכים: \"✏️ היעדים שלנו\" בגרפים."); box.appendChild(e); }
+  const sh=document.createElement("button"); sh.type="button"; sh.className="btn primary block"; sh.textContent=TX("📤 שיתוף הדרכון"); sh.onclick=()=>{ buzz(8); sharePassport(); }; box.appendChild(sh);
   document.body.appendChild(o);
 }
 let insIdx=0, insTimer=null;
@@ -1901,12 +1955,24 @@ const metaRef=()=>spaceRef().collection("trip").doc("meta");
 const keyHash=()=>SPACE?"#k="+SPACE:"";
 
 /* ---- the preferred (local) currency ---- */
-$("localBtn").onclick=()=>S.home ? openCurPicker(TX("לאן טסים? ✈️"),S.dest,c=>{ S.dest=c; patchTrip(curTrip,{localCur:c}); renderAll(); toast(TX("✈️ מיום הטיסה המטבע יתחלף ל")+CUR[c].name); }) : openCurPicker(TX("באיזו מדינה אתם עכשיו? 🌏"),S.localCur,c=>{
-  if(c===S.localCur) return;
+$("localBtn").onclick=()=>S.home ? openCurPicker(TX("לאן טסים? ✈️"),S.dest,c=>{ S.dest=c; patchTrip(curTrip,{localCur:c}); renderAll(); toast(TX("✈️ מיום הטיסה המטבע יתחלף ל")+CUR[c].name); }) : openCurPicker(TX("באיזו מדינה אתם עכשיו? 🌏"),S.localCur,changeCountry);
+
+function changeCountry(c){
+  if(!CUR[c]||c===S.localCur) return;
   const fromCur=S.localCur; settleNudge(fromCur,c);
   S.localCur=c; if(!editingId) cur.fCur=c; if(!pEditingId) cur.pCur=c; cur.cFrom=c; renderAll();
   patchTrip(curTrip,{localCur:c});
-});
+}
+/* an expense of today in another country's own currency: did you cross a border? (once a day for each currency) */
+const BORDER_SKIP=["USD","EUR","GBP","ILS"];
+function borderCheck(data){
+  if(!data||S.home||!loaded) return; const c=data.loc&&CTRY[data.loc]?data.loc:data.cur;
+  if(!CTRY[c]||BORDER_SKIP.includes(c)||c===S.localCur||(data.date||todayStr())!==todayStr()) return;
+  const k="trip-border-"+c+"-"+todayStr(); if(load(k)) return; store(k,"1");
+  setTimeout(()=>{ if(sheetOpen()) return; toast(TX("🛂 עברתם ל")+PL(ctryName(c))+"? "+ctryFlag(c),TX("כן, להטביע"),()=>{ changeCountry(c);
+    /* the stamp is down: now the town, so the route (and the passport's towns) know where you are */
+    setTimeout(()=>{ if(!sheetOpen()) toast(TX("📍 להוסיף עיר למסלול?"),TX("איפה אנחנו?"),()=>$("heroHere").click(),8000); },13500); },12000); },6400);
+}
 
 /* ---- who am I ---- */
 function isApp(){ try{ return navigator.standalone===true||matchMedia("(display-mode: standalone)").matches; }catch(e){ return false; } }
@@ -1993,6 +2059,7 @@ async function save(){
   if(ok&&!editingId) notifyOthers("🧾 "+nm(me||active()[0]?.id)+" "+(fem(me||active()[0]?.id)?TX("הוסיפה"):TX("הוסיף"))+": "+data.desc+" "+fmt(amount,data.cur));
   if(ok&&!editingId) toast((/^⏳/.test($("status").textContent)?TX("⏳ נשמר בטלפון, יעלה כשתחזור קליטה · "):TX("✓ נוסף: "))+label,"ביטול",()=>run(()=>EXP().doc(id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null})),6000);
   if(ok&&undoOld) toast(TX("✏️ השינויים נשמרו"),"ביטול",()=>restoreVersion(id,false,undoOld),10000);
+  if(ok&&!editingId) borderCheck(data);
   if(ok){ done($("saveBtn")); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("fDate").value; resetForm(); $("fDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
@@ -2047,6 +2114,7 @@ async function pSave(){
   if(!ok&&canWrite){ setTimeout(()=>{ openAdd(); showErr("pErr",TX("לא נשמר. בדקו את החיבור ונסו שוב.")); },400); return; }
   if(ok&&!old) toast((/^⏳/.test($("status").textContent)?TX("⏳ נשמר בטלפון, יעלה כשתחזור קליטה · "):TX("✓ נוסף: "))+catEmoji(data)+" "+fmt(amount,data.cur),"ביטול",()=>run(()=>EXP().doc(id).update({deleted:true,deletedAt:Date.now(),deletedBy:me||null})),6000);
   if(ok&&undoOldP) toast(TX("✏️ השינויים נשמרו"),"ביטול",()=>restoreVersion(id,true,undoOldP),10000);
+  if(ok&&!old) borderCheck(data);
   if(ok){ done($("pSave")); setTimeout(checkStreak,400); }
   if(ok){ const keep=$("pDate").value; pReset(); $("pDate").value=keep; if(!$("addSheet").hidden) closeSheet("addSheet"); }
 }
