@@ -127,7 +127,10 @@ const SEED_ITEMS=[
 let S={trip:"",localCur:"THB",people:[],items:[],fx:{rates:{...SNAPSHOT},at:null,live:false}};
 let db=null, canWrite=false, busy=false, editingId=null, filter="all", loaded=false;
 let form={payer:null,among:null,mode:"equal",pcts:{},cat:null,catSet:false};
-let me=null, showCur=load("trip-show")||"ILS"; if(!CUR[showCur]) showCur="ILS";
+/* amounts show in the currency you pay in now (Thailand: baht). A different choice lasts until the app is closed. */
+let showPick=(()=>{ try{ const v=sessionStorage.getItem("trip-show"); return CUR[v]?v:null; }catch(e){ return null; } })();
+function showDefault(){ return CUR[S.localCur]?S.localCur:"ILS"; }
+let me=null, showCur=showPick||"ILS";
 let nuG="m";
 
 function load(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
@@ -460,10 +463,16 @@ function seg(el,opts,isOn,onPick){
 function queueGlide(el,was){ GLIDE.set(el,was); if(!glideRaf) glideRaf=requestAnimationFrame(()=>{ glideRaf=0; const q=[...GLIDE]; GLIDE.clear(); for(const [r,w] of q) if(r.isConnected) Motion.glide(r,w); }); }
 /* all pills are measured together once the page has been drawn: one layout instead of one per row */
 const GLIDE=new Map(); let glideRaf=0;
+/* "show in": one small button with the currency shown now; the choices open under it */
+const SHOWOPEN=new Set();
 function showinRow(el){
   el.innerHTML="";
-  const lbl=document.createElement("span"); lbl.textContent=TX("להציג ב:"); el.appendChild(lbl);
-  const quick=["ILS",S.localCur,"USD"].filter((x,i,a)=>a.indexOf(x)===i);
+  const open=SHOWOPEN.has(el.id), c=CUR[showCur]||CUR.ILS;
+  const t=document.createElement("button"); t.type="button"; t.className="chip showin-t"; t.setAttribute("aria-expanded",String(open));
+  t.textContent=TX("להציג ב:")+" "+(c.sym?c.sym+" ":"")+c.name+(open?" ▴":" ▾");
+  t.onclick=()=>{ buzz(6); if(open) SHOWOPEN.delete(el.id); else SHOWOPEN.add(el.id); showinRow(el); };
+  el.appendChild(t); if(!open) return;
+  const quick=[S.localCur,"ILS","USD"].filter((x,i,a)=>CUR[x]&&a.indexOf(x)===i);
   for(const q of quick){ const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=(CUR[q].sym?CUR[q].sym+" ":"")+CUR[q].name; b.setAttribute("aria-pressed",String(showCur===q)); b.onclick=()=>setShow(q); el.appendChild(b); }
   const o=document.createElement("button"); o.type="button"; o.className="curbtn"; o.textContent=quick.includes(showCur)?TX("🔎 מטבע אחר"):curText(showCur);
   o.onclick=()=>openCurPicker(TX("להציג את הסכומים ב…"),showCur,setShow); el.appendChild(o);
@@ -584,7 +593,7 @@ function renderTicket(){
     D.appendChild(sh); }
   showinRow($("showin"));
 }
-function setShow(c){ showCur=c; store("trip-show",c); renderAll(); }
+function setShow(c){ showCur=c; showPick=c; try{ sessionStorage.setItem("trip-show",c); }catch(e){} SHOWOPEN.clear(); renderAll(); }
 
 function fmtRate(r){ return r>=100?r.toFixed(1):r>=1?r.toFixed(4):r.toPrecision(4); }
 function plain(v){ if(!isFinite(v)) return ""; const a=Math.abs(v); return String(Math.round(v*(a>=1000?1:100))/(a>=1000?1:100)); }
@@ -1667,7 +1676,7 @@ function renderSofar(){
       badge= total===0 ? ["",TX("היום עוד כלום")] : Math.abs(diff)<0.5 ? ["",TX("היום בדיוק בקצב")] : [diff>0?"up":"down",TX("היום ")+(diff>0?TX("העלה "):TX("הוריד "))+fmt(Math.max(1,Math.round(Math.abs(diff))),showCur)];
     }
     const d=document.createElement("div"); const bb=document.createElement("b"); bb.className="num"; money(bb,val,showCur,"sfc"+R.children.length);
-    const l=document.createElement("span"); l.textContent=label; if(label.length>14) l.className="wrap"; d.append(bb,l);
+    const l=document.createElement("span"); l.textContent=label; if(label.length>14) l.className="lwrap"; d.append(bb,l);
     if(badge){ const t=document.createElement("em"); t.className="sf-delta "+badge[0]; t.textContent=badge[1]; d.appendChild(t); }
     R.appendChild(d);
   };
@@ -1743,6 +1752,7 @@ function renderMoney(){
   $("moneyNote").textContent= r ? TX("התקציב לפי מה שהזנת ועדכוני הבנק · המזומן לפי הארנק · הכול ב")+(CUR[C]?.name||C)+TX(" בשער של היום") : "";
 }
 function renderAll(){
+  if(!showPick&&loaded) showCur=showDefault();
   syncCardFees(); applyG(); if(loaded&&!window.__mornT){ window.__mornT=setTimeout(()=>{ window.__mornT=0; morning(); checkMedals(); setTimeout(()=>weekly(false),document.querySelector(".morning")?3600:200); },900); } renderHero(); renderInsight(); renderSofar();
   { const arch=loaded&&curTrip!==activeTrip(); $("tripNote").hidden=!arch; if(arch) $("tripNoteTxt").textContent=TX("🗂️ אתם צופים בטיול ")+(S.trip||TX("קודם"))+TX(" מהארכיון"); }
   requestAnimationFrame(()=>{ watchReveal(); renderMini(); onScroll(); });
