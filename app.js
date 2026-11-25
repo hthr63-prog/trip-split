@@ -1570,18 +1570,33 @@ function ctryFlag(c){ return (CTRY[c]||"🌏").split(" ")[0]; }
 function stampDate(s){ const [y,m,d]=s.split("-"); return (+d)+"."+(+m)+"."+y.slice(2); }
 const escX=t=>String(t).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
 function passportData(){
-  const st=tripStart(), today=todayStr();
-  if(S.home||(st&&st>today)){ const to=CTRY[S.dest]?S.dest:null; return {soon:true,cur:to?{c:to,from:st}:null,prev:{c:"ILS",from:st,home:1},runs:[]}; }
+  const st=tripStart(), today=todayStr(), home={c:"ILS",from:st,to:st,home:1};
+  if(S.home||(st&&st>today)){ const to=CTRY[S.dest]?S.dest:null; return {soon:true,cur:to?{c:to,from:st}:null,prev:home,prevs:[home],runs:[]}; }
   const runs=countryRuns(); const cur=runs[runs.length-1]||null;
-  const prev= runs.length>1 ? runs[runs.length-2] : {c:"ILS",from:st,home:1};
-  return {cur,prev,runs};
+  /* every country before this one, like a real passport: Israel first, then each entry (the same country twice = two stamps) */
+  const prevs=[home].concat(runs.slice(0,-1));
+  return {cur,prev:prevs[prevs.length-1],prevs,runs};
+}
+/* where the earlier stamps go on the page: the latest one up top, the older ones around it, each with its own shape */
+const SLOTS=[[104,46,14],[46,46,-12],[76,30,-4],[122,96,10],[118,154,-6],[44,156,12],[82,160,4]];
+function oldStamp(r,k,n){
+  const [x,y,rot]=SLOTS[k], ink=inkOf(r.c), nm=escX(PL(ctryName(r.c))), sz=k<2?(n>4?.88:1):.72, op=(k===0?.6:.42).toFixed(2), shape=["c","r","e"][(r.c.charCodeAt(0)+k)%3];
+  const date=r.home? (r.from?stampDate(r.from)+" ✈":"✈") : stampDate(r.to)+" ✈";
+  const fs=nm.length>7?8:10.5;
+  let body;
+  if(shape==="c") body='<circle cx="0" cy="0" r="25" fill="none" stroke="'+ink+'" stroke-width="2.2"/><circle cx="0" cy="0" r="19.5" fill="none" stroke="'+ink+'" stroke-width="1"/>';
+  else if(shape==="r") body='<rect x="-30" y="-18" width="60" height="36" rx="5" fill="none" stroke="'+ink+'" stroke-width="2.2"/><rect x="-26" y="-14" width="52" height="28" rx="3" fill="none" stroke="'+ink+'" stroke-width=".8"/>';
+  else body='<ellipse cx="0" cy="0" rx="31" ry="20" fill="none" stroke="'+ink+'" stroke-width="2.2"/><path d="M-22 5 H22" stroke="'+ink+'" stroke-width=".8"/>';
+  return '<g class="ly" style="--i:'+(1+(k%2))+'"><g transform="translate('+x+' '+y+') rotate('+rot+') scale('+sz+')" opacity="'+op+'">'+body+
+    '<text x="0" y="'+(shape==="e"?0:-1)+'" text-anchor="middle" font-weight="800" font-size="'+fs+'" fill="'+ink+'">'+nm+'</text>'+
+    '<text x="0" y="'+(shape==="e"?13:10)+'" text-anchor="middle" font-weight="700" font-size="7" fill="'+ink+'">'+date+'</text></g></g>';
 }
 function renderPassport(){
   const P=$("pstamp"); if(!P) return; const d=passportData(), cur=d.cur, prev=d.prev;
   const nmC=c=>escX(PL(ctryName(c)));
-  const prevG= prev ? '<g class="ly" style="--i:1"><g transform="rotate(14 104 44)" opacity=".55"><circle cx="104" cy="44" r="25" fill="none" stroke="'+inkOf(prev.c)+'" stroke-width="2.2"/><circle cx="104" cy="44" r="19.5" fill="none" stroke="'+inkOf(prev.c)+'" stroke-width="1"/>'+
-    '<text x="104" y="43" text-anchor="middle" font-weight="800" font-size="'+(nmC(prev.c).length>7?8:10.5)+'" fill="'+inkOf(prev.c)+'">'+nmC(prev.c)+'</text>'+
-    '<text x="104" y="54" text-anchor="middle" font-weight="700" font-size="7" fill="'+inkOf(prev.c)+'">'+(prev.from?stampDate(prev.home?prev.from:prev.to):"")+' ✈</text></g></g>' : '';
+  /* the latest earlier stamp in the first slot; the ones before it in the next slots; the oldest drop off the page when it is full (all of them are in the passport) */
+  const shown=d.prevs.slice(-SLOTS.length).reverse();
+  const prevG=shown.map((r,k)=>oldStamp(r,k,shown.length)).reverse().join("");
   let curG='';
   if(cur){ const ink=RED, n=nmC(cur.c), fs=n.length>8?11:n.length>6?13:15;
     const soon=d.soon, lbl= soon ? TX("בקרוב") : TX("כניסה")+" · "+stampDate(cur.from);
@@ -1593,7 +1608,7 @@ function renderPassport(){
       '<text x="66" y="122" text-anchor="middle" font-weight="800" font-size="'+fs+'" fill="'+ink+'">'+n+'</text>'+
       '<text x="66" y="135" text-anchor="middle" font-weight="700" font-size="8.5" fill="'+ink+'">'+escX(lbl)+'</text></g></g>'; }
   const key=cur&&!d.soon ? cur.c+"|"+cur.from : "";
-  if(P.__key===key&&P.__prev===(prev&&prev.c)) return; P.__prev=prev&&prev.c;
+  const pk=d.prevs.map(r=>r.c+r.to).join(","); if(P.__key===key&&P.__prev===pk) return; P.__prev=pk;
   P.querySelector("svg").innerHTML='<g class="ly" style="--i:0"><g transform="rotate(-7 75 92)"><rect x="8" y="14" width="134" height="160" rx="10" fill="#F6F0DE"/><rect x="8" y="14" width="134" height="160" rx="10" fill="none" stroke="#D9CFB4" stroke-width="1.5"/><path d="M18 32 H132 M18 160 H132" stroke="#E5DCC2"/></g></g>'+prevG+curG;
   P.setAttribute("aria-label",cur? (d.soon? TX("הדרכון שלנו")+" · "+ctryName(cur.c)+" "+TX("בקרוב") : TX("הדרכון שלנו")+" · "+ctryName(cur.c)+", "+TX("כניסה")+" "+stampDate(cur.from)) : TX("הדרכון שלנו"));
   const first=P.__key===undefined; P.__key=key;
