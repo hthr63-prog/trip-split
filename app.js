@@ -1527,7 +1527,7 @@ function renderHero(){
   if(st&&diff<0){ const left=-diff; const to=(CTRY[S.dest]||"").split(" ").slice(1).join(" "); $("heroDay").textContent= left===1?TX("מחר!"):TX("עוד ")+left; $("heroSince").textContent= (left===1?TX("טסים"):TX("ימים לטיסה"))+(to?TX(" ל")+to:"")+" ✈️"; }
   else { $("heroDay").textContent=TX("יום ")+(diff+1); $("heroSince").textContent=TX("לטיול"); }
   /* countries you have been in: the country of each stay on the journey (and the one you are in now) */
-  const countries=(()=>{ const st=tripStart(); if(!st||st>todayStr()) return 0; const PC=placeCtx(); const set=new Set(PC.major.filter(c=>CTRY[c])); if(!S.home&&CTRY[S.localCur]) set.add(S.localCur); return set.size; })();
+  const countries=(()=>{ const st=tripStart(); if(!st||st>todayStr()) return 0; const PC=placeCtx(); const set=new Set(PC.major.filter(c=>CTRY[c])); PC.stays.forEach(x=>{ if(x.c&&CTRY[x.c]&&x.c!=="ILS") set.add(x.c); }); if(!S.home&&CTRY[S.localCur]) set.add(S.localCur); return set.size; })();
   const C=$("heroChips"); C.innerHTML="";
   const chip=(txt,hot)=>{ const s=document.createElement("span"); s.textContent=txt; if(hot) s.className="hot"; C.appendChild(s); };
   const sk=streak(); if(sk>=2) chip("🔥 "+sk+TX(" ימים ברצף"),true);
@@ -1536,6 +1536,94 @@ function renderHero(){
   /* the visa: days left in this country (tap to set) */
   if(!S.home&&CTRY[S.localCur]){ const vc=visaChip(S.localCur); if(vc){ const el=document.createElement("button"); el.type="button"; el.className="hero-visa"+(vc[1]?" hot":""); el.textContent=vc[0]; el.onclick=()=>{ buzz(5); openVisa(S.localCur); }; C.appendChild(el); } }
   visaNudge();
+  renderPassport();
+}
+
+/* ================= the passport in the top card: the stamp of the country you are in (its real entry day),
+   and under it, faded, the country you came from (Israel for the first one) ================= */
+const dPlus=(s,n)=>{ const [y,m,d]=s.split("-").map(Number); const t=new Date(Date.UTC(y,m-1,d+n)); return t.toISOString().slice(0,10); };
+/* the countries of the trip in order, each with the day you entered and the last day there:
+   the route (each stay's country) first, and on days the route says nothing, the country of that day's expenses */
+function countryRuns(){
+  const st=tripStart(), today=todayStr(); if(!st||st>today) return [];
+  const PC=placeCtx(), byDay=new Map(), cnt=new Map();
+  for(const it of S.items){ if(it.kind==="transfer"||!it.date||it.date<st||it.date>today) continue; const l=PC.effLoc(it); if(!CTRY[l]||l==="ILS") continue;
+    const m=cnt.get(it.date)||{}; m[l]=(m[l]||0)+1; cnt.set(it.date,m); }
+  for(const [d,m] of cnt) byDay.set(d,{c:Object.entries(m).sort((x,y)=>y[1]-x[1])[0][0],r:0});
+  PC.stays.forEach((x,i)=>{ const c=(x.c&&CTRY[x.c])?x.c:PC.major[i]; if(!CTRY[c]||c==="ILS") return;
+    const end=x.e||(PC.stays[i+1]?dPlus(PC.stays[i+1].d,-1):today); for(let d=x.d<st?st:x.d, k=0; d<=end&&d<=today&&k<800; d=dPlus(d,1), k++) byDay.set(d,{c,r:1}); });
+  const runs=[];
+  for(const d of [...byDay.keys()].sort()){ const v=byDay.get(d), r=runs[runs.length-1]; if(r&&r.c===v.c){ r.to=d; r.route=r.route||v.r; continue; } runs.push({c:v.c,from:d,to:d,route:!!v.r}); }
+  /* one day of another country's expenses in the middle of a stay (no route to say so) is not a border crossing */
+  for(let i=1;i<runs.length-1;i++){ const r=runs[i]; if(!r.route&&r.from===r.to&&runs[i-1].c===runs[i+1].c){ runs[i-1].to=runs[i+1].to; runs.splice(i,2); i--; } }
+  if(runs.length) runs[0].from=st;   /* the first country: from the day you flew */
+  /* where you are now: the currency in use, if the days have not shown it yet */
+  if(!S.home&&CTRY[S.localCur]&&S.localCur!=="ILS"&&(!runs.length||runs[runs.length-1].c!==S.localCur)) runs.push({c:S.localCur,from:runs.length?today:st,to:today,now:1});
+  if(runs.length) runs[runs.length-1].to=today;
+  return runs;
+}
+const INKS=["#1E4FA8","#0E7A55","#7A2BB5","#B45309","#0F766E","#4338CA"];
+const RED="#C8102E";   /* the country you are in: always the red stamp */
+function inkOf(c){ let h=0; for(const ch of String(c)) h=(h*31+ch.charCodeAt(0))%997; return INKS[h%INKS.length]; }
+function ctryName(c){ const v=CTRY[c]||""; return v ? v.split(" ").slice(1).join(" ") : (CUR[c]?.name||c); }
+function ctryFlag(c){ return (CTRY[c]||"🌏").split(" ")[0]; }
+function stampDate(s){ const [y,m,d]=s.split("-"); return (+d)+"."+(+m)+"."+y.slice(2); }
+const escX=t=>String(t).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+function passportData(){
+  const st=tripStart(), today=todayStr();
+  if(S.home||(st&&st>today)){ const to=CTRY[S.dest]?S.dest:null; return {soon:true,cur:to?{c:to,from:st}:null,prev:{c:"ILS",from:st,home:1},runs:[]}; }
+  const runs=countryRuns(); const cur=runs[runs.length-1]||null;
+  const prev= runs.length>1 ? runs[runs.length-2] : {c:"ILS",from:st,home:1};
+  return {cur,prev,runs};
+}
+function renderPassport(){
+  const P=$("pstamp"); if(!P) return; const d=passportData(), cur=d.cur, prev=d.prev;
+  const nmC=c=>escX(PL(ctryName(c)));
+  const prevG= prev ? '<g class="ly" style="--i:1"><g transform="rotate(14 104 44)" opacity=".55"><circle cx="104" cy="44" r="25" fill="none" stroke="'+inkOf(prev.c)+'" stroke-width="2.2"/><circle cx="104" cy="44" r="19.5" fill="none" stroke="'+inkOf(prev.c)+'" stroke-width="1"/>'+
+    '<text x="104" y="43" text-anchor="middle" font-weight="800" font-size="'+(nmC(prev.c).length>7?8:10.5)+'" fill="'+inkOf(prev.c)+'">'+nmC(prev.c)+'</text>'+
+    '<text x="104" y="54" text-anchor="middle" font-weight="700" font-size="7" fill="'+inkOf(prev.c)+'">'+(prev.from?stampDate(prev.home?prev.from:prev.to):"")+' ✈</text></g></g>' : '';
+  let curG='';
+  if(cur){ const ink=RED, n=nmC(cur.c), fs=n.length>8?11:n.length>6?13:15;
+    const soon=d.soon, lbl= soon ? TX("בקרוב") : TX("כניסה")+" · "+stampDate(cur.from);
+    curG='<g class="ly cur" style="--i:3"><g class="stp" transform="rotate(-10 66 112)"'+(soon?' opacity=".7"':'')+'>'+
+      '<circle class="ink" cx="66" cy="112" r="10" fill="'+ink+'" opacity="0"/>'+
+      '<rect x="16" y="78" width="100" height="68" rx="8" fill="none" stroke="'+ink+'" stroke-width="3"'+(soon?' stroke-dasharray="6 4"':'')+'/>'+
+      '<rect x="21" y="83" width="90" height="58" rx="5" fill="none" stroke="'+ink+'" stroke-width="1"/>'+
+      '<text x="66" y="103" text-anchor="middle" font-size="15">'+ctryFlag(cur.c)+'</text>'+
+      '<text x="66" y="122" text-anchor="middle" font-weight="800" font-size="'+fs+'" fill="'+ink+'">'+n+'</text>'+
+      '<text x="66" y="135" text-anchor="middle" font-weight="700" font-size="8.5" fill="'+ink+'">'+escX(lbl)+'</text></g></g>'; }
+  const key=cur&&!d.soon ? cur.c+"|"+cur.from : "";
+  if(P.__key===key&&P.__prev===(prev&&prev.c)) return; P.__prev=prev&&prev.c;
+  P.querySelector("svg").innerHTML='<g class="ly" style="--i:0"><g transform="rotate(-7 75 92)"><rect x="8" y="14" width="134" height="160" rx="10" fill="#F6F0DE"/><rect x="8" y="14" width="134" height="160" rx="10" fill="none" stroke="#D9CFB4" stroke-width="1.5"/><path d="M18 32 H132 M18 160 H132" stroke="#E5DCC2"/></g></g>'+prevG+curG;
+  P.setAttribute("aria-label",cur? (d.soon? TX("הדרכון שלנו")+" · "+ctryName(cur.c)+" "+TX("בקרוב") : TX("הדרכון שלנו")+" · "+ctryName(cur.c)+", "+TX("כניסה")+" "+stampDate(cur.from)) : TX("הדרכון שלנו"));
+  const first=P.__key===undefined; P.__key=key;
+  /* a new country (or a new entry to it): the stamp comes down once, with a thud */
+  if(key&&loaded){ const sk="trip-stamped-"+curTrip+"-"+key; if(!load(sk)){ store(sk,"1"); setTimeout(()=>stampSlam(true),first?900:250); } }
+}
+function stampSlam(big){
+  const P=$("pstamp"); const g=P&&P.querySelector(".cur"); if(!g||calm()) return;
+  g.classList.remove("slam"); void g.getBoundingClientRect(); g.classList.add("slam"); setTimeout(()=>g.classList.remove("slam"),900);
+  setTimeout(()=>{ buzz(big?[16,40,10]:12); sound("stamp"); const H=$("hero"); if(H&&big){ H.classList.remove("thud"); void H.offsetWidth; H.classList.add("thud"); setTimeout(()=>H.classList.remove("thud"),400); } },big?330:200);
+}
+/* the whole passport: every country of the trip, its stamp, when you came in and how long you stayed */
+function openPassport(){
+  const d=passportData(), today=todayStr(); const o=document.createElement("div"); o.className="hist-bg"; o.setAttribute("role","dialog"); o.setAttribute("aria-label",TX("הדרכון שלנו"));
+  const box=document.createElement("div"); box.className="hist pass"; o.appendChild(box);
+  const head=document.createElement("div"); head.className="hist-h"; const t=document.createElement("b"); t.textContent=TX("🛂 הדרכון שלנו"); const x=document.createElement("button"); x.type="button"; x.className="btn small"; x.textContent=TX("סגירה"); head.append(t,x); box.appendChild(head);
+  const close=()=>o.remove(); x.onclick=close; o.addEventListener("click",e=>{ if(e.target===o) close(); });
+  const grid=document.createElement("div"); grid.className="pass-grid"; box.appendChild(grid);
+  const st=tripStart(); const list=[{c:"ILS",from:st,home:1}].concat(d.runs);
+  if(d.soon&&d.cur) list.push({c:d.cur.c,from:st,soon:1});
+  list.forEach((r,i)=>{ const cell=document.createElement("div"); cell.className="pass-s"+(r.home?" home":"")+(r.soon?" soon":""); cell.style.setProperty("--ink",i===list.length-1&&!r.home?RED:inkOf(r.c)); cell.style.setProperty("--rot",((i*37)%17-8)+"deg");
+    const n=document.createElement("b"); n.textContent=ctryFlag(r.c)+" "+PL(ctryName(r.c));
+    const s=document.createElement("small");
+    if(r.home) s.textContent=r.from?TX("יציאה")+" · "+stampDate(r.from)+" ✈":TX("יציאה");
+    else if(r.soon) s.textContent=TX("בקרוב");
+    else { const days=daysBetween(r.from,r.to)+1, last=i===list.length-1; s.textContent=TX("כניסה")+" · "+stampDate(r.from)+(last?" · "+TX("עכשיו"):" – "+stampDate(r.to))+" · "+(days===1?TX("יום אחד"):days+TX(" ימים")); }
+    cell.append(n,s); grid.appendChild(cell); });
+  if(!d.runs.length&&!d.soon){ const e=document.createElement("p"); e.className="hint"; e.textContent=TX("החותמות מתמלאות מהמסלול ומההוצאות. \"📍 איפה אנחנו?\" מוסיף יעד."); box.appendChild(e); }
+  else { const e=document.createElement("p"); e.className="hint"; e.textContent=TX("תאריך הכניסה לפי המסלול, ואם אין, לפי ההוצאה הראשונה במדינה. תיקון תאריכים: \"✏️ היעדים שלנו\" בגרפים."); box.appendChild(e); }
+  document.body.appendChild(o);
 }
 let insIdx=0, insTimer=null;
 function insights(){
@@ -1557,6 +1645,7 @@ function renderInsight(){
   clearInterval(insTimer); if(list.length>1) insTimer=setInterval(()=>{ insIdx++; const L=insights(); if(!L.length) return; const [i2,t2]=L[insIdx%L.length]; $("insIco").textContent=i2; $("insTxt").textContent=t2; flash(I,"swap",400); },7000);
 }
 $("heroPlace").onclick=()=>$("localBtn").click();
+$("pstamp").onclick=()=>{ stampSlam(false); setTimeout(openPassport,calm()?0:420); };
 /* ---- where are we: the phone's location, or a city and country picked by hand ---- */
 function hereName(){ const h=hereNow(); if(!h) return ""; if(h.name) return h.name; try{ const t=nearTown(h.lat,h.lng); return t?t.name:""; }catch(e){ return ""; } }
 function hereOpen(){ const s=$("hereSheet"); return s&&!s.hidden; }
@@ -2680,6 +2769,7 @@ function sound(kind){
   else if(kind==="tick"){ tone(c,900,t,.035,.025,"square"); }
   else if(kind==="swoosh"){ tone(c,620,t,.22,.045,"sine",160); }
   else if(kind==="chime"){ [1046,1318,1568,2093].forEach((f,i)=>tone(c,f,t+i*.09,.5,.045,"sine")); }
+  else if(kind==="stamp"){ tone(c,160,t,.16,.11,"triangle",55); tone(c,70,t+.01,.22,.09,"sine",40); }
   else if(kind==="coins"){ for(let i=0;i<5;i++) tone(c,1500+Math.random()*700,t+i*.06,.12,.035,"triangle"); }
 }
 
