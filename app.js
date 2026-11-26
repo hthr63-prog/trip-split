@@ -1694,6 +1694,25 @@ function openPassport(){
   const sh=document.createElement("button"); sh.type="button"; sh.className="btn primary block"; sh.textContent=TX("📤 שיתוף הדרכון"); sh.onclick=()=>{ buzz(8); sharePassport(); }; box.appendChild(sh);
   document.body.appendChild(o);
 }
+
+/* the time of day an expense was logged, in the place it was logged (minutes after midnight), and that day */
+const TOD=new Map();
+function todOf(it){ const k=(it.createdAt||0)+"|"+(it.tz||""); if(TOD.has(k)) return TOD.get(k); let r=null;
+  try{ if(it.createdAt){ const p=new Intl.DateTimeFormat("en-CA",{timeZone:it.tz||undefined,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(it.createdAt)); const g=t=>(p.find(x=>x.type===t)||{}).value;
+    r={day:g("year")+"-"+g("month")+"-"+g("day"),min:(+g("hour"))*60+(+g("minute"))}; } }catch(e){}
+  TOD.set(k,r); return r; }
+/* how much today will come to: spent so far + the average of what was still spent after this hour on the last days.
+   Nights paid ahead (spread) count from the morning. An expense logged on another day than its own is taken as spread over its day. */
+function dayEstimate(sofar,pFilter,sumFor){
+  const td=todayStr(), st=tripStart(); if(!st||st>=td) return null;
+  const now=new Date(), nowMin=now.getHours()*60+now.getMinutes(), left=1-nowMin/1440;
+  const days=[]; for(let i=1;i<=14;i++){ const d=dayAdd(td,-i); if(d<st) break; days.push(d); } if(days.length<2) return null;
+  let rest=0;
+  for(const d of days){
+    rest+=sumFor(it=>pFilter(it)&&it.date===d&&!it._part&&(()=>{ const t=todOf(it); return t&&t.day===d&&t.min>nowMin; })());
+    rest+=left*sumFor(it=>pFilter(it)&&it.date===d&&!it._part&&(()=>{ const t=todOf(it); return !t||t.day!==d; })()); }
+  return {value:sofar+rest/days.length,rest:rest/days.length};
+}
 let insIdx=0, insTimer=null;
 function insights(){
   const out=[]; const td=todayStr(); const sh=spreadAll(S.items.filter(it=>it.kind!=="transfer"&&locOf(it)!=="prep"));
@@ -1828,10 +1847,17 @@ function renderSofar(){
       const tDaily= days>0 ? total/days : 0; label=TX("ממוצע ליום ב")+here; val=tDaily;
       if(daily>0&&total>0&&pDays>days){ const diff=tDaily-daily; badge= Math.abs(diff)<0.5 ? ["",TX("בדיוק כמו בטיול")] : [diff>0?"up":"down",(diff>0?"▲ ":"▼ ")+fmt(Math.max(1,Math.round(Math.abs(diff))),showCur)+TX(" מהממוצע בטיול")]; }
     } else if(scope==="day"&&pDays>=2&&daily>0){
-      /* today: the daily average as it stands with today in it, and how much today moved it */
-      label=TX("בקצב הזה, ממוצע ליום")+tail;
-      const prev=(sumFor(pFilter)-sumFor(it=>pFilter(it)&&inScope(it)))/(pDays-1), diff=daily-prev;
-      badge= total===0 ? ["",TX("היום עוד כלום")] : Math.abs(diff)<0.5 ? ["",TX("היום בדיוק בקצב")] : [diff>0?"up":"down",TX("היום ")+(diff>0?TX("העלה "):TX("הוריד "))+fmt(Math.max(1,Math.round(Math.abs(diff))),showCur)];
+      const prev=(sumFor(pFilter)-sumFor(it=>pFilter(it)&&inScope(it)))/(pDays-1);
+      const est= preTrip ? null : dayEstimate(total,pFilter,sumFor);
+      if(est){
+        /* today: what is already spent, plus what usually still goes out from this hour until the night (the last two weeks) */
+        val=est.value; label=TX("הערכה להיום");
+        const diff=est.value-prev; badge= prev>0&&Math.abs(diff)/prev<0.03 ? ["",TX("כמו הממוצע")] : [diff>0?"up":"down",(diff>0?"▲ ":"▼ ")+fmt(Math.max(1,Math.round(Math.abs(diff))),showCur)+TX(" מהממוצע")];
+      } else {
+        /* too few days to know how a day goes: the daily average as it stands with today in it, and how much today moved it */
+        label=TX("בקצב הזה, ממוצע ליום")+tail; const diff=daily-prev;
+        badge= total===0 ? ["",TX("היום עוד כלום")] : Math.abs(diff)<0.5 ? ["",TX("היום בדיוק בקצב")] : [diff>0?"up":"down",TX("היום ")+(diff>0?TX("העלה "):TX("הוריד "))+fmt(Math.max(1,Math.round(Math.abs(diff))),showCur)];
+      }
     }
     const d=document.createElement("div"); const bb=document.createElement("b"); bb.className="num"; money(bb,val,showCur,"sfc"+R.children.length);
     const l=document.createElement("span"); l.textContent=label; if(label.length>14) l.className="lwrap"; d.append(bb,l);
