@@ -1149,7 +1149,7 @@ function checkStreak(){
 let ticking=false;
 function onScroll(){
   ticking=false; const y=window.scrollY;
-  $("fabUp").hidden= y<400;
+  upVis(y);
   if(!calm()){ const sc=document.querySelector(".hero .scene"), tx=document.querySelector(".hero-txt");
     if(sc&&y<400){ sc.style.transform="translateY("+(y*.35)+"px) scale("+(1+y/1600)+")"; tx.style.opacity=String(Math.max(0,1-y/170)); tx.style.transform="translateY("+(y*.15)+"px)"; } }
   const t=$("ticket"); const mini=$("mini");
@@ -3258,7 +3258,12 @@ $("tabbar").addEventListener("click",e=>{ const b=e.target.closest("button"); if
   if(v==="personal"&&!me) return; goView(v); });
 $("addClose").onclick=()=>closeSheet("addSheet");
 $("fabUp").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
-window.addEventListener("scroll",()=>{ $("fabUp").hidden= window.scrollY<400; },{passive:true});
+/* "back to top" shows when you head back up (or reach the end of the page), and hides while you read down */
+var upLastY=0;
+function upVis(y){ const b=$("fabUp"), d=y-upLastY, end=y+innerHeight>=document.documentElement.scrollHeight-40;
+  if(y<400) b.hidden=true; else if(end||d<-6) b.hidden=false; else if(d>6) b.hidden=true;
+  if(Math.abs(d)>6||y<400) upLastY=y; }
+window.addEventListener("scroll",()=>upVis(window.scrollY),{passive:true});
 { let tl=0, tp=0;
   $("lSearch").addEventListener("input",()=>{ clearTimeout(tl); tl=setTimeout(()=>{ listLim.shared=LIST_STEP; renderLedger(); },140); });
   $("pSearch").addEventListener("input",()=>{ clearTimeout(tp); tp=setTimeout(()=>{ listLim.mine=LIST_STEP; renderPersonal(); },140); }); }

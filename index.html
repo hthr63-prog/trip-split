@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261128040331"></script>
+<script src="theme.js?v=20261128042649"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -291,6 +291,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .tour-dots i.on{background:var(--brand);width:20px;border-radius:4px}
 .tour-act{display:flex;justify-content:space-between;gap:10px;margin-top:6px}
 .rec-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* an odd one out (e.g. 5 records) sits in the middle of its row instead of hanging on one side */
+.rec-grid>.rec:last-child:nth-child(odd){grid-column:1/-1;justify-self:center;width:calc(50% - 5px)}
 .rec{background:var(--surface-2);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .rec .ic{font-size:22px}
 .rec small{color:var(--muted);font-size:.78rem}
@@ -766,9 +768,9 @@ html[dir=ltr] body{direction:ltr}html[dir=ltr] .rc-pbars{direction:ltr}html[dir=
 .tabbar .tab-add:active{transform:scale(.94)}
 body.has-tabs{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
 body.has-tabs .fabs{bottom:calc(100px + env(safe-area-inset-bottom,0px))}
-/* with the tab bar, "back to top" sits in the middle above the + : on the side it covered the amounts of the list */
-body.has-tabs .fabs{left:50%;transform:translateX(-50%)}
-body.has-tabs .fab.up{margin-inline:0}
+/* "back to top": on the left like most sites, a small frosted circle, and only while you scroll up (or reach the end),
+   so it does not sit on the amounts while you read down the list */
+.fab.up{width:42px;height:42px;font-size:1.15rem;background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border:1px solid color-mix(in srgb,var(--line) 80%,transparent);box-shadow:0 6px 18px -10px rgba(30,22,64,.45)}
 body.has-tabs #statsBtn,body.has-tabs #viewBtn{display:none}
 body.has-tabs #toprow{grid-template-columns:1fr}
 #foot{display:none!important}
@@ -1894,12 +1896,12 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261128040331">
-<script src="config.js?v=20261128040331"></script>
-<script src="i18n.js?v=20261128040331"></script>
-<script src="motion.js?v=20261128040331"></script>
-<script src="fx.js?v=20261128040331"></script>
-<script src="cinema.js?v=20261128040331"></script>
-<script src="app.js?v=20261128040331"></script>
+<meta name="app-v" content="20261128042649">
+<script src="config.js?v=20261128042649"></script>
+<script src="i18n.js?v=20261128042649"></script>
+<script src="motion.js?v=20261128042649"></script>
+<script src="fx.js?v=20261128042649"></script>
+<script src="cinema.js?v=20261128042649"></script>
+<script src="app.js?v=20261128042649"></script>
 </body>
 </html>
