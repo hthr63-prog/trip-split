@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261128042649"></script>
+<script src="theme.js?v=20261128092525"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -147,6 +147,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 
 .curbtn{font:inherit;font-weight:600;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:8px 12px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
 .curbtn::after{content:"▾";font-size:.75em;opacity:.6}
+.curbtn.fixed{cursor:default}.curbtn.fixed::after{content:none}
 
 /* chips */
 .seg{display:flex;flex-wrap:wrap;gap:7px}
@@ -876,6 +877,17 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .cash-more{grid-column:1/-1;display:flex;gap:7px}
 .cash-more[hidden]{display:none}
 .cash-more button{flex:1}
+/* deposits waiting to come back */
+.dep-list{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.dep-h{font-size:.82rem;font-weight:700;color:var(--muted)}
+.dep{background:var(--surface-2);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.dep-top{display:flex;align-items:center;gap:10px}
+.dep-top .main{flex:1;min-width:0;display:flex;flex-direction:column}
+.dep-top .t{font-weight:700}
+.dep-top .m{font-size:.8rem;color:var(--muted)}
+.dep-top .num{font-weight:800}
+.dep .btn.small{white-space:nowrap}
+.dep-ret{display:flex;flex-direction:column;gap:8px}
 .cx-short{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;border:1.5px solid color-mix(in srgb,#F59E0B 55%,var(--line));background:color-mix(in srgb,#F59E0B 10%,var(--surface))}
 .cx-short .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .bud-sync .note-in,.bud-sync input:not([type=checkbox]){background:var(--surface);border-color:var(--line)}
@@ -1521,12 +1533,21 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
       <section class="card" id="cashCard">
         <div class="card-head"><h2>💵 ארנק מזומן</h2><span class="hint" id="cashFees"></span></div>
         <div id="cashBal" class="cashbal"></div>
+        <div id="depList" class="dep-list" hidden></div>
         <div class="seg cashacts">
           <button id="cashBBtn" type="button">💼 מהבית</button>
           <button id="cashWBtn" type="button">🏧 משיכה</button>
           <button id="cashXBtn" type="button">💱 צ׳יינג׳</button>
           <button id="cashMore" type="button" aria-label="עוד פעולות" aria-expanded="false">⋯</button>
-          <span class="cash-more" id="cashMoreBox" hidden><button id="cashABtn" type="button">± עדכון ידני</button><button id="cashRBtn" type="button">🔄 איפוס</button></span>
+          <span class="cash-more" id="cashMoreBox" hidden><button id="cashDBtn" type="button">🔒 פיקדון</button><button id="cashABtn" type="button">± עדכון ידני</button><button id="cashRBtn" type="button">🔄 איפוס</button></span>
+        </div>
+        <div id="cashD" class="stack" hidden>
+          <div class="hint">פיקדון: כסף שלך שמחכה אצל מישהו (אופנוע, מלון) עד שתחזיר. הוא לא הוצאה ולא נספר בארנק, אבל נשאר בשווי שלך עד שיחזור.</div>
+          <div class="amount"><input id="cdAmt" class="num" inputmode="decimal" placeholder="כמה השארת" aria-label="סכום הפיקדון"><button class="curbtn" id="cdCur" type="button"></button></div>
+          <input id="cdNote" maxlength="40" placeholder="על מה? למשל אופנוע, מלון">
+          <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="cdPm"></div></div>
+          <div class="err" id="cdErr" hidden></div>
+          <button class="btn primary" id="cdSave" type="button">שמירת פיקדון</button>
         </div>
         <div id="cashB" class="stack" hidden>
           <div class="hint">המזומן שאתם לוקחים איתכם, בכל המטבעות. כל מטבע מנוהל בנפרד, וכל הוצאה במזומן יורדת מהמטבע שלה.</div>
@@ -1896,12 +1917,12 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261128042649">
-<script src="config.js?v=20261128042649"></script>
-<script src="i18n.js?v=20261128042649"></script>
-<script src="motion.js?v=20261128042649"></script>
-<script src="fx.js?v=20261128042649"></script>
-<script src="cinema.js?v=20261128042649"></script>
-<script src="app.js?v=20261128042649"></script>
+<meta name="app-v" content="20261128092525">
+<script src="config.js?v=20261128092525"></script>
+<script src="i18n.js?v=20261128092525"></script>
+<script src="motion.js?v=20261128092525"></script>
+<script src="fx.js?v=20261128092525"></script>
+<script src="cinema.js?v=20261128092525"></script>
+<script src="app.js?v=20261128092525"></script>
 </body>
 </html>
