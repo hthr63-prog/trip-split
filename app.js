@@ -1552,7 +1552,10 @@ function cashNudge(){
   if(left===null) return; const k="trip-cashnudge-"+c+"-"+today; if(load(k)) return; store(k,"1");
   const bal= me&&acct&&acctFor===me&&CASH.length ? (cashBalances()[c]||0) : null, nm=PL(ctryName(c));
   const when= left===0 ? TX("היום יוצאים מ")+nm : left===1 ? TX("מחר יוצאים מ")+nm : TX("עוד יומיים יוצאים מ")+nm;
-  const msg= bal>0 ? "🧳 "+when+TX(". נשארו ")+fmt(bal,c)+TX(" במזומן: כדאי לבזבז או להחליף") : bal===null ? "🧳 "+when+TX(". כדאי לבדוק כמה ")+CUR[c].name+TX(" נשאר במזומן") : null;
+  /* something left with someone (the passport at the motorbike rental) comes first: it cannot be left behind */
+  const its= me&&acct&&acctFor===me ? itemsOpen() : [], itm= its.length ? TX(" · ⚠️ לא לשכוח: ")+its.map(x=>itemName(x)+(x.note?TX(" אצל ")+x.note:"")).join(", ") : "";
+  const msg0= bal>0 ? "🧳 "+when+TX(". נשארו ")+fmt(bal,c)+TX(" במזומן: כדאי לבזבז או להחליף") : bal===null ? "🧳 "+when+TX(". כדאי לבדוק כמה ")+CUR[c].name+TX(" נשאר במזומן") : null;
+  const msg= msg0 ? msg0+itm : itm ? "🧳 "+when+itm : null;
   if(!msg) return;
   setTimeout(()=>{ if(sheetOpen()) return; toast(msg,TX("לארנק"),()=>{ goView("personal"); setTimeout(()=>{ const w=$("cashCard"); if(w) w.scrollIntoView({behavior:"smooth",block:"center"}); },450); },11000); },17000);
 }
@@ -1916,7 +1919,7 @@ function renderSofar(){
 function renderMoney(){
   const card=$("moneyCard"); if(!card) return; const on= view==="personal"&&me&&acct&&acctFor===me; card.hidden=!on; if(!on) return;
   const C=showCur, R=$("moneyRows"); R.innerHTML=""; let total=0;
-  const row=(ic,t,v,sub,neutral)=>{ const d=document.createElement("div"); d.className="money-row"; const a=document.createElement("span"); a.textContent=ic+" "+t; const b=document.createElement("b"); b.className="num"+(v<0?" minus":""); b.textContent=(v<0?"−":"")+fmt(Math.abs(v),C); d.append(a,b); if(sub){ const s=document.createElement("small"); s.textContent=sub; d.appendChild(s); } R.appendChild(d); if(!neutral) total+=v; };
+  const row=(ic,t,v,sub,neutral,noNum)=>{ const d=document.createElement("div"); d.className="money-row"; const a=document.createElement("span"); a.textContent=ic+" "+t; const b=document.createElement("b"); b.className="num"+(v<0?" minus":""); b.textContent=noNum?"":(v<0?"−":"")+fmt(Math.abs(v),C); d.append(a,b); if(sub){ const s=document.createElement("small"); s.textContent=sub; d.appendChild(s); } R.appendChild(d); if(!neutral) total+=v; };
   const r=budgetCalc();
   if(r) row("🏦",TX("בבנק (מה שנשאר מהתקציב)"),conv(r.left,r.cur,C));
   else row("🏦",TX("בבנק"),0,TX("עוד לא הוגדר תקציב · מגדירים בכרטיס התקציב, ואז רואים כאן כמה נשאר"),true);
@@ -1929,6 +1932,9 @@ function renderMoney(){
   if(!cash.length) row("💵",TX("מזומן בארנק"),0,TX("אין מזומן רשום · מוסיפים משיכה או מזומן מהבית בארנק"),true);
   /* deposits: my money waiting with someone until it comes back */
   { const ds=depOpen(); if(ds.length) row("🔒",TX("פיקדונות שמחכים לך"),ds.reduce((a,d)=>a+conv(d.left,d.x.cur,C),0),ds.map(d=>(d.x.note||TX("פיקדון"))+" "+fmt(d.left,d.x.cur)).join(" · ")); }
+  /* refunds on the way: shown, but not in the total until they arrive */
+  { const rs=refOpen(); if(rs.length) row("📥",TX("מגיע לך בחזרה"),rs.reduce((a,d)=>a+conv(d.left,d.x.cur,C),0),rs.map(d=>(d.x.note||TX("החזר"))+" "+fmt(d.left,d.x.cur)).join(" · ")+TX(" · לא בסה״כ עד שמתקבל"),true); }
+  { const its=itemsOpen(); if(its.length) row("🛂",its.map(x=>itemName(x)+(x.note?TX(" אצל ")+x.note:"")).join(" · "),0,TX("לא לשכוח לקחת בחזרה"),true,true); }
   /* paid ahead, not used yet: my part of what is spread over days still to come */
   const mine=[...P.filter(x=>!x._pfx&&!x.offTrip),...myShareItems()], ahead=spreadAhead(mine);
   if(ahead>0.5){ const names=[...new Set(mine.filter(x=>spreadN(x)>1&&dayAdd(x.spread.from||x.date,spreadN(x)-1)>todayStr()).map(x=>x.desc||TX("הוצאה")))].slice(0,3).join(", ");
@@ -3308,13 +3314,74 @@ function cashTransfers(){ return me ? S.items.filter(it=>it.kind==="transfer"&&i
    A return whose deposit was deleted is ignored everywhere, so deleting (and restoring) a deposit takes its returns with it. */
 function depOf(r){ return CASH.find(x=>x.id===r.of&&x.sub==="deposit")||null; }
 function depState(){ const rets=CASH.filter(r=>r.sub==="depret");
-  return CASH.filter(x=>x.sub==="deposit").map(x=>{ const rs=rets.filter(r=>r.of===x.id), back=rs.reduce((a,r)=>a+(+r.amount||0),0), kept=rs.reduce((a,r)=>a+(+r.kept||0),0);
+  return CASH.filter(x=>x.sub==="deposit"&&!x.item).map(x=>{ const rs=rets.filter(r=>r.of===x.id), back=rs.reduce((a,r)=>a+(+r.amount||0),0), kept=rs.reduce((a,r)=>a+(+r.kept||0),0);
     return {x,rs,back,kept,left:r2((+x.amount||0)-back-kept)}; }); }
 function depOpen(){ return depState().filter(d=>d.left>0.004); }
+/* a passport (or a licence…) left with the motorbike rental: no money, just something to get back */
+const ITEM_IC={passport:"🛂",other:"📄"};
+function itemName(x){ return x.item==="passport" ? TX("הדרכון") : (x.what||TX("פיקדון")); }
+function itemsOpen(){ const got=new Set(CASH.filter(r=>r.sub==="depret").map(r=>r.of)); return CASH.filter(x=>x.sub==="deposit"&&x.item&&!got.has(x.id)); }
+/* money that should come back to me: insurance, VAT refund, a cancelled booking. {sub:"refund",amount,cur,note};
+   what arrives is {sub:"refgot",of,amount,pm:"cash"|"bank",lost}. Not counted in what I have until it arrives. */
+function refOf(r){ return CASH.find(x=>x.id===r.of&&x.sub==="refund")||null; }
+function refState(){ const gs=CASH.filter(r=>r.sub==="refgot");
+  return CASH.filter(x=>x.sub==="refund").map(x=>{ const rs=gs.filter(r=>r.of===x.id), got=rs.reduce((a,r)=>a+(+r.amount||0),0), lost=rs.reduce((a,r)=>a+(+r.lost||0),0);
+    return {x,rs,got,lost,left:r2((+x.amount||0)-got-lost)}; }); }
+function refOpen(){ return refState().filter(d=>d.left>0.004); }
+let refRet=null, refForm={pm:"bank",rest:"later"}, cdKind="money";
+function renderItems(L,items){ if(!items.length) return;
+  const h=document.createElement("div"); h.className="dep-h"; h.textContent=TX("🛂 השארת אצל מישהו"); L.appendChild(h);
+  for(const x of items){ const box=document.createElement("div"); box.className="dep";
+    const top=document.createElement("div"); top.className="dep-top"; const main=document.createElement("div"); main.className="main";
+    const t=document.createElement("span"); t.className="t"; t.textContent=(ITEM_IC[x.item]||"📄")+" "+itemName(x)+(x.note?TX(" · אצל ")+x.note:"");
+    const m=document.createElement("span"); m.className="m"; m.textContent=TX("מאז ")+dayLabel(x.date); main.append(t,m);
+    const go=document.createElement("button"); go.type="button"; go.className="btn small"; go.textContent=TX("✓ קיבלתי בחזרה");
+    go.onclick=async()=>{ go.disabled=true; const ok=await cashSave({sub:"depret",of:x.id,amount:0,got:true,desc:TX("החזרת פיקדון")}); if(ok){ buzz(10); toast(TX("✓ ")+itemName(x)+TX(" חזר אליך")); } else go.disabled=false; };
+    top.append(main,go); box.appendChild(top); L.appendChild(box); } }
+function renderRefs(L,refs){ if(!refs.length) return;
+  const h=document.createElement("div"); h.className="dep-h"; h.textContent=TX("📥 מגיע לך בחזרה"); L.appendChild(h);
+  for(const d of refs.sort((a,b)=>(a.x.createdAt||0)-(b.x.createdAt||0))){ const x=d.x;
+    const box=document.createElement("div"); box.className="dep";
+    const top=document.createElement("div"); top.className="dep-top"; const main=document.createElement("div"); main.className="main";
+    const t=document.createElement("span"); t.className="t"; t.textContent=x.note||TX("החזר");
+    const m=document.createElement("span"); m.className="m"; m.textContent=dayLabel(x.date)+(d.got>0.004?TX(" · התקבל ")+fmt(d.got,x.cur):"");
+    main.append(t,m);
+    const v=document.createElement("b"); v.className="num"; v.textContent=fmt(d.left,x.cur);
+    const go=document.createElement("button"); go.type="button"; go.className="btn small"; go.textContent= refRet===x.id ? TX("סגירה") : TX("✓ התקבל");
+    go.onclick=()=>{ buzz(6); refRet= refRet===x.id ? null : x.id; refForm={pm:"bank",rest:"later"}; renderDeps(); if(refRet) setTimeout(()=>{ const i=$("rgAmt"); if(i){ i.focus(); i.select(); } },60); };
+    top.append(main,v,go); box.appendChild(top);
+    if(refRet===x.id){ const f=document.createElement("div"); f.className="dep-ret";
+      const lab=document.createElement("span"); lab.className="hint"; lab.textContent=TX("כמה התקבל?");
+      const am=document.createElement("div"); am.className="amount";
+      const inp=document.createElement("input"); inp.id="rgAmt"; inp.className="num"; inp.inputMode="decimal"; inp.value=refForm.amt!=null?refForm.amt:group(String(d.left)); inp.setAttribute("aria-label",TX("כמה התקבל"));
+      const cb=document.createElement("span"); cb.className="curbtn fixed"; cb.textContent=curText(x.cur); am.append(inp,cb);
+      const pmRow=document.createElement("div"); pmRow.className="seg";
+      const restWrap=document.createElement("div"); restWrap.className="fieldset"; const restH=document.createElement("span"); restH.className="hint"; const restRow=document.createElement("div"); restRow.className="seg"; restWrap.append(restH,restRow);
+      const err=document.createElement("div"); err.className="err"; err.hidden=true;
+      const sv=document.createElement("button"); sv.type="button"; sv.className="btn primary";
+      const val=()=>{ const n=parseFloat(String(inp.value).replace(/,/g,"")); return isNaN(n)?0:n; };
+      const upd=()=>{ const a=val(), rest=r2(d.left-a); restWrap.hidden=!(rest>0.004&&a<=d.left+0.004);
+        restH.textContent=TX("ומה עם ")+fmt(Math.max(0,rest),x.cur)+TX(" שעוד לא הגיעו?");
+        seg(restRow,[["later",TX("⏳ עוד יגיע")],["lost",TX("✖️ לא יגיע")]],v=>v===refForm.rest,v=>{ refForm.rest=v; upd(); });
+        sv.textContent= a>0.004 ? TX("שמירה · התקבל ")+fmt(a,x.cur) : TX("שמירה"); };
+      const drawPm=()=>seg(pmRow,[["bank",TX("🏦 נכנס לבנק")],["cash",TX("💵 במזומן")]],v=>v===refForm.pm,v=>{ refForm.pm=v; drawPm(); });
+      drawPm();
+      inp.oninput=()=>{ const g=group(inp.value); if(g!==inp.value) inp.value=g; refForm.amt=inp.value; upd(); };
+      sv.onclick=async()=>{ err.hidden=true; const a=val();
+        if(a<0||a>d.left+0.004){ err.textContent=TX("אפשר עד ")+fmt(d.left,x.cur); err.hidden=false; return; }
+        const rest=r2(d.left-a), lost= rest>0.004&&refForm.rest==="lost" ? rest : 0;
+        if(!(a>0.004)&&!lost){ err.textContent=TX("כמה התקבל?"); err.hidden=false; return; }
+        sv.disabled=true;
+        const ok=await cashSave({sub:"refgot",of:x.id,amount:r2(Math.max(0,a)),pm:refForm.pm,lost,desc:TX("החזר התקבל")});
+        if(ok){ refRet=null; buzz(10); toast((a>0.004?TX("📥 התקבלו ")+fmt(a,x.cur)+(refForm.pm==="cash"?TX(" לארנק"):TX(" לבנק")):TX("📥 נסגר"))+(rest>0.004&&!lost?TX(" · עוד ")+fmt(rest,x.cur)+TX(" מחכים"):"")); }
+        else sv.disabled=false; };
+      f.append(lab,am,pmRow,restWrap,err,sv); box.appendChild(f); upd(); }
+    L.appendChild(box); } }
 let depRet=null, depForm={pm:"cash",rest:"mine"}, cdPm="cash";
 function renderDeps(){
-  const L=$("depList"); if(!L) return; const open=depOpen(); L.hidden=!open.length; L.innerHTML=""; if(!open.length) return;
-  const h=document.createElement("div"); h.className="dep-h"; h.textContent=TX("🔒 פיקדונות שמחכים לך"); L.appendChild(h);
+  const L=$("depList"); if(!L) return; const open=depOpen(), items=itemsOpen(), refs=refOpen(); L.hidden=!(open.length||items.length||refs.length); L.innerHTML="";
+  renderItems(L,items);
+  if(open.length){ const h=document.createElement("div"); h.className="dep-h"; h.textContent=TX("🔒 פיקדונות שמחכים לך"); L.appendChild(h); }
   for(const d of open.sort((a,b)=>(a.x.createdAt||0)-(b.x.createdAt||0))){ const x=d.x;
     const box=document.createElement("div"); box.className="dep";
     const top=document.createElement("div"); top.className="dep-top";
@@ -3358,6 +3425,7 @@ function renderDeps(){
         else sv.disabled=false; };
       f.append(lab,am,pmRow,restWrap,err,sv); box.appendChild(f); upd(); }
     L.appendChild(box); }
+  renderRefs(L,refs);
 }
 /* Max "Backpacker" (מוצ'ילר) terms: one 1% conversion fee on every foreign-currency charge, card payments and
    ATM withdrawals alike (not 1% + 1%). The charge is in shekels at the Bank of Israel representative rate, immediately.
@@ -3386,8 +3454,9 @@ function cashBalances(){
     if(x.sub==="withdraw"||x.sub==="adjust"||x.sub==="reset"||x.sub==="bring"||x.sub==="gift") add(x.cur,+x.amount||0);
     if(x.sub==="exchange"){ add(x.cur,-(+x.amount||0)); add(x.toCur,+x.toAmount||0); }
     /* a deposit left in cash leaves the wallet; what comes back in cash comes back into it */
-    if(x.sub==="deposit"&&x.pm!=="card") add(x.cur,-(+x.amount||0));
-    if(x.sub==="depret"&&x.pm!=="card"){ const d=depOf(x); if(d) add(d.cur,+x.amount||0); }
+    if(x.sub==="deposit"&&x.pm!=="card"&&!x.item&&+x.amount) add(x.cur,-(+x.amount||0));
+    if(x.sub==="depret"&&x.pm!=="card"&&+x.amount){ const d=depOf(x); if(d&&!d.item) add(d.cur,+x.amount||0); }
+    if(x.sub==="refgot"&&x.pm==="cash"&&+x.amount){ const d=refOf(x); if(d) add(d.cur,+x.amount||0); }
   }
   /* cash payments count from the first wallet entry on */
   for(const it of cashPaidByMe()){ if((it.createdAt||0)<since) continue; add(it.cur,-(+it.amount||0)); }
@@ -3416,8 +3485,8 @@ function renderCash_(){
   /* history: every change shows as + / − */
   const L=$("cashList"); L.innerHTML="";
   renderDeps();
-  const label={withdraw:TX("🏧 משיכה מכספומט"),adjust:TX("± עדכון ידני"),reset:TX("🔄 איפוס ארנק"),exchange:TX("💱 החלפת מטבע"),bring:TX("💼 מזומן מהבית"),gift:TX("🎁 התקבל במזומן"),deposit:TX("🔒 פיקדון"),depret:TX("↩️ פיקדון חזר")};
-  const hist=[...CASH.filter(x=>x.sub!=="depret"||depOf(x)),...cashTransfers().map(it=>({...it,_tr:true}))];
+  const label={withdraw:TX("🏧 משיכה מכספומט"),adjust:TX("± עדכון ידני"),reset:TX("🔄 איפוס ארנק"),exchange:TX("💱 החלפת מטבע"),bring:TX("💼 מזומן מהבית"),gift:TX("🎁 התקבל במזומן"),deposit:TX("🔒 פיקדון"),depret:TX("↩️ פיקדון חזר"),refund:TX("📥 מגיע החזר"),refgot:TX("📥 החזר התקבל")};
+  const hist=[...CASH.filter(x=>(x.sub!=="depret"||depOf(x))&&(x.sub!=="refgot"||refOf(x))),...cashTransfers().map(it=>({...it,_tr:true}))];
   for(const x of hist.sort((p,q)=>(q.createdAt||0)-(p.createdAt||0))){
     if(x._tr){ const r=document.createElement("div"); r.className="row"; const got=x.to===me;
       const dot=document.createElement("div"); dot.className="dot c2"; dot.textContent="💸";
@@ -3428,14 +3497,18 @@ function renderCash_(){
     const r=document.createElement("div"); r.className="row"; r.dataset.id=x.id;
     const dot=document.createElement("div"); dot.className="dot c2"; dot.textContent=(label[x.sub]||"·").split(" ")[0];
     const main=document.createElement("div"); main.className="main";
-    const dp= x.sub==="depret" ? depOf(x) : null;
-    const t=document.createElement("div"); t.className="t"; t.textContent=(label[x.sub]||"").replace(/^\S+ /,"")+(x.note?" · "+x.note:"")+(dp&&dp.note?" · "+dp.note:"");
+    const dp= x.sub==="depret" ? depOf(x) : x.sub==="refgot" ? refOf(x) : null, itm= x.sub==="deposit"&&x.item ? x : dp&&dp.item ? dp : null;
+    const t=document.createElement("div"); t.className="t"; t.textContent= itm ? (x.sub==="deposit"?(ITEM_IC[itm.item]||"📄")+" "+itemName(itm)+(itm.note?TX(" · אצל ")+itm.note:""):"✓ "+itemName(itm)+TX(" חזר")) : (label[x.sub]||"").replace(/^\S+ /,"")+(x.note?" · "+x.note:"")+(dp&&dp.note?" · "+dp.note:"");
     const m=document.createElement("div"); m.className="m"; m.textContent=withTime(x,dayLabel(x.date)+(x.sub==="withdraw" ? TX(" · עמלות ")+(+x.fee>0?fmt(+x.fee,x.feeCur||x.cur)+TX(" כספומט + "):"")+fmt(cardFee(x),x.cur)+TX(" כרטיס (1%)") : (+x.fee>0?TX(" · עמלה ")+fmt(+x.fee,x.feeCur||x.cur)+TX(" (נרשמה כהוצאה)"):"")));
     main.append(t,m);
     const right=document.createElement("div"); right.className="r";
     const sign=v=>(v>0?"+":v<0?"−":"")+fmt(Math.abs(v),"X").replace(/ X$/,"");
     const line=(v,c)=>{ const b=document.createElement("b"); b.className="num "+(v<0?"neg":"pos"); b.textContent=(v>0?"+":v<0?"−":"")+fmt(Math.abs(v),c); right.appendChild(b); };
     if(x.sub==="exchange"){ line(-(+x.amount),x.cur); line(+x.toAmount,x.toCur); }
+    else if(itm){ m.textContent=withTime(x,dayLabel(x.date)); }
+    else if(x.sub==="refund"||x.sub==="refgot"){ const c=x.sub==="refund"?x.cur:(dp?dp.cur:x.cur);
+      if(x.sub==="refgot"&&x.pm==="cash") line(+x.amount,c); else if(+x.amount){ const b=document.createElement("b"); b.className="num"; b.textContent=fmt(+x.amount,c); right.appendChild(b); }
+      m.textContent=withTime(x,dayLabel(x.date)+(x.sub==="refund"?TX(" · עוד לא התקבל"):x.pm==="cash"?TX(" · 💵 לארנק"):TX(" · 🏦 לבנק"))+(+x.lost>0?TX(" · ")+fmt(+x.lost,c)+TX(" לא יגיעו"):"")); }
     else if(x.sub==="deposit"||x.sub==="depret"){ const c=x.sub==="deposit"?x.cur:(dp?dp.cur:x.cur), v=(x.sub==="deposit"?-1:1)*(+x.amount||0);
       if(x.pm==="card"){ const b=document.createElement("b"); b.className="num"; b.textContent=fmt(Math.abs(v),c); right.appendChild(b); } else if(Math.abs(v)>0.004) line(v,c);
       m.textContent=withTime(x,dayLabel(x.date)+(x.pm==="card"?(x.sub==="deposit"?TX(" · 💳 בכרטיס, לא מהארנק"):TX(" · 💳 חזר לכרטיס")):(x.sub==="deposit"?TX(" · 💵 יצא מהארנק"):TX(" · 💵 חזר לארנק")))+(+x.kept>0?TX(" · ")+fmt(+x.kept,c)+TX(" לא חזרו")+(x.keptShared?TX(" (הוצאה משותפת)"):TX(" (הוצאה שלך)")):"")); }
@@ -3448,9 +3521,13 @@ function renderCash_(){
     L.appendChild(swipeWrap(r,{id:x.id},true,{again:rep1?()=>againCash(x):null,againLabel:x.sub==="withdraw"?TX("🔁 עוד משיכה כזו"):TX("🔁 שוב להיום"),del:()=>delItem({id:x.id,desc:(label[x.sub]||TX("ארנק")).replace(/^\S+ /,"")},true)}));
   }
   /* panels */
-  for(const [k,id] of [["b","cashB"],["w","cashW"],["a","cashA"],["x","cashX"],["r","cashR"],["d","cashD"]]) if(!$("addSlot").contains($(id))) $(id).hidden=cashForm!==k;
-  for(const [k,id] of [["b","cashBBtn"],["w","cashWBtn"],["a","cashABtn"],["x","cashXBtn"],["r","cashRBtn"],["d","cashDBtn"]]) $(id).setAttribute("aria-pressed",String(cashForm===k));
-  if(cashForm==="a"||cashForm==="r"||cashForm==="d") $("cashMoreBox").hidden=false;
+  for(const [k,id] of [["b","cashB"],["w","cashW"],["a","cashA"],["x","cashX"],["r","cashR"],["d","cashD"],["f","cashF"]]) if(!$("addSlot").contains($(id))) $(id).hidden=cashForm!==k;
+  for(const [k,id] of [["b","cashBBtn"],["w","cashWBtn"],["a","cashABtn"],["x","cashXBtn"],["r","cashRBtn"],["d","cashDBtn"],["f","cashFBtn"]]) $(id).setAttribute("aria-pressed",String(cashForm===k));
+  if(cashForm==="a"||cashForm==="r"||cashForm==="d"||cashForm==="f") $("cashMoreBox").hidden=false;
+  setCurBtn("cfCur",cur.cf||S.localCur);
+  seg($("cdKind"),[["money",TX("💵 כסף")],["passport",TX("🛂 דרכון")],["other",TX("📄 משהו אחר")]],v=>v===cdKind,v=>{ cdKind=v; renderCash(); });
+  { const money=cdKind==="money"; $("cdMoney").hidden=!money; $("cdPmBox").hidden=!money; $("cdWhat").hidden=cdKind!=="other";
+    $("cdNote").placeholder= money ? TX("על מה? למשל אופנוע, מלון") : TX("אצל מי? למשל השכרת האופנוע"); }
   setCurBtn("cdCur",cur.cd||S.localCur); seg($("cdPm"),[["cash",TX("💵 מזומן מהארנק")],["card",TX("💳 כרטיס")]],v=>v===cdPm,v=>{ cdPm=v; renderCash(); });
   setCurBtn("cwCur",cur.cw||S.localCur); cwCardHint(); setCurBtn("cwFeeCur",cur.cwFee||S.localCur); setCurBtn("caCur",cur.ca||S.localCur);
   setCurBtn("cxFrom",cur.cxF||S.localCur); setCurBtn("cxTo",cur.cxT||(S.localCur==="USD"?"ILS":"USD"));
@@ -3495,7 +3572,21 @@ $("cbSave").onclick=async()=>{
 $("cashDBtn").onclick=()=>openCash("d","cdAmt");
 $("cdCur").onclick=()=>openCurPicker(TX("באיזה מטבע?"),cur.cd||S.localCur,c=>{ cur.cd=c; renderCash(); });
 $("cdAmt").addEventListener("input",()=>{ const i=$("cdAmt"), g=group(i.value); if(g!==i.value) i.value=g; });
-$("cdSave").onclick=async()=>{ showErr("cdErr"); const a=num("cdAmt");
+$("cashFBtn").onclick=()=>openCash("f","cfAmt");
+$("cfCur").onclick=()=>openCurPicker(TX("באיזה מטבע?"),cur.cf||S.localCur,c=>{ cur.cf=c; renderCash(); });
+$("cfAmt").addEventListener("input",()=>{ const i=$("cfAmt"), g=group(i.value); if(g!==i.value) i.value=g; });
+$("cfSave").onclick=async()=>{ showErr("cfErr"); const a=num("cfAmt");
+  if(!(a>0)) return showErr("cfErr",TX("כמה מגיע לך?"),$("cfAmt"));
+  const c=cur.cf||S.localCur, note=$("cfNote").value.trim();
+  const ok=await cashSave({sub:"refund",amount:a,cur:c,note,desc:TX("מגיע החזר")});
+  if(ok){ $("cfAmt").value=""; $("cfNote").value=""; cashForm=null; renderCash(); buzz(10); toast(TX("📥 נרשם: מגיע לך ")+fmt(a,c)+(note?" · "+note:"")); } };
+$("cdSave").onclick=async()=>{ showErr("cdErr");
+  if(cdKind!=="money"){ const note=$("cdNote").value.trim(), what=$("cdWhat").value.trim();
+    if(cdKind==="other"&&!what) return showErr("cdErr",TX("מה השארת?"),$("cdWhat"));
+    const kind=cdKind, ok=await cashSave({sub:"deposit",item:kind,amount:0,note,...(kind==="other"?{what}:{}),desc:TX("פיקדון")});
+    if(ok){ $("cdNote").value=""; $("cdWhat").value=""; cashForm=null; cdKind="money"; renderCash(); buzz(10); toast((kind==="passport"?TX("🛂 הדרכון נרשם"):"📄 "+what+TX(" נרשם"))+(note?TX(" · אצל ")+note:"")+TX(" · נזכיר לפני שעוזבים")); }
+    return; }
+  const a=num("cdAmt");
   if(!(a>0)) return showErr("cdErr",TX("כמה השארת בפיקדון?"),$("cdAmt"));
   const c=cur.cd||S.localCur, note=$("cdNote").value.trim();
   const ok=await cashSave({sub:"deposit",amount:a,cur:c,pm:cdPm,note,desc:TX("פיקדון")});
@@ -3831,7 +3922,7 @@ function budgetCalc(){
   const onTrip=it=> !it.offTrip && locOf(it)!=="prep" && (!st||(it.date||"")>=st);
   const inc=it=> B.prep!==false || onTrip(it) || it.offTrip;
   const C=(a,c)=>conv(+a||0,c||cur,cur);
-  const parts={atm:0,home:0,cardP:0,cardS:0,fx:0,tr:0,gift:0,off:0,dep:0}; let usedTrip=0;
+  const parts={atm:0,home:0,cardP:0,cardS:0,fx:0,tr:0,gift:0,off:0,dep:0,ref:0}; let usedTrip=0;
   const add=(k,v,it)=>{ parts[k]+=v; if(onTrip(it)) usedTrip+=v; };
   for(const x of CASH) if(x.sub==="withdraw"&&inc(x)) add("atm",C(x.amount,x.cur)+C(x.fee||0,x.feeCur||x.cur)+C(cardFee(x),x.cur),x);
   /* cash bought from the bank counts only if bought after the budget was set: a budget is "what is in the bank now" */
@@ -3839,7 +3930,9 @@ function budgetCalc(){
   for(const x of CASH) if(x.sub==="bring"&&x.bank&&(x.createdAt||0)>since) add("home",C(x.amount,x.cur),x);
   for(const x of INCOME) add("gift",-C(x.amount,x.cur),x);
   /* a deposit by card leaves the bank until it comes back to the card (what stays with them is an expense of its own) */
-  for(const x of CASH){ if(x.sub==="deposit"&&x.pm==="card") parts.dep+=C(x.amount,x.cur); if(x.sub==="depret"&&x.pm==="card"){ const d=depOf(x); if(d) parts.dep-=C(x.amount,d.cur); } }
+  for(const x of CASH){ if(x.sub==="deposit"&&x.pm==="card") parts.dep+=C(x.amount,x.cur); if(x.sub==="depret"&&x.pm==="card"){ const d=depOf(x); if(d&&!d.item) parts.dep-=C(x.amount,d.cur); }
+    /* a refund that arrived in the bank (insurance, VAT…) */
+    if(x.sub==="refgot"&&x.pm!=="cash"){ const d=refOf(x); if(d) parts.ref-=C(x.amount,d.cur); } }
   for(const it of expandRecur(P)){ if(it._fee||!inc(it)) continue;
     if(it.offTrip){ if(it.pm!=="cash") add("off",C(it.amount,it.cur)+C(payFee(it),it.cur),it); continue; }   /* subscriptions and bills at home, from the bank */
     if(it.pm==="card"||it.pm==="bank"){ add("cardP",C(it.amount,it.cur),it); if(payFee(it)) add("fx",C(payFee(it),it.cur),it); } }
@@ -3847,7 +3940,7 @@ function budgetCalc(){
     if(it.kind==="transfer"){ if(it.pm==="cash") continue; if(it.payer===me) add("tr",C(it.amount,it.cur),it); else if(it.to===me) add("tr",-C(it.amount,it.cur),it); }
     else if(it.pm==="card"&&paidShare(it,me)>0){ const f=paidShare(it,me); add("cardS",C(it.amount,it.cur)*f,it); if(payFee(it)) add("fx",C(payFee(it),it.cur)*f,it); } }
   const adj=+B.adj||0;
-  const used=parts.atm+parts.home+parts.cardP+parts.cardS+parts.fx+parts.tr+parts.off+parts.dep-adj, gifts=-parts.gift, amount=+B.amount, left=amount+gifts-used;
+  const used=parts.atm+parts.home+parts.cardP+parts.cardS+parts.fx+parts.tr+parts.off+parts.dep+parts.ref-adj, gifts=-parts.gift, amount=+B.amount, left=amount+gifts-used;
   let pace=null, perDay=null;
   if(st&&st<=td){ const days=Math.round((new Date(td+"T12:00")-new Date(st+"T12:00"))/864e5)+1; perDay=usedTrip/days; if(perDay>0) pace=Math.floor(left/perDay); }
   return {cur,amount,gifts,used,left,parts,adj,adjAt:B.adjAt||null,pace,perDay,pct:Math.max(0,Math.min(1,used/(amount+gifts))),prep:B.prep!==false};
@@ -3914,6 +4007,7 @@ function renderBudget(){
   row("💳",TX("עמלת כרטיס ")+feePct()+TX(" על תשלומים במט״ח"),r.parts.fx);
   if(Math.abs(r.parts.tr)>0.004) row("💸",TX("העברות בהתחשבנות (בנק)"),r.parts.tr);
   if(Math.abs(r.parts.dep)>0.004) row("🔒",TX("פיקדון בכרטיס שעוד לא חזר"),r.parts.dep);
+  if(Math.abs(r.parts.ref)>0.004) row("📥",TX("החזרים שנכנסו לבנק"),r.parts.ref);
   if(Math.abs(r.adj)>0.004) row("🏦",TX("עדכון לפי הבנק")+(r.adjAt?" · "+new Date(r.adjAt).toLocaleDateString(LOC,{day:"numeric",month:"numeric"}):""),-r.adj);
   $("budPace").textContent= r.left<0 ? TX("⚠️ עברת את התקציב ב-")+fmt(-r.left,r.cur)
     : runwayText(runwayCalc(r)) ? runwayText(runwayCalc(r)) : (r.prep?TX("כולל ההוצאות לפני הטיול"):TX("מתחיל לספור מיום הטיסה"));

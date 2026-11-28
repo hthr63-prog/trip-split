@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261128092525"></script>
+<script src="theme.js?v=20261128101444"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -877,6 +877,7 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .cash-more{grid-column:1/-1;display:flex;gap:7px}
 .cash-more[hidden]{display:none}
 .cash-more button{flex:1}
+.cash-more{flex-wrap:wrap}.cash-more button{min-width:calc(50% - 4px)}
 /* deposits waiting to come back */
 .dep-list{display:flex;flex-direction:column;gap:8px;margin-top:4px}
 .dep-h{font-size:.82rem;font-weight:700;color:var(--muted)}
@@ -1539,15 +1540,26 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
           <button id="cashWBtn" type="button">🏧 משיכה</button>
           <button id="cashXBtn" type="button">💱 צ׳יינג׳</button>
           <button id="cashMore" type="button" aria-label="עוד פעולות" aria-expanded="false">⋯</button>
-          <span class="cash-more" id="cashMoreBox" hidden><button id="cashDBtn" type="button">🔒 פיקדון</button><button id="cashABtn" type="button">± עדכון ידני</button><button id="cashRBtn" type="button">🔄 איפוס</button></span>
+          <span class="cash-more" id="cashMoreBox" hidden><button id="cashDBtn" type="button">🔒 פיקדון</button><button id="cashFBtn" type="button">📥 החזר</button><button id="cashABtn" type="button">± עדכון ידני</button><button id="cashRBtn" type="button">🔄 איפוס</button></span>
         </div>
         <div id="cashD" class="stack" hidden>
           <div class="hint">פיקדון: כסף שלך שמחכה אצל מישהו (אופנוע, מלון) עד שתחזיר. הוא לא הוצאה ולא נספר בארנק, אבל נשאר בשווי שלך עד שיחזור.</div>
-          <div class="amount"><input id="cdAmt" class="num" inputmode="decimal" placeholder="כמה השארת" aria-label="סכום הפיקדון"><button class="curbtn" id="cdCur" type="button"></button></div>
+          <div class="seg" id="cdKind"></div>
+          <input id="cdWhat" maxlength="30" placeholder="מה השארת? למשל רישיון נהיגה" hidden>
+          <div id="cdMoney" class="stack">
+            <div class="amount"><input id="cdAmt" class="num" inputmode="decimal" placeholder="כמה השארת" aria-label="סכום הפיקדון"><button class="curbtn" id="cdCur" type="button"></button></div>
+          </div>
           <input id="cdNote" maxlength="40" placeholder="על מה? למשל אופנוע, מלון">
-          <div class="fieldset"><span class="hint">איך שולם?</span><div class="seg" id="cdPm"></div></div>
+          <div class="fieldset" id="cdPmBox"><span class="hint">איך שולם?</span><div class="seg" id="cdPm"></div></div>
           <div class="err" id="cdErr" hidden></div>
           <button class="btn primary" id="cdSave" type="button">שמירת פיקדון</button>
+        </div>
+        <div id="cashF" class="stack" hidden>
+          <div class="hint">כסף שמגיע לך בחזרה: ביטוח (רופא, תרופות), החזר מע״מ, הזמנה שבוטלה. רואים אותו עד שהוא מגיע, ורק אז הוא נכנס לבנק או לארנק.</div>
+          <div class="amount"><input id="cfAmt" class="num" inputmode="decimal" placeholder="כמה מגיע לך" aria-label="כמה מגיע לך"><button class="curbtn" id="cfCur" type="button"></button></div>
+          <input id="cfNote" maxlength="40" placeholder="מאיפה? למשל ביטוח · רופא בפאי">
+          <div class="err" id="cfErr" hidden></div>
+          <button class="btn primary" id="cfSave" type="button">שמירה</button>
         </div>
         <div id="cashB" class="stack" hidden>
           <div class="hint">המזומן שאתם לוקחים איתכם, בכל המטבעות. כל מטבע מנוהל בנפרד, וכל הוצאה במזומן יורדת מהמטבע שלה.</div>
@@ -1917,12 +1929,12 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261128092525">
-<script src="config.js?v=20261128092525"></script>
-<script src="i18n.js?v=20261128092525"></script>
-<script src="motion.js?v=20261128092525"></script>
-<script src="fx.js?v=20261128092525"></script>
-<script src="cinema.js?v=20261128092525"></script>
-<script src="app.js?v=20261128092525"></script>
+<meta name="app-v" content="20261128101444">
+<script src="config.js?v=20261128101444"></script>
+<script src="i18n.js?v=20261128101444"></script>
+<script src="motion.js?v=20261128101444"></script>
+<script src="fx.js?v=20261128101444"></script>
+<script src="cinema.js?v=20261128101444"></script>
+<script src="app.js?v=20261128101444"></script>
 </body>
 </html>
