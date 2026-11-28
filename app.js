@@ -2728,7 +2728,8 @@ function showMedal(){
 }
 function renderMedals(){
   const box=$("medalGrid"); if(!box) return; box.innerHTML=""; const have=new Set(loaded?medalsNow():[]);
-  for(const m of MEDALS){ const d=document.createElement("div"); d.className="mdl"+(have.has(m[0])?" on":""); d.title=m[3];
+  /* the ones you already have come first (in their usual order), then the locked ones */
+  for(const m of [...MEDALS.filter(x=>have.has(x[0])),...MEDALS.filter(x=>!have.has(x[0]))]){ const d=document.createElement("div"); d.className="mdl"+(have.has(m[0])?" on":""); d.title=m[3];
     const i=document.createElement("span"); i.className="mdl-i"; i.textContent=have.has(m[0])?m[1]:"🔒"; const t=document.createElement("b"); t.textContent=m[2]; const s=document.createElement("small"); s.textContent=m[3];
     d.append(i,t,s); box.appendChild(d); }
   $("medalCount").textContent=have.size+TX(" מתוך ")+MEDALS.length;

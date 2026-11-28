@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap">
-<script src="theme.js?v=20261126052500"></script>
+<script src="theme.js?v=20261128040331"></script>
 <style>
 /* Layout: one playful column. Gradient balance card, add-expense right under it, money-changer converter, then the day-by-day ledger. Sheets slide up from the bottom. */
 :root{
@@ -169,7 +169,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{margin:0}
 .quick{display:flex;flex-wrap:wrap;gap:6px}
 
 /* categories */
-.cats{display:flex;flex-direction:column;gap:9px}
+.cats{display:grid;grid-template-columns:7em 1fr auto;column-gap:10px;row-gap:9px}
+.cats>*{grid-column:1/-1}
+/* every row shares the same three columns, so the bars all start and end at the same place even when the amounts differ in width */
+.cats>.cat{grid-template-columns:subgrid}
 .cat{display:grid;grid-template-columns:7em 1fr auto;gap:10px;align-items:center;font-size:.93rem}
 .bar{height:12px;background:var(--surface-2);border-radius:8px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--grad);border-radius:8px}
@@ -658,7 +661,8 @@ html[data-tone="cream"]{--bg:var(--t-cream)} html[data-tone="sky"]{--bg:var(--t-
 @media (max-width:380px){ .hero-txt{padding-inline-end:110px} .tstack{width:108px;left:4px} }
 @media (max-width:440px){
   .grid{grid-template-columns:1fr}
-  .cat{grid-template-columns:6em 1fr auto}
+  .cat,.cats{grid-template-columns:6em 1fr auto}
+  .cats>.cat{grid-template-columns:subgrid}
   .ticket .verdict{font-size:1.35rem}
   h1{font-size:1.55rem}
 }
@@ -762,6 +766,9 @@ html[dir=ltr] body{direction:ltr}html[dir=ltr] .rc-pbars{direction:ltr}html[dir=
 .tabbar .tab-add:active{transform:scale(.94)}
 body.has-tabs{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
 body.has-tabs .fabs{bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+/* with the tab bar, "back to top" sits in the middle above the + : on the side it covered the amounts of the list */
+body.has-tabs .fabs{left:50%;transform:translateX(-50%)}
+body.has-tabs .fab.up{margin-inline:0}
 body.has-tabs #statsBtn,body.has-tabs #viewBtn{display:none}
 body.has-tabs #toprow{grid-template-columns:1fr}
 #foot{display:none!important}
@@ -906,8 +913,8 @@ small .pd{font-family:var(--display);font-weight:700;color:var(--ink);font-size:
 .sf-budget .go{color:var(--muted)}
 
 /* bigger touch areas for small controls, same look */
-.bd-toggle,#catMore,.card-head .link,.quick .link,.bud-head .link{position:relative}
-.bd-toggle::after,#catMore::after,.card-head .link::after,.quick .link::after,.bud-head .link::after{content:"";position:absolute;inset:-8px -3px}
+.bd-toggle,#catMore,.card-head .link,.quick .link,.bud-head .link,.hero-visa{position:relative}
+.bd-toggle::after,#catMore::after,.card-head .link::after,.quick .link::after,.bud-head .link::after,.hero-visa::after{content:"";position:absolute;inset:-8px -3px}
 .sf-top{padding-block:6px;margin-block:-6px}
 
 /* simpler account sheet: long sections fold */
@@ -1887,12 +1894,12 @@ body.globe-open #tabbar,body.globe-open #fabs{visibility:hidden}
 
 <script src="vendor/firebase-app-compat-10.12.2.js"></script>
 <script src="vendor/firebase-firestore-compat-10.12.2.js"></script>
-<meta name="app-v" content="20261126052500">
-<script src="config.js?v=20261126052500"></script>
-<script src="i18n.js?v=20261126052500"></script>
-<script src="motion.js?v=20261126052500"></script>
-<script src="fx.js?v=20261126052500"></script>
-<script src="cinema.js?v=20261126052500"></script>
-<script src="app.js?v=20261126052500"></script>
+<meta name="app-v" content="20261128040331">
+<script src="config.js?v=20261128040331"></script>
+<script src="i18n.js?v=20261128040331"></script>
+<script src="motion.js?v=20261128040331"></script>
+<script src="fx.js?v=20261128040331"></script>
+<script src="cinema.js?v=20261128040331"></script>
+<script src="app.js?v=20261128040331"></script>
 </body>
 </html>

@@ -94,17 +94,21 @@
     const on=row.querySelectorAll('button[aria-pressed="true"]'); let ind=row.querySelector(":scope > .seg-ind");
     if(on.length!==1||row.offsetParent===null){ row.classList.remove("glide"); if(ind) ind.remove(); return; }
     row.classList.add("glide"); if(!ind){ ind=document.createElement("i"); ind.className="seg-ind"; ind.setAttribute("aria-hidden","true"); row.prepend(ind); }
-    const R=row.getBoundingClientRect(), b=on[0].getBoundingClientRect(), to={left:b.left-R.left,top:b.top-R.top,width:b.width,height:b.height};
+    const to=rectOf(row,on[0]);
     const same=ind.dataset.to===JSON.stringify(to); if(same&&ind.getAnimations().length) return;   /* already gliding there */
     ind.dataset.to=JSON.stringify(to);
-    const cur=ind.getAnimations().length&&ind.style.width ? (()=>{ const r=ind.getBoundingClientRect(); return {left:r.left-R.left,top:r.top-R.top,width:r.width,height:r.height}; })() : null;
+    const cur=ind.getAnimations().length&&ind.style.width ? (()=>{ return rectOf(row,ind); })() : null;
     if(cur) prevRect=cur; ind.getAnimations().forEach(a=>a.cancel());
     Object.assign(ind.style,{left:to.left+"px",top:to.top+"px",width:to.width+"px",height:to.height+"px"});
     if(prevRect&&!calm()&&(Math.abs(prevRect.left-to.left)>.5||Math.abs(prevRect.top-to.top)>.5))
       animate(ind,[{left:prevRect.left+"px",top:prevRect.top+"px",width:prevRect.width+"px",height:prevRect.height+"px"},{left:to.left+"px",top:to.top+"px",width:to.width+"px",height:to.height+"px"}],{spring:"snappy"});
   }
+  /* where the chosen button sits inside its row, in the row's own (unscaled) pixels: measured while a sheet is still
+     sliding/zooming in, the screen rect is scaled, and the pill used to land a few pixels off the button */
+  function rectOf(row,b){ const R=row.getBoundingClientRect(), B=b.getBoundingClientRect(); const kx=row.offsetWidth?R.width/row.offsetWidth:1, ky=row.offsetHeight?R.height/row.offsetHeight:1;
+    const sx=kx>0.01?kx:1, sy=ky>0.01?ky:1; return {left:(B.left-R.left)/sx,top:(B.top-R.top)/sy,width:B.width/sx,height:B.height/sy}; }
   function rectIn(row){ const on=row.querySelectorAll('button[aria-pressed="true"]'); if(on.length!==1||row.offsetParent===null) return null;
-    const R=row.getBoundingClientRect(), b=on[0].getBoundingClientRect(); return {left:b.left-R.left,top:b.top-R.top,width:b.width,height:b.height}; }
+    return rectOf(row,on[0]); }
 
   window.Motion={SPRINGS,spring,curve,count,animate,enter,flip,pop,glide,rectIn,calm};
 })();
